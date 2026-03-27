@@ -1,0 +1,25 @@
+# IDE files
+.venv*
+.env*
+
+# Build artifacts
+__pycache__
+build
+*.egg-info
+dist
+version.py
+.webassets-cache
+
+# Node
+node_modules
+package*
+
+# Test artifacts
+.test
+.coverage
+coverage.json
+test_log.json
+result.json
+
+# Secrets
+*.secret
