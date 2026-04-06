@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import ipaddress
+import json
 import re
 import textwrap
 from decimal import Decimal
@@ -112,6 +113,7 @@ HTTP_CODE_OK = 200
 HTTP_CODE_REDIRECT = 302
 HTTP_CODE_BAD_REQUEST = 400
 HTTP_CODE_FORBIDDEN = 403
+HTTP_CODE_INTERNAL_ERROR = 500
 
 RE_JINJA = re.compile(r"(\{[{%#]).+?([#%}]\})")
 RE_ICON_VAR = re.compile(r'set icon = "([\w\-]+)"')
@@ -440,8 +442,8 @@ def ctx_to_json(d: dict[str, object], precision: int = 2) -> str:
         msg = f"Unknown type {type(obj)}"
         raise TypeError(msg)
 
-    return flask.current_app.json.dumps(
-        d,
+    return json.dumps(
+        utils.json_mutate(d, skip_decimal=True),
         default=default,
         separators=(",", ":"),
     ).replace("'", "\\'")

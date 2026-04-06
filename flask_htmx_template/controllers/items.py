@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, TypedDict
 import flask
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, web
+from flask_htmx_template import sql, utils, web
 from flask_htmx_template.controllers import base
 from flask_htmx_template.models.item import Item
 
@@ -36,7 +36,7 @@ class AllItemsContext(TypedDict):
 
 
 def page_all() -> flask.Response:
-    """GET /items.
+    """GET all items page.
 
     Returns:
         string HTML response
@@ -51,7 +51,7 @@ def page_all() -> flask.Response:
 
 
 def page(uri: str) -> flask.Response:
-    """GET /items/<uri>.
+    """GET item page.
 
     Args:
         uri: Item URI
@@ -72,7 +72,7 @@ def page(uri: str) -> flask.Response:
 
 
 def new() -> str | flask.Response:
-    """GET & POST /h/items/new.
+    """GET & POST new item dialog.
 
     Returns:
         HTML response
@@ -113,7 +113,7 @@ def new() -> str | flask.Response:
 
 
 def item(uri: str) -> str | werkzeug.Response:
-    """GET, PUT, DELETE /h/items/a/<uri>.
+    """GET, PUT, DELETE item edit dialog.
 
     Args:
         uri: Item URI
@@ -154,7 +154,7 @@ def item(uri: str) -> str | werkzeug.Response:
 
 
 def validation() -> str:
-    """GET /h/items/validation.
+    """GET validation for items UI.
 
     Returns:
         string HTML response
@@ -192,6 +192,85 @@ def validation() -> str:
             )
 
     raise NotImplementedError
+
+
+def json_all() -> AllItemsContext | base.JSONResponse:
+    """GET all items via JSON.
+
+    Returns:
+        JSON response
+
+    """
+    with web.db.begin_session():
+        return ctx_items()
+
+
+def json_new() -> ItemContext | base.JSONResponse:
+    """POST new item via JSON.
+
+    Returns:
+        JSON response
+
+    """
+    today = datetime.datetime.now(datetime.UTC).date()
+    with web.db.begin_session() as s:
+        today = datetime.datetime.now(datetime.UTC).date()
+        j: ItemContext = flask.request.json
+        j["uri"] = ""
+        j["date"] = today
+        j, e = utils.validate_json(j, ItemContext)
+        if e:
+            return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
+
+        try:
+            with s.begin_nested():
+                item = Item.create(
+                    name=j["name"].strip(),
+                    date_ord=today.toordinal(),
+                    value=j["value"],
+                    note=j["note"],
+                )
+        except (exc.IntegrityError, exc.InvalidORMValueError) as e:
+            return {"errors": [str(e)]}, base.HTTP_CODE_BAD_REQUEST
+
+        return ctx_item(item)
+
+
+def json(uri: str) -> ItemContext | base.JSONResponse:
+    """GET & PUT settings via JSON.
+
+    Args:
+        uri: Item URI
+
+    Returns:
+        JSON response
+
+    """
+    with web.db.begin_session() as s:
+        try:
+            item = base.find(Item, uri)
+        except exc.http.HTTPException as e:
+            return {"errors": [str(e)]}, e.code or base.HTTP_CODE_INTERNAL_ERROR
+
+        if flask.request.method == "PUT":
+            today = datetime.datetime.now(datetime.UTC).date()
+            j: ItemContext = flask.request.json
+            j["uri"] = uri
+            j["date"] = today
+            j, e = utils.validate_json(j, ItemContext)
+            if e:
+                return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
+
+            try:
+                with s.begin_nested():
+                    item.name = j["name"]
+                    item.date_ord = today.toordinal()
+                    item.value = j["value"]
+                    item.note = j["note"]
+            except (exc.IntegrityError, exc.InvalidORMValueError) as e:
+                return {"errors": [str(e)]}, base.HTTP_CODE_BAD_REQUEST
+
+        return ctx_item(item)
 
 
 def ctx_item(
@@ -243,4 +322,7 @@ ROUTES: base.Routes = {
     "/h/items/new": (new, ["GET", "POST"]),
     "/h/items/i/<path:uri>": (item, ["GET", "PUT", "DELETE"]),
     "/h/items/validation": (validation, ["GET"]),
+    "/j/items": (json_all, ["GET"]),
+    "/j/items/new": (json_new, ["POST"]),
+    "/j/items/i/<path:uri>": (json, ["GET", "PUT"]),
 }

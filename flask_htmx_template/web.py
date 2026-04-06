@@ -8,7 +8,6 @@ import json
 import logging
 import os
 from decimal import Decimal
-from enum import IntEnum
 from pathlib import Path
 from typing import override, TYPE_CHECKING
 
@@ -34,24 +33,13 @@ from flask_htmx_template.version import __version__
 if TYPE_CHECKING:
     import jinja2
 
-_logger = logging.getLogger(__name__)
-
 
 class JSONEncoder(flask.json.provider.JSONProvider):
     """Custom JSON encoder."""
 
     @override
     def dumps(self, obj: object, **kwargs: object) -> str:
-        def mutate(o: object) -> object:
-            if isinstance(o, dict):
-                return {k: mutate(v) for k, v in o.items()}  # type: ignore[attr-defined]
-            if isinstance(o, list | tuple):
-                return [mutate(v) for v in o]  # type: ignore[attr-defined]
-            if isinstance(o, IntEnum):
-                return o.name.lower()
-            return o
-
-        return json.dumps(mutate(obj), **kwargs)  # type: ignore[attr-defined]
+        return json.dumps(utils.json_mutate(obj), **kwargs)  # type: ignore[attr-defined]
 
     @override
     def loads(self, s: str | bytes, **kwargs: object) -> object:

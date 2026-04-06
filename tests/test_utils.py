@@ -4,16 +4,24 @@ import ast
 import datetime
 import textwrap
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from types import NoneType
+from typing import TYPE_CHECKING, TypedDict
 
 import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
+from flask_htmx_template.models.base import BaseEnum
 from tests import conftest
 
 if TYPE_CHECKING:
     from tests.conftest import RandomStringGenerator
+
+
+class Derived(BaseEnum):
+    RED = 1
+    BLUE = 2
+    SEAFOAM_GREEN = 3
 
 
 @pytest.mark.parametrize(
@@ -729,3 +737,165 @@ def test_set_sub_keys() -> None:
     }
     target = {"a", "b", 3}
     assert utils.set_sub_keys(d) == target
+
+
+class Top(TypedDict):
+    bool: bool
+    list: list[bool]
+    none: None
+    object: Top | None
+
+
+@pytest.mark.parametrize(
+    ("obj", "type_", "target"),
+    [
+        (True, NoneType, ["json should be null, not a boolean"]),
+        ([], NoneType, ["json should be null, not an array"]),
+        ({}, NoneType, ["json should be null, not an object"]),
+        (
+            {},
+            Top,
+            [
+                "json.bool is missing",
+                "json.list is missing",
+                "json.none is missing",
+                "json.object is missing",
+            ],
+        ),
+        (None, NoneType, []),
+        (None, bool, ["json should be a boolean, not null"]),
+        (True, bool, []),
+        (None, int, ["json should be an integer, not null"]),
+        (0.0, int, ["json should be an integer, not a number"]),
+        (0, int, []),
+        (None, float, ["json should be a number, not null"]),
+        (0, float, []),
+        (0.0, float, []),
+        (None, list, ["json should be an array, not null"]),
+        # Generic typing won't check contents
+        ([None], list, []),
+        ([None], list[bool], ["json[0] should be a boolean, not null"]),
+        (None, list[bool] | None, []),
+        ([True], list[bool] | None, []),
+        ([None], list[bool] | None, ["json[0] should be a boolean, not null"]),
+        (
+            [0, None, True],
+            list[bool | int],
+            ["json[1] should be a boolean or an integer, not null"],
+        ),
+        (None, dict, ["json should be an object, not null"]),
+        # Generic typing won't check contents
+        ({"k": None}, dict, []),
+        ({None: None}, dict, ["json object keys should be strings"]),
+        ({"k": None}, dict[str, bool], ["json.k should be a boolean, not null"]),
+        ({"k": None}, dict[str, bool] | None, ["json.k should be a boolean, not null"]),
+        ({"k": None}, dict[str, bool | None] | None, []),
+        (
+            {"k": None},
+            dict[str, bool | int],
+            ["json.k should be a boolean or an integer, not null"],
+        ),
+        (None, str, ["json should be a string, not null"]),
+        ("", str, []),
+        (None, int | float, ["json should be an integer or a number, not null"]),
+        (None, int | float | None, []),
+        (
+            {},
+            int | float | None,
+            ["json should be an integer or a number or null, not an object"],
+        ),
+    ],
+    ids=conftest.id_func,
+)
+def test_validate_json(obj: object, type_: type, target: list[str]) -> None:
+    obj_upgraded, errors = utils.validate_json(obj, type_)
+    assert errors == target
+    if not target:
+        assert obj_upgraded == obj
+
+
+@pytest.mark.parametrize(
+    ("obj", "type_", "target"),
+    [
+        (datetime.date(2026, 4, 6), datetime.date, []),
+        (datetime.date(2026, 4, 6), datetime.date | None, []),
+        (
+            0,
+            datetime.date | None,
+            ["json should be an ISO 8601 date string or null, not an integer"],
+        ),
+        (
+            "4/6/2026",
+            datetime.date,
+            ["json should be an ISO 8601 date string, not a string"],
+        ),
+        (
+            datetime.datetime(2026, 4, 6, 15, 47, 1, tzinfo=datetime.UTC),
+            datetime.datetime,
+            [],
+        ),
+        (
+            datetime.datetime(2026, 4, 6, 15, 47, 1),  # noqa: DTZ001
+            datetime.datetime,
+            ["json should be an ISO 8601 date time string with TZ, not a string"],
+        ),
+        (Derived.SEAFOAM_GREEN, Derived, []),
+        (
+            "1",
+            Derived,
+            ['json should be "red" or "blue" or "seafoam_green", not a string'],
+        ),
+        (
+            1,
+            Derived,
+            ['json should be "red" or "blue" or "seafoam_green", not an integer'],
+        ),
+        (Decimal(), Decimal, []),
+        (Decimal("1234.5"), Decimal, []),
+        ("abc", Decimal, ["json should be a number, not a string"]),
+    ],
+    ids=conftest.id_func,
+)
+def test_validate_json_upgrade(obj: object, type_: type, target: list[str]) -> None:
+    obj_upgraded, errors = utils.validate_json(utils.json_mutate(obj), type_)
+    assert errors == target
+    if not target:
+        assert obj_upgraded == obj
+
+
+def test_validate_json_nested() -> None:
+    j: dict[str, object] = {
+        "bool": False,
+        "none": None,
+        "list": [],
+        "object": {
+            "bool": False,
+            "none": None,
+            "list": [True, False],
+            "object": None,
+        },
+    }
+    assert not utils.validate_json(j, Top)[1]
+
+
+def test_validate_json_nested_error() -> None:
+    j: dict[str, object] = {
+        "list": [None],
+        "none": True,
+        "object": {
+            "bool": None,
+            "list": [True, {}],
+            "object": [True, False],
+        },
+        "fake": None,
+    }
+    assert utils.validate_json(j, Top)[1] == [
+        "json.bool is missing",
+        "json.list[0] should be a boolean, not null",
+        "json.none should be null, not a boolean",
+        "json.object.bool should be a boolean, not null",
+        "json.object.list[1] should be a boolean, not an object",
+        "json.object.none is missing",
+        "json.object.object should be an object or null, not an array",
+        "json.fake is not recognized",
+    ]

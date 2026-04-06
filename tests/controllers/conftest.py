@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import NamedTuple, TYPE_CHECKING
+from typing import NamedTuple, overload, TYPE_CHECKING
 
 import flask
 import flask.sessions
@@ -21,6 +22,9 @@ if TYPE_CHECKING:
     import werkzeug.datastructures
 
     from flask_htmx_template.database import Database
+
+JSONValue = str | float | int | bool | list["JSONValue"] | dict[str, "JSONValue"] | None
+JSON = dict[str, JSONValue]
 
 
 class TreeNode(NamedTuple):
@@ -75,29 +79,30 @@ class TreeNode(NamedTuple):
         assert inner_html == target
         return True
 
+    def _has_valid_hx_attributes_dialog(self) -> bool:
+        dialog = 'hx-push-url="#dialog"'
+        explicit_false = 'hx-push-url="false"'
+        assert dialog in self.attributes or explicit_false in self.attributes
+        top = 'hx-swap="innerHTML show:#dialog:top"'
+        btm = 'hx-swap="innerHTML show:#dialog:bottom"'
+        assert top in self.attributes or btm in self.attributes
+        return True
+
+    def _has_valid_hx_attributes_main(self) -> bool:
+        if "hx-trigger" in self.attributes and "click consume" not in self.attributes:
+            # triggered updates don't move the page or push history
+            assert "hx-push-url" not in self.attributes
+            assert "hx-swap" not in self.attributes
+        else:
+            assert 'hx-push-url="true"' in self.attributes
+            assert 'hx-swap="innerHTML show:window:top"' in self.attributes
+        return True
+
     def has_valid_hx_attributes(self) -> bool:
         if 'hx-target="#dialog"' in self.attributes:
-            dialog = 'hx-push-url="#dialog"'
-            explicit_false = 'hx-push-url="false"'
-            assert dialog in self.attributes or explicit_false in self.attributes
-            top = 'hx-swap="innerHTML show:#dialog:top"'
-            btm = 'hx-swap="innerHTML show:#dialog:bottom"'
-            assert top in self.attributes or btm in self.attributes
-            return True
-
+            return self._has_valid_hx_attributes_dialog()
         if 'hx-target="#main"' in self.attributes:
-            if (
-                "hx-trigger" in self.attributes
-                and "click consume" not in self.attributes
-            ):
-                # triggered updates don't move the page or push history
-                assert "hx-push-url" not in self.attributes
-                assert "hx-swap" not in self.attributes
-            else:
-                assert 'hx-push-url="true"' in self.attributes
-                assert 'hx-swap="innerHTML show:window:top"' in self.attributes
-            return True
-
+            return self._has_valid_hx_attributes_main()
         if not re.search(r"hx-(get|put|post|delete)", self.attributes):
             return True
 
@@ -109,26 +114,26 @@ class TreeNode(NamedTuple):
             'hx-disabled-elt="this"' in self.attributes
             or 'hx-disabled-elt="find' in self.attributes
         )
+        if 'hx-target="next error"' in self.attributes:
+            # validation request, no disable needed
+            assert not has_disabled_elt
+            return True
+
+        m = re.search(r'hx-trigger="([^"]+)"', self.attributes)
+        triggers = [x.strip() for x in m.group(1).split(",")] if m else ["default"]
+        if all(x.startswith(("load", "every")) for x in triggers):
+            if has_disabled_elt:
+                pytest.fail(f"has hx-disabled-elt: <{self.tag} {self.attributes}>")
+            return True
+
+        if not has_disabled_elt:
+            pytest.fail(f"bad hx-disabled-elt: <{self.tag} {self.attributes}>")
 
         if 'type="date"' in self.attributes:
-            if 'hx-target="next error"' in self.attributes:
-                # validation request, no disable needed
-                assert not has_disabled_elt
-                return True
-
-            if not has_disabled_elt:
-                pytest.fail(f"bad hx-disabled-elt: <{self.tag} {self.attributes}>")
-
             # Better trigger than default
             assert 'hx-trigger="blur changed"' in self.attributes
 
             return True
-
-        is_triggered = (
-            "hx-trigger" in self.attributes and "confirm" not in self.attributes
-        )
-        if is_triggered == has_disabled_elt:
-            pytest.fail(f"bad hx-disabled-elt: <{self.tag} {self.attributes}>")
 
         return True
 
@@ -181,6 +186,7 @@ class TreeNode(NamedTuple):
             # Data
             "content",
             "src",
+            "alt",
             # HTMX Methods
             "hx-get",
             "hx-post",
@@ -294,7 +300,7 @@ class HTMLValidator:
             assert node.has_valid_hx_attributes()
             assert node.has_preferred_attribute_order()
 
-            if node.tag not in {"link", "meta", "path", "input", "hr", "rect"}:
+            if node.tag not in {"link", "meta", "path", "input", "hr", "rect", "img"}:
                 # Tags without close tags
                 current_node = node
 
@@ -399,9 +405,9 @@ class WebClient:
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
+        content_type: str | None = None,
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
+    ) -> tuple[str | bytes, werkzeug.datastructures.Headers]:
         """Run a test HTTP request.
 
         Args:
@@ -412,7 +418,7 @@ class WebClient:
             kwargs: Passed to client.get
 
         Returns:
-            (response.text, headers)
+            (response.text | response.data, headers)
 
         """
         if isinstance(endpoint, str):
@@ -420,6 +426,7 @@ class WebClient:
         else:
             endpoint, url_args = endpoint
         url = self.url_for(endpoint, **url_args)
+        content_type = content_type or "text/html; charset=utf-8"
 
         kwargs["method"] = method
         kwargs["headers"] = kwargs.get("headers", {"HX-Request": "true"})
@@ -431,7 +438,7 @@ class WebClient:
                 follow_redirects=False,
                 **kwargs,
             )
-            assert response.status_code == rc
+            assert response.status_code == rc, response.data
             assert response.content_type == content_type
 
             if content_type == "text/html; charset=utf-8":
@@ -440,19 +447,39 @@ class WebClient:
                     # werkzeug redirect doesn't have close tags
                     assert self.valid_html(html)
                 return html, response.headers
-            return response.data, response.headers
+            d = response.data
+            assert isinstance(d, bytes)
+            return d, response.headers
         finally:
             if response is not None:
                 response.close()
 
+    @overload
+    def GET(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int,
+        content_type: str,
+        **kwargs: object,
+    ) -> tuple[bytes, werkzeug.datastructures.Headers]: ...
+    @overload
     def GET(
         self,
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
+        content_type: None = None,
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
+    ) -> tuple[str, werkzeug.datastructures.Headers]: ...
+    def GET(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        content_type: str | None = None,
+        **kwargs: object,
+    ) -> tuple[str | bytes, werkzeug.datastructures.Headers]:
         """GET an HTTP response.
 
         Args:
@@ -467,15 +494,14 @@ class WebClient:
         """
         return self.open_("GET", endpoint, rc=rc, content_type=content_type, **kwargs)
 
-    def PATCH(
+    def GET_J(
         self,
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
-        """PATCH an HTTP response.
+    ) -> tuple[JSON, werkzeug.datastructures.Headers]:
+        """GET a JSON response.
 
         Args:
             endpoint: Route endpoint to test or (endpoint, url_for kwargs)
@@ -484,19 +510,44 @@ class WebClient:
             kwargs: Passed to client.get
 
         Returns:
-            (response.text, headers)
+            (response.json, headers)
 
         """
-        return self.open_("PATCH", endpoint, rc=rc, content_type=content_type, **kwargs)
+        s, headers = self.open_(
+            "GET",
+            endpoint,
+            rc=rc,
+            content_type="application/json",
+            **kwargs,
+        )
+        return json.loads(s), headers
 
+    @overload
+    def PUT(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int,
+        content_type: str,
+        **kwargs: object,
+    ) -> tuple[bytes, werkzeug.datastructures.Headers]: ...
+    @overload
     def PUT(
         self,
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
+        content_type: None = None,
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
+    ) -> tuple[str, werkzeug.datastructures.Headers]: ...
+    def PUT(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        content_type: str | None = None,
+        **kwargs: object,
+    ) -> tuple[str | bytes, werkzeug.datastructures.Headers]:
         """PUT an HTTP response.
 
         Args:
@@ -511,14 +562,60 @@ class WebClient:
         """
         return self.open_("PUT", endpoint, rc=rc, content_type=content_type, **kwargs)
 
+    def PUT_J(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        **kwargs: object,
+    ) -> tuple[JSON, werkzeug.datastructures.Headers]:
+        """PUT a JSON response.
+
+        Args:
+            endpoint: Route endpoint to test or (endpoint, url_for kwargs)
+            rc: Expected HTTP return code
+            content_type: Content type to check for
+            kwargs: Passed to client.get
+
+        Returns:
+            (response.json, headers)
+
+        """
+        s, headers = self.open_(
+            "PUT",
+            endpoint,
+            rc=rc,
+            content_type="application/json",
+            **kwargs,
+        )
+        return json.loads(s), headers
+
+    @overload
+    def POST(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int,
+        content_type: str,
+        **kwargs: object,
+    ) -> tuple[bytes, werkzeug.datastructures.Headers]: ...
+    @overload
     def POST(
         self,
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
+        content_type: None = None,
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
+    ) -> tuple[str, werkzeug.datastructures.Headers]: ...
+    def POST(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        content_type: str | None = None,
+        **kwargs: object,
+    ) -> tuple[str | bytes, werkzeug.datastructures.Headers]:
         """POST an HTTP response.
 
         Args:
@@ -533,14 +630,60 @@ class WebClient:
         """
         return self.open_("POST", endpoint, rc=rc, content_type=content_type, **kwargs)
 
+    def POST_J(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        **kwargs: object,
+    ) -> tuple[JSON, werkzeug.datastructures.Headers]:
+        """POST a JSON response.
+
+        Args:
+            endpoint: Route endpoint to test or (endpoint, url_for kwargs)
+            rc: Expected HTTP return code
+            content_type: Content type to check for
+            kwargs: Passed to client.get
+
+        Returns:
+            (response.json, headers)
+
+        """
+        s, headers = self.open_(
+            "POST",
+            endpoint,
+            rc=rc,
+            content_type="application/json",
+            **kwargs,
+        )
+        return json.loads(s), headers
+
+    @overload
+    def DELETE(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int,
+        content_type: str,
+        **kwargs: object,
+    ) -> tuple[bytes, werkzeug.datastructures.Headers]: ...
+    @overload
     def DELETE(
         self,
         endpoint: str | tuple[str, Queries],
         *,
         rc: int = HTTP_CODE_OK,
-        content_type: str = "text/html; charset=utf-8",
+        content_type: None = None,
         **kwargs: object,
-    ) -> tuple[str, werkzeug.datastructures.Headers]:
+    ) -> tuple[str, werkzeug.datastructures.Headers]: ...
+    def DELETE(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        content_type: str | None = None,
+        **kwargs: object,
+    ) -> tuple[str | bytes, werkzeug.datastructures.Headers]:
         """DELETE an HTTP response.
 
         Args:
@@ -560,6 +703,34 @@ class WebClient:
             content_type=content_type,
             **kwargs,
         )
+
+    def DELETE_J(
+        self,
+        endpoint: str | tuple[str, Queries],
+        *,
+        rc: int = HTTP_CODE_OK,
+        **kwargs: object,
+    ) -> tuple[JSON, werkzeug.datastructures.Headers]:
+        """DELETE a JSON response.
+
+        Args:
+            endpoint: Route endpoint to test or (endpoint, url_for kwargs)
+            rc: Expected HTTP return code
+            content_type: Content type to check for
+            kwargs: Passed to client.get
+
+        Returns:
+            (response.json, headers)
+
+        """
+        s, headers = self.open_(
+            "DELETE",
+            endpoint,
+            rc=rc,
+            content_type="application/json",
+            **kwargs,
+        )
+        return json.loads(s), headers
 
 
 @pytest.fixture
