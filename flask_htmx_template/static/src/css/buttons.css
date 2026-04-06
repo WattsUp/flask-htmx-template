@@ -1,0 +1,381 @@
+@theme {
+  --btn-px: calc(var(--spacing) * 4);
+  --btn-py: calc(var(--spacing) * 0.5);
+  --btn-focus-indicator-color: var(--color-secondary);
+
+  --radioset-p: calc(var(--spacing) * 1);
+}
+
+@utility btn {
+  @apply flex items-center gap-1 border whitespace-nowrap transition;
+  @apply cursor-default;
+
+  /* big radius to get pill shape */
+  border-radius: 100em;
+
+  padding-inline: var(--btn-px);
+  padding-block: var(--btn-py);
+
+  border-color: var(--btn-border-color);
+  background-color: var(--btn-bg-color);
+
+  color: var(--btn-text-color);
+
+  transition-property: color, background-color, box-shadow;
+
+  @variant disabled {
+    @apply cursor-auto text-on-surface/38;
+
+    & * {
+      @apply text-on-surface/38;
+    }
+  }
+
+  @variant focus-visible {
+    @apply outline-3;
+    outline-color: var(--btn-focus-indicator-color);
+  }
+}
+
+@utility btn-icon-filled {
+  & icon {
+    font-variation-settings: "FILL" 1;
+  }
+}
+
+@utility btn-stacked {
+  @apply mb-6;
+
+  & > div {
+    @apply absolute -bottom-6 left-1/2 -translate-x-1/2;
+    @apply text-center text-sm;
+  }
+}
+
+@utility btn-filled {
+  @apply btn;
+
+  --btn-base-color: var(--color-primary);
+  --btn-text-color: var(--color-on-primary);
+  --btn-state-color: var(--color-on-primary);
+
+  --btn-bg-color: var(--btn-base-color);
+  --btn-border-color: transparent;
+
+  @variant not-disabled {
+    @variant hover {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 92%,
+        var(--btn-state-color)
+      );
+      @apply shadow-md btn-icon-filled;
+    }
+
+    @variant [:active, :focus-visible] {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 90%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+  }
+
+  @variant disabled {
+    @apply bg-on-surface/12;
+  }
+}
+
+@utility btn-tonal {
+  @apply btn;
+
+  --btn-base-color: var(--color-secondary-container);
+  --btn-text-color: var(--color-on-secondary-container);
+  --btn-state-color: var(--color-on-secondary-container);
+
+  --btn-bg-color: var(--btn-base-color);
+  --btn-border-color: transparent;
+
+  @variant not-disabled {
+    @variant hover {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 92%,
+        var(--btn-state-color)
+      );
+      @apply shadow-md btn-icon-filled;
+    }
+
+    @variant [:active, :focus-visible] {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 90%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+  }
+
+  @variant disabled {
+    @apply bg-on-surface/12;
+  }
+}
+
+@utility btn-outlined {
+  @apply btn;
+
+  --btn-base-color: var(--color-primary);
+  --btn-text-color: var(--color-primary);
+  --btn-state-color: transparent;
+
+  --btn-bg-color: transparent;
+  --btn-border-color: var(--color-outline);
+
+  @variant not-disabled {
+    @variant hover {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 8%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+
+    @variant [:active, :focus-visible] {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 10%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+  }
+
+  @variant disabled {
+    @apply border-on-surface/12;
+  }
+}
+
+@utility btn-text {
+  @apply btn;
+
+  --btn-base-color: var(--color-primary);
+  --btn-text-color: var(--color-primary);
+  --btn-state-color: transparent;
+
+  --btn-bg-color: transparent;
+  --btn-border-color: transparent;
+
+  @variant not-disabled {
+    @variant hover {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 8%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+
+    @variant [:active, :focus-visible] {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 10%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+  }
+}
+
+@utility btn-tight {
+  --btn-px: calc(var(--spacing) * 2);
+  --btn-py: 0;
+}
+
+@utility btn-size-lg {
+  @apply text-2xl;
+
+  --btn-px: calc(var(--spacing) * 5);
+  --btn-py: calc(var(--spacing) * 1);
+
+  & icon {
+    font-size: 28px;
+  }
+}
+
+@utility btn-size-xl {
+  @apply text-3xl;
+
+  --btn-px: calc(var(--spacing) * 7);
+  --btn-py: calc(var(--spacing) * 1.5);
+
+  & icon {
+    font-size: 32px;
+  }
+}
+
+@utility btn-sq {
+  --btn-px: var(--btn-py);
+}
+
+/* Other colors */
+@utility btn-filled-error {
+  @apply btn-filled;
+  --btn-base-color: var(--color-error);
+  --btn-text-color: var(--color-on-error);
+}
+
+@utility btn-tonal-secondary {
+  @apply btn-filled;
+  --btn-base-color: var(--color-secondary-container);
+  --btn-text-color: var(--color-on-secondary-container);
+  --btn-state-color: var(--color-on-secondary-container);
+}
+
+@utility btn-tonal-tertiary {
+  @apply btn-filled;
+  --btn-base-color: var(--color-tertiary-container);
+  --btn-text-color: var(--color-on-tertiary-container);
+  --btn-state-color: var(--color-on-tertiary-container);
+}
+
+@utility btn-tonal-error {
+  @apply btn-filled;
+  --btn-base-color: var(--color-error-container);
+  --btn-text-color: var(--color-on-error-container);
+  --btn-state-color: var(--color-on-error-container);
+}
+
+@utility btn-text-on-tertiary {
+  @apply btn-text;
+  --btn-base-color: var(--color-on-tertiary);
+  --btn-text-color: var(--color-on-tertiary);
+}
+
+@utility btn-text-error {
+  @apply btn-text;
+  --btn-base-color: var(--color-error);
+  --btn-text-color: var(--color-error);
+}
+
+/* Floating action buttons (FAB) */
+
+@utility fab {
+  @apply btn p-4 shadow-lg;
+
+  border-radius: 1em;
+
+  --btn-base-color: var(--color-primary-container);
+  --btn-text-color: var(--color-on-primary-container);
+  --btn-state-color: var(--color-on-primary-container);
+
+  --btn-bg-color: var(--btn-base-color);
+  --btn-border-color: transparent;
+
+  @variant not-disabled {
+    @variant hover {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 92%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+
+    @variant [:active, :focus-visible] {
+      --btn-bg-color: color-mix(
+        in oklab,
+        var(--btn-base-color) 90%,
+        var(--btn-state-color)
+      );
+      @apply btn-icon-filled;
+    }
+  }
+
+  @variant disabled {
+    @apply bg-on-surface/12;
+  }
+}
+
+/* radioset is a set of radio buttons like a three way toggle */
+
+@utility radioset {
+  @apply flex gap-0.5 border-2;
+
+  --radioset-base-color: var(--color-primary);
+  --radioset-text-color: var(--color-primary);
+  --radioset-state-color: transparent;
+
+  padding: var(--radioset-p);
+  color: var(--radioset-text-color);
+
+  /* big radius to get pill shape */
+  border-radius: 100em;
+
+  & input {
+    @apply h-0 w-0 opacity-0;
+  }
+
+  & label {
+    @apply contents;
+  }
+
+  & icon {
+    @apply box-content transition-colors;
+
+    height: 24px;
+    padding: var(--radioset-p);
+    border-radius: 50%;
+  }
+
+  @variant not-disabled {
+    & > label {
+      @variant hover {
+        & icon {
+          background-color: color-mix(
+            in oklab,
+            var(--radioset-base-color) 16%,
+            var(--radioset-state-color)
+          );
+          font-variation-settings: "FILL" 1;
+        }
+      }
+
+      @variant active {
+        & icon {
+          background-color: color-mix(
+            in oklab,
+            var(--radioset-base-color) 20%,
+            var(--radioset-state-color)
+          );
+          font-variation-settings: "FILL" 1;
+        }
+      }
+    }
+
+    & input:checked + icon {
+      background-color: color-mix(
+        in oklab,
+        var(--radioset-base-color) 20%,
+        var(--radioset-state-color)
+      );
+    }
+
+    &:has(input:focus-visible) {
+      @apply outline-3 outline-secondary;
+    }
+  }
+
+  @variant disabled {
+    @apply cursor-auto text-on-surface/38;
+
+    & > label {
+      @apply cursor-auto;
+    }
+
+    & input:checked + icon {
+      @apply bg-on-surface/16;
+    }
+  }
+}

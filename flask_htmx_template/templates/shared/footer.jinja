@@ -1,0 +1,11 @@
+<footer id="nav-footer">
+  <p>Copyright © {{ current_year }} SEL</p>
+  <p>Version: {{ version }}</p>
+  {% include "shared/theme-selector.jinja" %}
+  {# Set radio buttons once buttons load #}
+  <script>
+    onLoad(() => {
+      updateTheme();
+    });
+  </script>
+</footer>

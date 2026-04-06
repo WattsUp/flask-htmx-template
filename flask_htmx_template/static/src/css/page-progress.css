@@ -1,0 +1,18 @@
+@layer components {
+  #page-progress {
+    @apply fixed top-10 left-0 z-40 h-1 w-full md:top-0;
+    @apply pointer-events-none;
+    @apply opacity-0 transition-opacity delay-150 duration-500;
+
+    & > div {
+      @apply h-full;
+      @apply rounded-r-lg;
+      @apply bg-secondary md:bg-primary;
+      @apply transition-[width];
+    }
+
+    @variant open {
+      @apply opacity-100 delay-0 duration-250;
+    }
+  }
+}

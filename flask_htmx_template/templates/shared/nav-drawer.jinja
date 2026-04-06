@@ -1,0 +1,64 @@
+<nav
+  id="nav-drawer"
+  hx-target="#main"
+  hx-swap="innerHTML show:window:top"
+  hx-push-url="true"
+  onclick="nav.closeDrawer(event)"
+>
+  <a
+    href="{{ url_for('common.page_dashboard') }}"
+    hx-get="{{ url_for('common.page_dashboard') }}"
+    hx-disabled-elt="this"
+  >
+    Template
+  </a>
+  <section class="w-min"></section>
+  {% for group_label, group in nav_items %}
+    {% if not loop.first %}<hr class="mx-2" />{% endif %}
+    <section>
+      {% if group_label %}
+        <h1 class="text-on-surface-variant italic">{{ group_label }}</h1>
+      {% endif %}
+      {% for label, (icon, endpoint, link) in group.items() %}
+        {% if link == "PAGE" %}
+          <a
+            href="{{ url_for(endpoint) }}"
+            hx-get="{{ url_for(endpoint) }}"
+            hx-disabled-elt="this"
+          >
+            <icon>{{ icon }}</icon>
+            <div>{{ label }}</div>
+          </a>
+        {% elif link == "DIALOG" %}
+          <button
+            hx-get="{{ url_for(endpoint) }}"
+            hx-trigger="click"
+            hx-disabled-elt="this"
+            hx-target="#dialog"
+            hx-swap="innerHTML show:#dialog:top"
+            hx-push-url="#dialog"
+          >
+            <icon>{{ icon }}</icon>
+            <div>{{ label }}</div>
+          </button>
+        {% elif link == "HX_POST" %}
+          <button
+            hx-post="{{ url_for(endpoint) }}"
+            hx-disabled-elt="this"
+            hx-push-url="false"
+          >
+            <icon>{{ icon }}</icon>
+            <div>{{ label }}</div>
+          </button>
+        {% endif %}
+      {% endfor %}
+    </section>
+  {% endfor %}
+  {% include "shared/theme-selector.jinja" %}
+  {# Set radio buttons once buttons load #}
+  <script>
+    onLoad(() => {
+      updateTheme();
+    });
+  </script>
+</nav>

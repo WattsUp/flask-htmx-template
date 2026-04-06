@@ -1,0 +1,5 @@
+<div {% if disabled %}disabled{% endif %}>
+  <input name="{{ name }}" type="hidden" value="{{ value }}" />
+  {{ value }}
+  <icon onclick="this.parentNode.remove()">clear</icon>
+</div>

@@ -1,0 +1,18 @@
+<a
+  class="relative btn-text block px-6 text-on-surface"
+  href="{{ url_for('items.page', uri=item.uri) }}"
+  hx-get="{{ url_for('items.page', uri=item.uri) }}"
+  hx-disabled-elt="this"
+  hx-target="#main"
+  hx-swap="innerHTML show:window:top"
+  hx-push-url="true"
+>
+  <div class="flex justify-between">
+    <b>{{ item.name }}</b>
+    <span>{{ item.value | comma }}</span>
+  </div>
+  <div class="flex justify-between text-sm text-on-surface-variant">
+    Subtitle
+  </div>
+  <icon class="absolute top-1/2 right-0 -translate-y-1/2">chevron_forward</icon>
+</a>

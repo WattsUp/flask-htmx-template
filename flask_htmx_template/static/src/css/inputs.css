@@ -1,0 +1,507 @@
+@layer base {
+  input,
+  textarea,
+  select {
+    --input-border-color: var(--color-outline);
+    @apply rounded-md px-2 py-1;
+    @apply border;
+
+    border-color: var(--input-border-color);
+  }
+
+  input[type="number"] {
+    appearance: textfield;
+  }
+
+  select {
+    appearance: menulist-button;
+  }
+}
+
+@utility input-outlined-translate {
+  & ~ div:first-of-type {
+    @apply translate-x-2 delay-75 before:scale-x-100 before:delay-0;
+
+    & > div {
+      @apply -translate-y-1/2 text-sm delay-0;
+    }
+  }
+}
+
+@utility input-outlined {
+  @apply relative mt-1 block;
+
+  --input-bg-color: var(--color-surface);
+  --input-label-color: var(--color-on-surface-variant);
+
+  --input-pl: calc(var(--spacing) * 2);
+  --input-pr: calc(var(--spacing) * 2);
+
+  &:has(> icon) {
+    --input-pl: calc(var(--spacing) * 8);
+  }
+
+  &:has(> icon:nth-of-type(2)) {
+    --input-pr: calc(var(--spacing) * 8);
+  }
+
+  & > icon {
+    @apply absolute top-2 border border-transparent;
+    @apply text-on-surface-variant;
+
+    @variant nth-of-type-1 {
+      @apply left-1;
+    }
+
+    @variant nth-of-type-2 {
+      @apply right-1;
+    }
+  }
+
+  & > div {
+    color: var(--input-label-color);
+  }
+
+  /* label text */
+  & > div:first-of-type {
+    @apply absolute top-0 left-0 border border-transparent;
+    @apply transition-transform;
+
+    translate: var(--input-pl) 0;
+
+    &::before {
+      @apply absolute -top-1.5 block h-3 w-full;
+      @apply scale-x-0 transition-transform delay-75;
+
+      content: "";
+      background-color: var(--input-bg-color);
+    }
+
+    & > div {
+      @apply px-1 py-2 transition delay-75;
+
+      transition-property: transform, translate, font-size;
+    }
+  }
+
+  /* Supporting text */
+  & > div:not(:first-of-type) {
+    @apply ml-2 block h-5;
+    @apply truncate text-sm;
+  }
+
+  & input,
+  & textarea,
+  & select {
+    @apply w-full resize-none scroll-my-5 py-2;
+
+    background-color: var(--input-bg-color);
+
+    padding-left: var(--input-pl);
+    padding-right: var(--input-pr);
+
+    @variant focus-visible {
+      @apply outline-2 outline-primary;
+    }
+
+    @variant not-disabled {
+      @variant hover {
+        @apply border-on-surface;
+      }
+
+      @variant [:active, :focus-visible, :focus-within] {
+        @apply input-outlined-translate;
+        --input-label-color: var(--color-on-surface-var);
+      }
+    }
+
+    @variant disabled {
+      @apply border-on-surface/12;
+      --input-label-color: color-mix(
+        in oklab,
+        var(--color-on-surface) 38%,
+        transparent
+      );
+      color: var(--input-label-color);
+
+      & ~ div {
+        --input-label-color: color-mix(
+          in oklab,
+          var(--color-on-surface) 38%,
+          transparent
+        );
+      }
+
+      & ~ icon {
+        color: color-mix(in oklab, var(--color-on-surface) 38%, transparent);
+      }
+    }
+
+    /* No clicking the label */
+    & ~ div {
+      @apply pointer-events-none;
+    }
+  }
+
+  & > chips {
+    --input-border-color: var(--color-outline);
+    @apply rounded-md pt-1.5;
+    @apply block border;
+
+    padding-left: var(--input-pl);
+    padding-right: var(--input-pr);
+    border-color: var(--input-border-color);
+
+    & > div {
+      @apply flex gap-x-2 overflow-x-auto px-0.5 py-1;
+
+      & > input {
+        @apply w-auto min-w-16 py-0 pr-0.5 pl-2;
+      }
+
+      & > div {
+        @apply flex min-w-16 shrink-0 items-center justify-between gap-1 pr-0.5 pl-2 whitespace-nowrap transition;
+        @apply text-on-surface-variant;
+        @apply rounded-lg border border-outline-variant;
+
+        & > icon {
+          border-radius: 1em;
+          font-size: 20px;
+        }
+
+        @variant disabled {
+          @apply text-on-surface/38;
+        }
+
+        @variant not-disabled {
+          & > icon {
+            @apply text-primary;
+
+            @variant hover {
+              @apply bg-primary/8;
+            }
+
+            @variant [:active, :focus-visible] {
+              @apply bg-primary/10;
+            }
+          }
+        }
+      }
+    }
+
+    &:has(input:not(:placeholder-shown)) {
+      @apply input-outlined-translate;
+    }
+
+    &:not(:has(div)) {
+      & input {
+        --input-border-color: transparent;
+      }
+    }
+
+    &:has(div) {
+      @apply input-outlined-translate;
+
+      & input {
+        @variant placeholder-shown {
+          --input-border-color: transparent;
+        }
+      }
+    }
+
+    &:has(input:disabled) {
+      & ~ div {
+        --input-label-color: color-mix(
+          in oklab,
+          var(--color-on-surface) 38%,
+          transparent
+        );
+      }
+
+      & ~ icon {
+        color: color-mix(in oklab, var(--color-on-surface) 38%, transparent);
+      }
+    }
+
+    /* No clicking the label */
+    & ~ div {
+      @apply pointer-events-none;
+    }
+  }
+
+  & textarea {
+    @apply h-24;
+  }
+
+  & input:not(:placeholder-shown),
+  & textarea:not(:placeholder-shown),
+  & select:has(option:checked:not([value])),
+  & select:has(option:checked:not([value=""])) {
+    @apply input-outlined-translate;
+  }
+
+  & input:placeholder-shown ~ icon:nth-of-type(2),
+  & textarea:placeholder-shown ~ icon:nth-of-type(2) {
+    @apply hidden;
+  }
+
+  &:has(error:not(:empty)) {
+    --input-label-color: var(--color-error);
+    --input-border-color: var(--color-error);
+
+    & input,
+    & textarea,
+    & select {
+      @variant focus-visible {
+        @apply outline-error;
+      }
+    }
+
+    & > div:not(:first-of-type) > span {
+      @apply hidden;
+    }
+
+    @variant hover {
+      --input-border-color: var(--color-on-error-container);
+
+      & > div:first-of-type {
+        @apply text-on-error-container;
+      }
+    }
+  }
+}
+
+@utility input-bg-* {
+  --input-bg-color: --value(--color-*);
+}
+
+@utility toggle {
+  @apply flex items-center;
+
+  --toggle-base-color: var(--color-primary);
+  --toggle-state-color: var(--color-on-primary);
+
+  --toggle-track-color: var(--color-surface-container-highest);
+  --toggle-border-color: var(--color-outline);
+  --toggle-handle-color: var(--color-outline);
+
+  & > input {
+    @apply h-0 w-0 opacity-0;
+
+    @variant disabled {
+      & ~ div {
+        @apply cursor-auto text-on-surface/38;
+
+        & > span {
+          @apply text-on-surface/38;
+        }
+      }
+
+      @variant checked {
+        & ~ switch {
+          --toggle-track-color: color-mix(
+            in oklab,
+            var(--color-on-surface) 12%,
+            transparent
+          );
+          --toggle-border-color: transparent;
+          --toggle-handle-color: var(--color-surface);
+        }
+      }
+
+      @variant not-checked {
+        & ~ switch {
+          --toggle-track-color: color-mix(
+            in oklab,
+            var(--color-surface-container-highest) 12%,
+            transparent
+          );
+          --toggle-border-color: color-mix(
+            in oklab,
+            var(--color-on-surface) 12%,
+            transparent
+          );
+          --toggle-handle-color: color-mix(
+            in oklab,
+            var(--color-on-surface) 32%,
+            transparent
+          );
+        }
+      }
+    }
+
+    @variant not-disabled {
+      @variant checked {
+        & ~ switch {
+          --toggle-track-color: var(--toggle-base-color);
+          --toggle-border-color: var(--toggle-base-color);
+          --toggle-handle-color: var(--toggle-state-color);
+        }
+
+        @variant hover {
+          & ~ switch {
+            @apply after:bg-primary-container;
+          }
+        }
+      }
+
+      @variant not-checked {
+        @variant hover {
+          & ~ switch {
+            --toggle-track-color: color-mix(
+              in oklab,
+              var(--color-surface-container-highest) 92%,
+              var(--color-on-surface)
+            );
+            --toggle-handle-color: var(--color-on-surface-variant);
+          }
+        }
+      }
+
+      @variant focus-visible {
+        & ~ switch {
+          @apply outline-3 outline-secondary;
+        }
+      }
+    }
+
+    @variant checked {
+      & ~ switch::after {
+        @apply translate-x-5;
+      }
+    }
+  }
+
+  & > div {
+    @apply flex grow flex-col justify-center;
+
+    & > span {
+      @variant not-first {
+        @apply text-sm text-on-surface-variant;
+      }
+    }
+  }
+
+  & > switch {
+    @apply relative h-8 w-13;
+    @apply border-2 transition-colors;
+
+    background-color: var(--toggle-track-color);
+    border-color: var(--toggle-border-color);
+
+    /* big radius to get pill shape */
+    border-radius: 100em;
+
+    &::after {
+      @apply block;
+      @apply absolute top-1.5 left-1.5 h-4 w-4;
+      @apply origin-center transition-transform;
+
+      transition-property: scale, transform, translate, background-color;
+      background-color: var(--toggle-handle-color);
+      content: "";
+      border-radius: 50%;
+    }
+  }
+
+  @variant active {
+    & > input:not(:disabled) {
+      & ~ switch::after {
+        @apply scale-175;
+      }
+    }
+  }
+
+  @variant not-active {
+    & > input:checked {
+      & ~ switch::after {
+        @apply scale-150;
+      }
+    }
+  }
+}
+
+@utility checkbox {
+  @apply flex items-center;
+
+  --toggle-base-color: var(--color-primary);
+  --toggle-icon-color: var(--color-primary);
+  --toggle-state-color: transparent;
+
+  --toggle-bg-color: transparent;
+
+  & > icon {
+    @apply p-1 transition-colors;
+    border-radius: 100em;
+    background-color: var(--toggle-bg-color);
+    color: var(--toggle-icon-color);
+
+    @variant not-inverse {
+      @variant nth-of-type-2 {
+        font-variation-settings: "FILL" 1;
+      }
+    }
+    @variant inverse {
+      @variant nth-of-type-1 {
+        font-variation-settings: "FILL" 1;
+      }
+    }
+  }
+
+  & > div {
+    @apply rounded-md;
+  }
+
+  & > input {
+    @apply h-0 w-0 opacity-0;
+
+    @variant disabled {
+      & ~ div,
+      & ~ icon {
+        @apply text-on-surface/38;
+      }
+    }
+
+    @variant not-disabled {
+      @variant hover {
+        & ~ icon {
+          --toggle-bg-color: color-mix(
+            in oklab,
+            var(--toggle-base-color) 8%,
+            var(--toggle-state-color)
+          );
+          font-variation-settings: "FILL" 1;
+        }
+      }
+
+      @variant [:active, :focus-visible] {
+        & ~ icon {
+          --toggle-bg-color: color-mix(
+            in oklab,
+            var(--toggle-base-color) 10%,
+            var(--toggle-state-color)
+          );
+          font-variation-settings: "FILL" 1;
+        }
+      }
+    }
+
+    @variant not-checked {
+      & ~ div > span:nth-of-type(2),
+      & ~ icon:nth-of-type(2) {
+        @apply hidden;
+      }
+    }
+
+    @variant checked {
+      & ~ div > span:nth-of-type(1),
+      & ~ icon:nth-of-type(1) {
+        @apply hidden;
+      }
+    }
+  }
+
+  &:has(input:focus-visible) > div {
+    @apply outline-3 outline-secondary;
+  }
+}

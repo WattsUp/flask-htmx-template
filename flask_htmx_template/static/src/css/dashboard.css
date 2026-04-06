@@ -1,0 +1,37 @@
+@utility dashboard {
+  @apply grid grid-flow-dense grid-cols-[repeat(auto-fill,minmax(330px,1fr))] gap-2;
+
+  & > div {
+    @apply min-h-64 rounded-xl p-2;
+    @apply flex flex-col;
+    @apply bg-surface-container;
+
+    & > a {
+      @apply relative flex justify-between pr-6;
+
+      & > h1 {
+        @apply font-serif text-xl text-primary;
+      }
+
+      & > h2 {
+        @apply text-lg;
+      }
+
+      & > icon {
+        @apply absolute top-1/2 right-0 -translate-y-1/2;
+      }
+
+      @variant hover {
+        &[href] > h1 {
+          @apply underline decoration-primary;
+        }
+      }
+    }
+
+    & > div {
+      @variant last-of-type {
+        @apply mt-auto text-center italic;
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+<div
+  id="dialog"
+  class="dialog"
+  hx-swap-oob="{{ oob }}"
+  hx-on::after-settle="dialog.updateSave()"
+>
+  {{- content | safe -}}
+</div>
+{% if snackbar %}
+  <script id="snackbar-script" hx-swap-oob="true">
+    onLoad(() => {
+      snackbar.show("{{ snackbar }}");
+    });
+  </script>
+{% endif %}

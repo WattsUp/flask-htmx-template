@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+{# djlint: off #}
+{# ignore missing <head> #}
+<html lang="en-US">
+  {# djlint: on #}
+  {% include "shared/head.jinja" %}
+  <body
+    hx-on::history-cache-miss="progress.update(null, 0);progress.update(null, 0.3)"
+    hx-on::history-cache-miss-load="progress.update(null, 1)"
+    hx-on::history-cache-miss-load-error="appResponseError(event)"
+    hx-on::config-request="addTimezone(event)"
+    hx-on::before-request="progress.update(event, 0)"
+    hx-on::before-send="progress.update(event, 0.3)"
+    hx-on::send-error="appSendError(event)"
+    hx-on::response-error="appResponseError(event)"
+    hx-on::before-swap="progress.update(event, 0.6)"
+    hx-on::after-swap="progress.update(event, 0.7)"
+    hx-on::after-request="progress.update(event, 0.9)"
+    hx-on::after-settle="progress.update(event, 1)"
+  >
+    {# Default current-account is blank #}
+    <input class="current-account" name="account" type="hidden" />
+    <script id="history-script"></script>
+    <div id="page-progress">
+      {# djlint: off H020b #}
+      <div></div>
+      {# djlint: on #}
+    </div>
+    {% include "shared/hx-error.jinja" %}
+    {% include "shared/nav-header.jinja" %}
+    {% include "shared/nav-rail.jinja" %}
+    {% include "shared/nav-drawer.jinja" %}
+    <div id="main-wrapper">
+      <main id="main" hx-history-elt>
+        {% block content required %}
+        {% endblock content %}
+      </main>
+      <div id="main-footer">
+        <p>Copyright © {{ current_year }}</p>
+        <p>Version: {{ version }}</p>
+      </div>
+    </div>
+    {% include "shared/nav-bar.jinja" %}
+    <div id="snackbar" onclick="snackbar.hide()"></div>
+    <script id="snackbar-script"></script>
+    <div class="dialog-wrapper z-48">{% include "shared/dialog.jinja" %}</div>
+    <div
+      id="scrim"
+      class="scrim z-47"
+      onclick="dialog.close();nav.closeDrawer()"
+    ></div>
+    <script id="dialog-script"></script>
+    <div class="dialog-wrapper z-50">
+      <div id="confirm-dialog" class="dialog max-w-80"></div>
+    </div>
+    <div
+      id="confirm-scrim"
+      class="scrim z-49"
+      onclick="dialog.closeConfirm()"
+    ></div>
+    {# Dummy element when no response from server expected #}
+    <div id="no-target"></div>
+  </body>
+</html>

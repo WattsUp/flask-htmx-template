@@ -1,0 +1,39 @@
+<nav
+  id="nav-bar"
+  hx-target="#main"
+  hx-swap="innerHTML show:window:top"
+  hx-push-url="true"
+>
+  {% for label, (icon, endpoint, link) in nav_items[0][1].items() %}
+    {% if link == "PAGE" %}
+      <a
+        href="{{ url_for(endpoint) }}"
+        hx-get="{{ url_for(endpoint) }}"
+        hx-disabled-elt="this"
+      >
+        <icon>{{ icon }}</icon>
+        <div>{{ label }}</div>
+      </a>
+    {% elif link == "DIALOG" %}
+      <button
+        hx-get="{{ url_for(endpoint) }}"
+        hx-disabled-elt="this"
+        hx-target="#dialog"
+        hx-swap="innerHTML show:#dialog:top"
+        hx-push-url="#dialog"
+      >
+        <icon>{{ icon }}</icon>
+        <div>{{ label }}</div>
+      </button>
+    {% elif link == "HX_POST" %}
+      <button
+        hx-post="{{ url_for(endpoint) }}"
+        hx-disabled-elt="this"
+        hx-push-url="false"
+      >
+        <icon>{{ icon }}</icon>
+        <div>{{ label }}</div>
+      </button>
+    {% endif %}
+  {% endfor %}
+</nav>

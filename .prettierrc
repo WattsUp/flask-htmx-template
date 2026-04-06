@@ -1,0 +1,4 @@
+{
+  "plugins": ["prettier-plugin-tailwindcss", "prettier-plugin-jinja-template"],
+  "tailwindStylesheet": "./flask_htmx_template/static/src/css/main.css"
+}

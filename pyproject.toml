@@ -1,0 +1,253 @@
+[build-system]
+requires = [
+  "setuptools>=77",
+  "setuptools-scm>=8",
+  "flask",
+  "flask-assets",
+  "pytailwindcss",
+  "jsmin",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flask-htmx-template"
+dynamic = ["version"]
+dependencies = [
+  "sqlalchemy>=2",
+  "colorama",
+  "flask>=3",
+  "flask-assets",
+  "flask-login",
+  "argcomplete",
+  "prometheus-flask-exporter",
+  "packaging",
+]
+description = "A template repository for flask with htmx"
+license = "MIT"
+readme = "README.md"
+authors = [{ name = "Bradley Davis", email = "me@bradleydavis.tech" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.12"
+
+[project.scripts]
+flask_htmx_template = "flask_htmx_template.main:main"
+
+[project.urls]
+Homepage = "https://github.com/WattsUp/flask_htmx_template"
+Repository = "https://github.com/WattsUp/flask_htmx_template.git"
+Issues = "https://github.com/WattsUp/flask_htmx_template/issues"
+
+[project.optional-dependencies]
+encrypt = ["sqlcipher3-binary", "Cipher", "pycryptodomex"]
+deploy = ["gunicorn"]
+test = [
+  "pytest",
+  "coverage",
+  "numpy",
+  "time-machine",
+  "tomli",
+  "pytailwindcss",
+  "jsmin",
+  "setuptools>=77",
+]
+dev = [
+  "flask-htmx-template[deploy,test]",
+  "ruff>=0.15.8",
+  "codespell>=2.4.1",
+  "black>=25.9",
+  "isort",
+  "prek",
+  "djlint>=1.36.4",
+  "basedpyright>=1.38.0",
+  "taplo",
+]
+build = ["build"]
+build-docker = ["flask-htmx-template[build,encrypt]", "setuptools-scm>=8"]
+
+[tool.black]
+target-version = ["py312", "py313"]
+preview = true
+
+[tool.codespell]
+skip = "3rd-party,dist,*.pem,*.json"
+ignore-words-list = ["initialY"]
+
+[tool.coverage.run]
+command_line = "-m pytest tests"
+branch = true
+source = ["flask_htmx_template"]
+
+[tool.coverage.report]
+ignore_errors = true
+precision = 2
+show_missing = true
+fail_under = 100
+exclude_lines = [
+  "pragma: no cover", # Have to re-enable the standard pragma
+
+  # Don't complain about missing debug-only code:
+  "def __repr__",
+  "if self.debug",
+
+  # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError",
+
+  # Don't complain if non-runnable code isn't run:
+  "if 0:",
+  "if False:",
+  "if __name__ == .__main__.:",
+
+  # Don't complain about the one win32 line
+  "if sys.platform == .win32.:",
+
+  # Don't complain about ImportErrors, unit tests mocks them
+  "except ImportError",
+
+  # Don't complain about missing typing hints
+  "if TYPE_CHECKING:",
+
+  # Don't need to test guard code
+  "raise exc.UnboundExecutionError",
+
+  # Overloads have branch issues
+  "@overload",
+
+  # TypeErrors are just typing insurance, should never get reached
+  "TypeError",
+]
+
+[tool.djlint]
+extension = "jinja"
+profile = "jinja"
+ignore = "H020"
+
+[tool.isort]
+profile = "black"
+skip_gitignore = true
+float_to_top = true
+force_alphabetical_sort_within_sections = true
+
+[tool.basedpyright]
+include = ["flask_htmx_template", "tests", "tools"]
+exclude = ["**/__pycache__", "typing"]
+venvPath = "."
+typeCheckingMode = "strict"
+
+reportUnknownParameterType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownLambdaType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownMemberType = "warning"
+reportUnnecessaryTypeIgnoreComment = "warning"
+
+# Checked by ruff
+reportPrivateUsage = "none"
+
+[tool.pytest.ini_options]
+markers = ["encryption: tests that require encryption"]
+addopts = ["--durations=10", "--import-mode=importlib"]
+
+[tool.ruff]
+target-version = "py312"
+exclude = ["typings"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+preview = true
+future-annotations = true
+
+ignore = [
+  "FIX002", # Permit TODOs
+  "I001",   # mismatch between ruff and isort
+  "CPY001", # No copyright
+  "D104",   # Missing docstring in public package
+  "D203",   # No blank line before pydocs
+  "D213",   # Summary on not on second line
+]
+
+[tool.ruff.lint.per-file-ignores]
+"docker/*.py" = [
+  "D100",   # Disable missing docstrings in tests
+  "INP001", # Implicit namespace
+  "S104",   # binding to 0.0.0.0
+]
+"flask_htmx_template/commands/*.py" = [
+  "T201",    # Allow printing for commands
+  "PLC0415", # Allow imports outside of top for faster time to main
+]
+"flask_htmx_template/models/base_uri.py" = [
+  "PLW0603", # Allow global CIPHER
+]
+"flask_htmx_template/migrations/v*.py" = [
+  "N801", # Allow underscore in class name for version names
+]
+"tests/*.py" = [
+  "D100",    # Disable missing docstrings in tests
+  "D101",
+  "D102",
+  "D103",
+  "D105",
+  "D106",
+  "D107",
+  "S608",    # Disable possible SQL injection
+  "PLC2701", # Private import
+  "S404",    # subprocess import
+  "S101",    # Uses asserts in pytest
+  "S311",    # Uses random in pytest
+  "PLR2004", # Uses magic numbers in pytest
+  "FBT001",  # Boolean positional arguments
+  "T201",    # Allow printing for extra context
+  "SLF001",  # Allow access to privates
+  "ARG001",  # Allow unused arguments for fixtures
+  "PLR0913", # Allow many arguments
+  "PLR0917", # Allow many arguments
+]
+"tests/controllers/*.py" = [
+  "N802", # Allow CAPS methods
+]
+"tests/mock*.py" = [
+  "TRY002", # Allow base Exception
+]
+
+[tool.ruff.lint.flake8-annotations]
+suppress-dummy-args = true
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+  "sqlalchemy.orm.DeclarativeBase",
+  "flask_htmx_template.models.base.Base",
+]
+
+[tool.ruff.lint.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.ruff]
+strictly-empty-init-modules = true
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["flask_htmx_template*"]
+namespaces = false
+
+[tool.setuptools.cmdclass]
+build_py = "flask_htmx_template.web_assets.BuildAssets"
+
+[tool.setuptools.package-data]
+flask_htmx_template = [
+  "static/dist/**/*",
+  "static/fonts/**/*",
+  "static/img/**/*",
+  "templates/**/*",
+]
+
+[tool.setuptools_scm]
+version_file = "flask_htmx_template/version.py"

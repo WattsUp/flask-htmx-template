@@ -1,0 +1,39 @@
+<div
+  hx-get="{{ url_for('items.page_all') }}"
+  hx-trigger="item from:body"
+  hx-target="#main"
+>
+  <h1>Items</h1>
+  <button
+    class="btn-tonal"
+    hx-get="{{ url_for('items.new') }}"
+    hx-disabled-elt="this"
+    hx-target="#dialog"
+    hx-swap="innerHTML show:#dialog:top"
+    hx-push-url="#dialog"
+  >
+    <icon>add</icon>New
+  </button>
+</div>
+
+<div>
+  <h2 class="text-xl">Total</h2>
+  <h1 class="font-serif text-6xl text-tertiary">{{ ctx.total | comma }}</h1>
+</div>
+<details class="mx-auto mb-2 max-w-2xl rounded-md bg-surface-container-high">
+  <summary
+    class="flex items-center gap-2 rounded-md bg-tertiary-container p-2 text-on-tertiary-container"
+  >
+    <icon>help</icon>
+    <span class="mr-auto">About items</span>
+    <icon class="details-icon-open">keyboard_arrow_up</icon>
+    <icon class="details-icon-closed">keyboard_arrow_down</icon>
+  </summary>
+  <div class="mx-auto prose px-2">
+    <p>Items are things</p>
+  </div>
+</details>
+{% for item in ctx.items_ %}
+  {% include "items/item-row.jinja" %}
+  {% if not loop.last %}<hr class="mx-4 my-1" />{% endif %}
+{% endfor %}

@@ -1,0 +1,796 @@
+<h1 class="font-serif text-3xl text-primary">Style test</h1>
+<div class="mx-auto prose">
+  <p>
+    This page has most commonents in most states to test their styling. Style is
+    based off of Google's
+    <a href="https://m3.material.io/">Material 3 Design</a>. Icons use the
+    <a href="https://fonts.google.com/icons">Material Design Icons</a>
+    delivered as a variantiable font for filled and unfilled states.
+  </p>
+</div>
+<h2 class="font-serif text-2xl text-primary">Colors</h2>
+<div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2">
+  <div class="col-start-1">
+    <div class="h-30 bg-primary p-2 text-on-primary">Primary</div>
+    <div class="h-20 bg-on-primary p-2 text-primary">On Primary</div>
+  </div>
+  <div>
+    <div class="h-30 bg-secondary p-2 text-on-secondary">Secondary</div>
+    <div class="h-20 bg-on-secondary p-2 text-secondary">On Secondary</div>
+  </div>
+  <div>
+    <div class="h-30 bg-tertiary p-2 text-on-tertiary">Tertiary</div>
+    <div class="h-20 bg-on-tertiary p-2 text-tertiary">On Tertiary</div>
+  </div>
+  <div>
+    <div class="h-30 bg-error p-2 text-on-error">Error</div>
+    <div class="h-20 bg-on-error p-2 text-error">On Error</div>
+  </div>
+  <div class="col-start-1">
+    <div class="h-30 bg-primary-container p-2 text-on-primary-container">
+      Primary Container
+    </div>
+    <div class="h-20 bg-on-primary-container p-2 text-primary-container">
+      On Primary Container
+    </div>
+  </div>
+  <div>
+    <div class="h-30 bg-secondary-container p-2 text-on-secondary-container">
+      Secondary Container
+    </div>
+    <div class="h-20 bg-on-secondary-container p-2 text-secondary-container">
+      On Secondary Container
+    </div>
+  </div>
+  <div>
+    <div class="h-30 bg-tertiary-container p-2 text-on-tertiary-container">
+      Tertiary Container
+    </div>
+    <div class="h-20 bg-on-tertiary-container p-2 text-tertiary-container">
+      On Tertiary Container
+    </div>
+  </div>
+  <div>
+    <div class="h-30 bg-error-container p-2 text-on-error-container">
+      Error Container
+    </div>
+    <div class="h-20 bg-on-error-container p-2 text-error-container">
+      On Error Container
+    </div>
+  </div>
+  <div class="col-start-1">
+    <div class="flex h-30 text-on-primary-fixed">
+      <div class="w-1/2 bg-primary-fixed p-2 text-on-primary-fixed">
+        Primary Fixed
+      </div>
+      <div class="w-1/2 bg-primary-fixed-dim p-2 text-on-primary-fixed">
+        Primary Fixed Dim
+      </div>
+    </div>
+    <div class="h-20 bg-on-primary-fixed p-2 text-primary-fixed">
+      On Primary Fixed
+    </div>
+    <div class="h-20 bg-on-primary-fixed-variant p-2 text-primary-fixed">
+      On Primary Fixed Variant
+    </div>
+  </div>
+  <div>
+    <div class="flex h-30 text-on-secondary-fixed">
+      <div class="w-1/2 bg-secondary-fixed p-2 text-on-secondary-fixed">
+        Secondary Fixed
+      </div>
+      <div class="w-1/2 bg-secondary-fixed-dim p-2 text-on-secondary-fixed">
+        Secondary Fixed Dim
+      </div>
+    </div>
+    <div class="h-20 bg-on-secondary-fixed p-2 text-secondary-fixed">
+      On Secondary Fixed
+    </div>
+    <div class="h-20 bg-on-secondary-fixed-variant p-2 text-secondary-fixed">
+      On Secondary Fixed Variant
+    </div>
+  </div>
+  <div>
+    <div class="flex h-30 text-on-tertiary-fixed">
+      <div class="w-1/2 bg-tertiary-fixed p-2 text-on-tertiary-fixed">
+        Tertiary Fixed
+      </div>
+      <div class="w-1/2 bg-tertiary-fixed-dim p-2 text-on-tertiary-fixed">
+        Tertiary Fixed Dim
+      </div>
+    </div>
+    <div class="h-20 bg-on-tertiary-fixed p-2 text-tertiary-fixed">
+      On Tertiary Fixed
+    </div>
+    <div class="h-20 bg-on-tertiary-fixed-variant p-2 text-tertiary-fixed">
+      On Tertiary Fixed Variant
+    </div>
+  </div>
+  <div class="col-span-2 col-start-1 flex md:col-span-3">
+    <div class="w-1/3 bg-surface-dim p-2 text-on-surface">Surface Dim</div>
+    <div class="w-1/3 bg-surface p-2 text-on-surface">Surface</div>
+    <div class="w-1/3 bg-surface-bright p-2 text-on-surface">
+      Surface Bright
+    </div>
+  </div>
+  <div>
+    <div class="bg-inverse-surface p-2 text-inverse-on-surface">
+      Inverse Surface
+    </div>
+    <div class="bg-inverse-on-surface p-2 text-inverse-surface">
+      Inverse On Surface
+    </div>
+  </div>
+  <div class="col-span-2 col-start-1 flex max-md:text-sm md:col-span-3">
+    <div class="w-1/5 bg-surface-container-lowest p-2 text-on-surface">
+      Surface Container Lowest
+    </div>
+    <div class="w-1/5 bg-surface-container-low p-2 text-on-surface">
+      Surface Container Low
+    </div>
+    <div class="w-1/5 bg-surface-container p-2 text-on-surface">
+      Surface Container
+    </div>
+    <div class="w-1/5 bg-surface-container-high p-2 text-on-surface">
+      Surface Container High
+    </div>
+    <div class="w-1/5 bg-surface-container-highest p-2 text-on-surface">
+      Surface Container Highest
+    </div>
+  </div>
+  <div>
+    <div class="bg-inverse-primary p-2 text-on-primary-fixed">
+      Inverse Primary
+    </div>
+  </div>
+  <div class="col-span-2 col-start-1 flex md:col-span-3">
+    <div class="w-1/4 bg-on-surface p-2 text-surface">On Surface</div>
+    <div class="w-1/4 bg-on-surface-variant p-2 text-surface">
+      On Surface Variant
+    </div>
+    <div class="w-1/4 bg-outline p-2 text-surface">Outline</div>
+    <div class="w-1/4 bg-outline-variant p-2 text-on-surface">
+      Outline Variant
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <div class="w-1/2 bg-scrim p-2 text-white">Scrim</div>
+    <div class="w-1/2 bg-shadow p-2 text-white">Shadow</div>
+  </div>
+</div>
+<h2 class="font-serif text-2xl text-primary">Prose</h2>
+<div class="mx-auto prose">
+  <h1>Heading 1</h1>
+  <p>
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+    <q>Quote Donec</q> hendrerit lectus sit amet mi tincidunt, eget pretium mi
+    tempor. Maecenas dapibus diam id leo dictum posuere.
+    <b>Bold Suspendisse</b> eget maximus lacus, sit amet ultrices justo.
+  </p>
+  <h2>Heading 2</h2>
+  <p class="lead">
+    Lead: Morbi ornare vehicula erat, sodales efficitur lacus consequat a.
+    Aenean leo urna, efficitur eu libero eget, volutpat tincidunt mauris.
+  </p>
+  <hr />
+  <p>
+    Integer ac erat aliquam, finibus tellus non, eleifend nisl.
+    <code>import antigravity</code>
+    Suspendisse mi massa, imperdiet vitae eros bibendum, pellentesque elementum
+    neque.
+  </p>
+  <blockquote>
+    "blockquote: Praesent sit amet est finibus, pretium nisl et, hendrerit
+    tortor."
+  </blockquote>
+  <p>
+    Aliquam erat volutpat. Cras dictum erat non luctus elementum. Aenean vel
+    velit sed justo placerat dignissim. Sed malesuada est eros, ac aliquam felis
+    pellentesque at. Ut ut augue vitae nibh scelerisque posuere at et nibh.
+    Quisque nec ullamcorper nibh. Sed lobortis sapien sit amet metus efficitur
+    mattis. Press <kbd>Enter</kbd>.
+  </p>
+  <h3>Heading 3</h3>
+  <pre><code>&lt;blockquote&gt;
+    "Praesent sit amet est finibus, pretium nisl et, hendrerit tortor."
+&lt;/blockquote&gt;
+&lt;p&gt;
+    Aliquam erat volutpat. Cras dictum erat non luctus elementum.
+    Aenean vel velit sed justo placerat dignissim.
+    Sed malesuada est eros, ac aliquam felis pellentesque at.
+    Ut ut augue vitae nibh scelerisque posuere at et nibh.
+    Quisque nec ullamcorper nibh. Sed lobortis sapien sit amet metus efficitur mattis.
+&lt;/p&gt;</code></pre>
+  <h4>Heading 4</h4>
+  <ul>
+    <li>Apples</li>
+    <li>Bananas</li>
+  </ul>
+  <ol>
+    <li>Apples</li>
+    <li>Bananas</li>
+  </ol>
+  <table>
+    <thead>
+      <tr>
+        <th>Column 1</th>
+        <th>Column 2</th>
+        <th>Column 3</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Row 1 Column 1</td>
+        <td>Row 1 Column 2</td>
+        <td>Row 1 Column 3</td>
+      </tr>
+      <tr>
+        <td>Row 2 Column 1</td>
+        <td>Row 2 Column 2</td>
+        <td>Row 2 Column 3</td>
+      </tr>
+    </tbody>
+  </table>
+  <figure>
+    <svg viewbox="0 0 220 100">
+      <rect width="100" height="100" />
+      <rect width="100" height="100" x="120" rx="15" />
+    </svg>
+    <figcaption>Caption for figure</figcaption>
+  </figure>
+</div>
+<h2 class="font-serif text-2xl text-primary">Buttons</h2>
+<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
+  <button class="btn-filled"><icon>mouse</icon>Filled</button>
+  <button class="btn-tonal"><icon>mouse</icon>Tonal</button>
+  <button class="btn-outlined"><icon>mouse</icon>Outlined</button>
+  <button class="btn-text"><icon>mouse</icon>Text</button>
+  <button class="btn-filled" disabled><icon>mouse</icon>Filled</button>
+  <button class="btn-tonal" disabled><icon>mouse</icon>Tonal</button>
+  <button class="btn-outlined" disabled><icon>mouse</icon>Outlined</button>
+  <button class="btn-text" disabled><icon>mouse</icon>Text</button>
+  <button class="btn-filled">Filled</button>
+  <button class="btn-tonal">Tonal</button>
+  <button class="btn-outlined">Outlined</button>
+  <button class="btn-text">Text</button>
+</div>
+<h3 class="font-serif text-xl text-primary">Icon only buttons</h3>
+<div class="flex flex-wrap gap-2">
+  <button class="btn-filled btn-sq">
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-tonal btn-sq">
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-outlined btn-sq">
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-text btn-sq">
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-filled btn-sq" disabled>
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-tonal btn-sq" disabled>
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-outlined btn-sq" disabled>
+    <icon>mouse</icon>
+  </button>
+  <button class="btn-text btn-sq" disabled>
+    <icon>mouse</icon>
+  </button>
+</div>
+<h3 class="font-serif text-xl text-primary">Floating action buttons (FAB)</h3>
+<div class="flex flex-wrap gap-2">
+  <button class="fab">
+    <icon>mouse</icon>
+  </button>
+  <button class="fab" disabled>
+    <icon>mouse</icon>
+  </button>
+  <button class="fab"><icon>mouse</icon>Extended FAB</button>
+  <button class="fab" disabled><icon>mouse</icon>Extended FAB</button>
+</div>
+<h3 class="font-serif text-xl text-primary">Radioset</h3>
+<div class="flex flex-wrap gap-2">
+  <fieldset class="radioset">
+    <label>
+      <input name="radioset" type="radio" checked autocomplete="off" />
+      <icon>devices</icon>
+    </label>
+    <label>
+      <input name="radioset" type="radio" autocomplete="off" />
+      <icon>light_mode</icon>
+    </label>
+    <label>
+      <input name="radioset" type="radio" autocomplete="off" />
+      <icon>dark_mode</icon>
+    </label>
+  </fieldset>
+  <fieldset class="radioset" disabled>
+    <label>
+      <input name="radioset-2" type="radio" checked autocomplete="off" />
+      <icon>devices</icon>
+    </label>
+    <label>
+      <input name="radioset-2" type="radio" autocomplete="off" />
+      <icon>light_mode</icon>
+    </label>
+    <label>
+      <input name="radioset-2" type="radio" autocomplete="off" />
+      <icon>dark_mode</icon>
+    </label>
+  </fieldset>
+</div>
+<h2 class="font-serif text-2xl text-primary">Inputs</h2>
+<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
+  <label class="input-outlined col-start-1">
+    <input placeholder="" autocomplete="off" enterkeyhint="next" />
+    <div>
+      <div>Text</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+    <icon onclick="htmx.find(this.parentNode, 'input').value=''">clear</icon>
+  </label>
+  <label class="input-outlined">
+    <input
+      value="Banana"
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+    />
+    <div>
+      <div>Text with value</div>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined">
+    <input
+      value="Banana"
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      disabled
+    />
+    <div>
+      <div>Text disabled</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined col-start-1">
+    <input placeholder="" autocomplete="off" enterkeyhint="next" />
+    <div>
+      <div>Text</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined">
+    <input
+      value="Banana"
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+    />
+    <div>
+      <div>Text with value</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined col-start-1">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    ></textarea>
+    <div>
+      <div>Extended text</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+    <icon onclick="htmx.find(this.parentNode, 'textarea').value=''">clear</icon>
+  </label>
+  <label class="input-outlined">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    >
+Banana</textarea
+    >
+    <div>
+      <div>Extended text with value</div>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    >
+Bananas are fruits. Apples are fruits. Pineapples are fruits. Limes are fruits. Lemons are fruits. Tomatoes are fruits.</textarea
+    >
+    <div>
+      <div>Extended text with value</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      disabled
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    >
+Bananas are fruits. Apples are fruits. Pineapples are fruits. Limes are fruits. Lemons are fruits. Tomatoes are fruits.</textarea
+    >
+    <div>
+      <div>Extended text disabled</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined col-start-1">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    ></textarea>
+    <div>
+      <div>Extended text</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+    <icon>search</icon>
+  </label>
+  <label class="input-outlined">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    >
+Banana</textarea
+    >
+    <div>
+      <div>Extended text with value</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined">
+    <textarea
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      onkeydown="if(event.keyCode == 13)event.preventDefault()"
+    >
+Bananas are fruits. Apples are fruits. Pineapples are fruits. Limes are fruits. Lemons are fruits. Tomatoes are fruits.</textarea
+    >
+    <div>
+      <div>Extended text with value</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined col-start-1">
+    <select autocomplete="off">
+      <option value="" selected disabled hidden></option>
+      <option value="apple">Apple</option>
+      <option value="banana">Banana</option>
+    </select>
+    <div>
+      <div>Select</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined">
+    <select autocomplete="off">
+      <option value="" disabled hidden></option>
+      <option value="apple" selected>Apple</option>
+      <option value="banana">Banana</option>
+    </select>
+    <div>
+      <div>Select with value</div>
+    </div>
+  </label>
+  <label class="input-outlined">
+    <select autocomplete="off" disabled>
+      <option value="" disabled hidden></option>
+      <option value="apple" selected>Apple</option>
+      <option value="banana">Banana</option>
+    </select>
+    <div>
+      <div>Select disabled</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined col-start-1">
+    <select autocomplete="off">
+      <option value="" selected disabled hidden></option>
+      <option value="apple">Apple</option>
+      <option value="banana">Banana</option>
+    </select>
+    <div>
+      <div>Select</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined">
+    <select autocomplete="off">
+      <option value="" disabled hidden></option>
+      <option value="apple" selected>Apple</option>
+      <option value="banana">Banana</option>
+    </select>
+    <div>
+      <div>Select</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+      <span>Supporting text</span>
+    </div>
+  </label>
+  <label class="input-outlined col-start-1">
+    <chips>
+      <div>
+        <input placeholder="" autocomplete="off" enterkeyhint="enter" />
+      </div>
+    </chips>
+    <div>
+      <div>Chips</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>label</icon>
+  </label>
+  <label class="input-outlined col-span-2">
+    <chips>
+      <div>
+        <input
+          value="Banana"
+          placeholder=""
+          autocomplete="off"
+          enterkeyhint="enter"
+        />
+      </div>
+    </chips>
+    <div>
+      <div>Chips with value</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>label</icon>
+  </label>
+  <label class="input-outlined">
+    <chips>
+      <div>
+        <input
+          value="Banana"
+          placeholder=""
+          autocomplete="off"
+          enterkeyhint="enter"
+          disabled
+        />
+      </div>
+    </chips>
+    <div>
+      <div>Chips disabled</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Supporting text</span>
+    </div>
+    <icon>label</icon>
+  </label>
+  <label class="input-outlined col-start-1">
+    <chips>
+      <div>
+        {% with value="Enabled" %}
+          {% include "shared/chip.jinja" %}
+        {% endwith %}
+        {% with value="Disabled", disabled=True %}
+          {% include "shared/chip.jinja" %}
+        {% endwith %}
+        <input placeholder="" autocomplete="off" enterkeyhint="enter" />
+      </div>
+    </chips>
+    <div>
+      <div>Chips</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+    </div>
+    <icon>label</icon>
+  </label>
+  <label class="input-outlined col-span-2">
+    <chips>
+      <div>
+        {% with value="Enabled" %}
+          {% include "shared/chip.jinja" %}
+        {% endwith %}
+        <input
+          value="Banana"
+          placeholder=""
+          autocomplete="off"
+          enterkeyhint="next"
+        />
+      </div>
+    </chips>
+    <div>
+      <div>Chips with value</div>
+    </div>
+    <div>
+      <error>Inline validation error</error>
+    </div>
+    <icon>label</icon>
+  </label>
+  <label class="toggle col-start-1">
+    <input type="checkbox" autocomplete="off" />
+    <div>Toggle switch off</div>
+    <switch></switch>
+  </label>
+  <label class="toggle">
+    <input type="checkbox" checked autocomplete="off" />
+    <div>
+      <span>Toggle switch on</span>
+      <span>Supporting text</span>
+    </div>
+    <switch></switch>
+  </label>
+  <label class="toggle">
+    <input type="checkbox" autocomplete="off" disabled />
+    <div>
+      <span>Toggle switch off</span>
+      <span>Disabled</span>
+    </div>
+    <switch></switch>
+  </label>
+  <label class="toggle">
+    <input type="checkbox" checked autocomplete="off" disabled />
+    <div>
+      <span>Toggle switch on</span>
+      <span>Disabled</span>
+    </div>
+    <switch></switch>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" autocomplete="off" />
+    <div>
+      <span>xxxxx hidden</span>
+      <span>12347 not hidden</span>
+    </div>
+    <icon>visibility</icon>
+    <icon>visibility_off</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" checked autocomplete="off" />
+    <div>
+      <span>xxxxx hidden</span>
+      <span>12347 not hidden</span>
+    </div>
+    <icon>visibility</icon>
+    <icon>visibility_off</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" autocomplete="off" disabled />
+    <div>
+      <span>xxxxx hidden</span>
+      <span>12347 not hidden</span>
+    </div>
+    <icon>visibility</icon>
+    <icon>visibility_off</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" checked autocomplete="off" disabled />
+    <div>
+      <span>xxxxx hidden</span>
+      <span>12347 not hidden</span>
+    </div>
+    <icon>visibility</icon>
+    <icon>visibility_off</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" autocomplete="off" />
+    <div>Plain checkbox</div>
+    <icon>check_box_outline_blank</icon>
+    <icon>check_box</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" checked autocomplete="off" />
+    <div>Plain checkbox</div>
+    <icon>check_box_outline_blank</icon>
+    <icon>check_box</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" autocomplete="off" disabled />
+    <div>Plain checkbox</div>
+    <icon>check_box_outline_blank</icon>
+    <icon>check_box</icon>
+  </label>
+  <label class="checkbox">
+    <input type="checkbox" checked autocomplete="off" disabled />
+    <div>Plain checkbox</div>
+    <icon>check_box_outline_blank</icon>
+    <icon>check_box</icon>
+  </label>
+  <label class="inverse checkbox">
+    <input type="checkbox" autocomplete="off" />
+    <div>Inverted checkbox</div>
+    <icon>check_box</icon>
+    <icon>check_box_outline_blank</icon>
+  </label>
+  <label class="inverse checkbox">
+    <input type="checkbox" checked autocomplete="off" />
+    <div>Inverted checkbox</div>
+    <icon>check_box</icon>
+    <icon>check_box_outline_blank</icon>
+  </label>
+  <label class="inverse checkbox">
+    <input type="checkbox" autocomplete="off" disabled />
+    <div>Inverted checkbox</div>
+    <icon>check_box</icon>
+    <icon>check_box_outline_blank</icon>
+  </label>
+  <label class="inverse checkbox">
+    <input type="checkbox" checked autocomplete="off" disabled />
+    <div>Inverted checkbox</div>
+    <icon>check_box</icon>
+    <icon>check_box_outline_blank</icon>
+  </label>
+</div>
+<h2 class="font-serif text-2xl text-primary">Snackbar</h2>
+<button class="btn-tonal" onclick="snackbar.show('All changes saved')">
+  <icon>icecream</icon>Open Snackbar
+</button>
+<h2 class="font-serif text-2xl text-primary">Status boxes</h2>
+<div class="mb-2 status-success"><icon>check</icon>Something went right</div>
+<div class="status-error"><icon>error</icon>Something went wrong</div>

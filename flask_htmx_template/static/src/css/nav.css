@@ -1,0 +1,142 @@
+@custom-variant nav-current (&:where(.nav-current, .nav-current *));
+
+@utility nav-section {
+  @apply flex items-center;
+
+  & > h1 {
+    @apply w-full border border-transparent px-3;
+  }
+
+  & > button,
+  & > a {
+    @apply relative mx-auto btn-text w-min;
+
+    @variant nav-current {
+      @apply btn-tonal font-bold;
+
+      & > icon {
+        font-variation-settings: "FILL" 1;
+      }
+    }
+
+    @variant not-nav-current {
+      @apply text-on-surface;
+    }
+  }
+}
+
+@utility nav-rail {
+  @apply flex h-full w-24 shrink-0 flex-col overflow-y-auto p-1;
+  @apply fixed left-0;
+  @apply bg-surface;
+
+  & > * {
+    @apply shrink-0;
+  }
+
+  & > a {
+    @apply mx-auto hidden h-12 flex-col justify-end md:flex;
+    @apply font-title text-xl;
+    @apply transition-colors hover:text-primary active:text-primary;
+  }
+
+  & > section {
+    @apply nav-section;
+    @apply flex-col gap-1 py-1;
+
+    @variant first-of-type {
+      @apply my-8;
+    }
+
+    @variant last-of-type {
+      @apply grow;
+    }
+  }
+}
+
+@layer components {
+  #nav-rail {
+    @apply nav-rail max-md:hidden lg:hidden;
+
+    & > section > button,
+    & > section > a {
+      @apply btn-stacked;
+    }
+  }
+
+  #nav-drawer {
+    @apply nav-rail w-52 px-2;
+
+    /* Modal nav-drawer */
+    @variant max-lg {
+      @apply fixed top-0 z-48 rounded-r-3xl;
+      @apply -translate-x-full transition-transform duration-300;
+      @apply bg-surface-container-low;
+
+      @variant open {
+        @apply translate-x-0;
+
+        & ~ #scrim {
+          @apply translate-x-0 opacity-100;
+          transition:
+            opacity 0.3s,
+            translate 0s;
+        }
+      }
+    }
+
+    & > a {
+      @apply text-5xl;
+    }
+
+    & > section > button,
+    & > section > a {
+      @apply w-full p-3;
+    }
+  }
+
+  #nav-bar {
+    @apply nav-section z-40;
+    @apply fixed bottom-0 w-full justify-evenly pt-2 md:hidden;
+    @apply bg-surface-container;
+
+    transition: translate 0.5s;
+
+    & > button,
+    & > a {
+      @apply btn-stacked mx-0 btn-size-lg last:w-min;
+
+      @variant last {
+        @apply absolute right-3 bottom-19.5 w-min;
+        @apply fab shadow-shadow/50;
+        transition: translate 0.5s;
+      }
+    }
+  }
+
+  #nav-header {
+    @apply fixed top-0 z-40 w-full md:hidden;
+    @apply bg-primary text-on-primary;
+
+    transition: translate 0.5s;
+
+    & > * {
+      @apply transition-colors hover:text-primary-container active:text-primary-container;
+    }
+
+    & > icon {
+      @apply absolute p-0.5 text-[36px];
+    }
+
+    & > a {
+      @apply block w-min px-2;
+      @apply mx-auto font-title text-4xl;
+    }
+  }
+
+  #nav-footer {
+    @apply fixed bottom-0 h-28 w-full p-2;
+    @apply border-primary bg-primary-container;
+    @apply border-t-4 text-left text-sm md:text-center;
+  }
+}

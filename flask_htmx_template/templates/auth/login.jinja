@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+{# djlint: off #}
+{# ignore missing <head> #}
+<html lang="en-US">
+  {# djlint: on #}
+  {% with resizes="visual" %}
+    {% include "shared/head.jinja" %}
+  {% endwith %}
+  <body
+    class="bg-primary-container text-on-primary-container"
+    hx-on::config-request="addTimezone(event)"
+    hx-on::send-error="appSendError(event)"
+    hx-on::response-error="appResponseError(event)"
+  >
+    {% include "shared/hx-error.jinja" %}
+    <div id="main-sizer" class="p-0 pb-28">
+      <main id="main" class="flex flex-col items-center justify-center">
+        <form
+          id="form-login"
+          class="mx-2 my-8 flex max-h-96 w-full max-w-96 grow flex-col items-center rounded-2xl bg-surface p-2"
+          hx-post="{{ url_for('auth.login') }}"
+          hx-disabled-elt="find button"
+          hx-target="#login-error"
+          hx-include="this"
+        >
+          <h1 class="font-title text-7xl">Template</h1>
+          <p class="grow text-center">
+            A template repository for flask with htmx
+          </p>
+          <div id="login-error" class="status-error"></div>
+          {% if next_url %}
+            <input name="next" type="hidden" value="{{ next_url }}" />
+          {% endif %}
+          <label class="input-outlined my-2 w-full">
+            <input
+              class="scroll-mb-20"
+              name="password"
+              type="password"
+              placeholder=""
+              enterkeyhint="go"
+              autofocus
+            />
+            <div>
+              <div>Password</div>
+            </div>
+          </label>
+          <button class="btn-filled font-serif btn-size-lg">
+            Login
+            <icon>login</icon>
+          </button>
+        </form>
+      </main>
+    </div>
+    {% block footer %}
+      {% include "shared/footer.jinja" %}
+    {% endblock footer %}
+  </body>
+</html>

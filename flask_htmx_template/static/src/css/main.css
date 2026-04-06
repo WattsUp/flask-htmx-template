@@ -1,0 +1,283 @@
+/* static/src/main.css */
+
+@import "tailwindcss";
+
+@import "./fonts.css";
+@import "./buttons.css";
+@import "./inputs.css";
+@import "./patterns.css";
+@import "./prose.css";
+
+@import "./nav.css";
+@import "./dashboard.css";
+@import "./dialog.css";
+@import "./snackbar.css";
+@import "./page-progress.css";
+@import "./spinner.css";
+
+/* Apply dark theme if on element or any ancestor */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@custom-variant disabled (&:where(.disabled, .disabled *, [disabled], [disabled] *));
+@custom-variant open (&:where(.open, .open *));
+@custom-variant error (&:where(.error, .error *));
+@custom-variant edit (&:where(.edit, .edit *));
+@custom-variant inverse (&:where(.inverse, .inverse *));
+
+@theme {
+  --color-*: initial;
+
+  --color-primary: #3f6837;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #bff0b1;
+  --color-on-primary-container: #002201;
+  --color-primary-fixed: #bff0b1;
+  --color-on-primary-fixed: #002201;
+  --color-primary-fixed-dim: #a4d396;
+  --color-on-primary-fixed-variant: #275021;
+  --color-inverse-primary: #a4d396;
+
+  --color-secondary: #53634e;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d7e8cd;
+  --color-on-secondary-container: #121f0f;
+  --color-secondary-fixed: #d7e8cd;
+  --color-on-secondary-fixed: #121f0f;
+  --color-secondary-fixed-dim: #bbcbb2;
+  --color-on-secondary-fixed-variant: #3c4b37;
+
+  --color-tertiary: #386569;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #bcebef;
+  --color-on-tertiary-container: #002022;
+  --color-tertiary-fixed: #bcebef;
+  --color-on-tertiary-fixed: #002022;
+  --color-tertiary-fixed-dim: #a0cfd2;
+  --color-on-tertiary-fixed-variant: #1e4d51;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #410002;
+
+  --color-surface: #f8fbf1;
+  --color-on-surface: #191d17;
+  --color-surface-dim: #d8dbd2;
+  --color-surface-bright: #f8fbf1;
+  --color-surface-variant: #dfe4d8;
+  --color-on-surface-variant: #43493f;
+
+  --color-inverse-surface: #2e322b;
+  --color-inverse-on-surface: #eff2e8;
+
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f5eb;
+  --color-surface-container: #ecefe5;
+  --color-surface-container-high: #e6e9e0;
+  --color-surface-container-highest: #e1e4da;
+
+  --color-outline: #73796e;
+  --color-outline-variant: #c3c8bc;
+
+  --color-shadow: #000000;
+  --color-scrim: #000000;
+
+  --color-white: #fff;
+  --color-black: #000;
+
+  --font-serif: "linux-libertine", "serif", "Noto Color Emoji";
+  --font-sans: "liberation-sans", "sans-serif", "Noto Color Emoji";
+  --font-title: "fogtwo-no5", "serif", "Noto Color Emoji";
+  --font-mono: "code-new-roman", "monospace", "Noto Color Emoji";
+}
+
+@layer base {
+  icon {
+    user-select: none;
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -moz-font-feature-settings: "liga";
+    font-feature-settings: "liga";
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  icon.filled {
+    font-variation-settings: "FILL" 1;
+  }
+
+  icon.lg {
+    font-size: 32px;
+  }
+
+  icon.sm {
+    font-size: 20px;
+  }
+
+  html {
+    @apply overscroll-y-contain scroll-smooth;
+
+    font-variant-emoji: unicode;
+
+    @variant dark {
+      --color-primary: #a4d396;
+      --color-on-primary: #10380c;
+      --color-primary-container: #275021;
+      --color-on-primary-container: #bff0b1;
+      --color-inverse-primary: #3f6837;
+
+      --color-secondary: #bbcbb2;
+      --color-on-secondary: #263422;
+      --color-secondary-container: #3c4b37;
+      --color-on-secondary-container: #d7e8cd;
+
+      --color-tertiary: #a0cfd2;
+      --color-on-tertiary: #00373a;
+      --color-tertiary-container: #1e4d51;
+      --color-on-tertiary-container: #bcebef;
+
+      --color-error: #ffb4ab;
+      --color-on-error: #690005;
+      --color-error-container: #93000a;
+      --color-on-error-container: #ffdad6;
+
+      --color-bg: #11140f;
+      --color-on-bg: #e1e4da;
+      --color-surface: #11140f;
+      --color-on-surface: #e1e4da;
+      --color-surface-dim: #11140f;
+      --color-surface-bright: #363a34;
+      --color-surface-variant: #43493f;
+      --color-on-surface-variant: #c3c8bc;
+
+      --color-inverse-surface: #e1e4da;
+      --color-inverse-on-surface: #2e322b;
+
+      --color-surface-container-lowest: #0b0f0a;
+      --color-surface-container-low: #191d17;
+      --color-surface-container: #1d211b;
+      --color-surface-container-high: #272b25;
+      --color-surface-container-highest: #32362f;
+
+      --color-outline: #8d9387;
+      --color-outline-variant: #43493f;
+
+      --color-shadow: #000000;
+      --color-scrim: #000000;
+    }
+
+    &:has(.dialog:not(:empty)) {
+      /* no scrolling when a dialog is open */
+      @apply overflow-hidden;
+    }
+  }
+
+  body {
+    @apply relative h-screen w-full overscroll-y-contain antialiased;
+    @apply bg-surface text-on-surface;
+    @apply max-md:scroll-mt-10;
+  }
+
+  table td {
+    @apply px-1 py-0.5;
+  }
+
+  table > thead {
+    @apply sticky top-0;
+    @apply bg-surface;
+  }
+
+  table > tbody > tr {
+    @apply even:bg-surface-container;
+    @apply hover:bg-surface-container-high;
+  }
+
+  hr {
+    @apply border-outline-variant;
+  }
+
+  .grid > hr {
+    @apply col-span-full;
+  }
+
+  * {
+    @apply disabled:pointer-events-none;
+  }
+
+  details[open] .details-icon-closed {
+    @apply hidden;
+  }
+
+  details:not([open]) .details-icon-open {
+    @apply hidden;
+  }
+}
+
+@layer components {
+  .scrim {
+    @apply fixed inset-0;
+    @apply -translate-x-full;
+    @apply bg-scrim/40 opacity-0;
+
+    /* delay translate until opacity finishes */
+    transition:
+      opacity 0.3s,
+      translate 0s 0.3s;
+  }
+
+  #main-wrapper {
+    @apply relative min-h-screen;
+    @apply max-md:mt-10 max-md:mb-16.5;
+    @apply md:ml-24 lg:ml-52;
+  }
+
+  #main {
+    @apply min-h-full overflow-hidden px-2 pt-2 pb-20 md:px-4;
+    @apply mx-auto max-w-7xl;
+
+    & > div:first-of-type {
+      @apply flex items-center justify-between pb-1;
+
+      & > h1 {
+        @apply font-serif text-3xl text-primary;
+      }
+    }
+
+    & > h2 {
+      @apply font-serif text-2xl text-primary;
+    }
+  }
+
+  #main-footer {
+    @apply absolute bottom-0 w-full p-2;
+    @apply text-center text-sm;
+  }
+}
+
+@utility status-box {
+  @apply flex items-center justify-center gap-1 rounded-md p-1;
+  @apply empty:hidden;
+}
+
+@utility status-error {
+  @apply status-box;
+  @apply bg-error-container text-on-error-container;
+}
+
+@utility status-tertiary {
+  @apply status-box;
+  @apply bg-tertiary-container text-on-tertiary-container;
+}
+
+@utility status-success {
+  @apply status-box;
+  @apply bg-primary-container text-on-primary-container;
+}

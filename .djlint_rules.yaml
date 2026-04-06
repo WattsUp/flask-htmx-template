@@ -1,0 +1,6 @@
+- rule:
+    name: H020b
+    message: Empty tag pair found. Consider removing.
+    flags: re.DOTALL|re.I
+    patterns:
+      - <((?!td|li|th|dt|dd|error|switch|chips)\w+)\s*?>\s*?<\/\1>

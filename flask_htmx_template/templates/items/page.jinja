@@ -1,0 +1,32 @@
+<div
+  hx-get="{{ url_for('items.page', uri=item.uri) }}"
+  hx-trigger="item from:body"
+  hx-target="#main"
+>
+  <h1>{{ item.name }}</h1>
+  <button
+    class="btn-tonal"
+    hx-get="{{ url_for('items.item', uri=item.uri) }}"
+    hx-disabled-elt="this"
+    hx-target="#dialog"
+    hx-swap="innerHTML show:#dialog:top"
+    hx-push-url="#dialog"
+  >
+    <icon>edit</icon>Edit
+  </button>
+</div>
+<input class="current-item" name="item" type="hidden" value="{{ item.uri }}" />
+<label class="checkbox">
+  <input type="checkbox" autocomplete="off" />
+  <div>
+    <span>#xxxxxxx</span>
+    <span>#{{ item.value | comma }}</span>
+  </div>
+  <icon>visibility</icon>
+  <icon>visibility_off</icon>
+</label>
+<i>as of {{ item.date }}</i>
+{% if item.note %}
+  <h2>Note</h2>
+  <div>{{ item.note }}</div>
+{% endif %}

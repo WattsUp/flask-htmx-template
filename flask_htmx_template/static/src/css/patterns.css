@@ -1,0 +1,45 @@
+@theme {
+  --pattern-opacity: 0.4;
+  --pattern-bg-color: transparent;
+  --pattern-color: var(--color-primary);
+  --pattern-size: calc(var(--spacing) * 2);
+}
+
+@utility pattern-lines {
+  opacity: var(--pattern-opacity);
+  background-color: var(--pattern-bg-color);
+  background-image: linear-gradient(
+    0deg,
+    var(--pattern-bg-color) 50%,
+    var(--pattern-color) 50%
+  );
+  background-size: var(--pattern-size) var(--pattern-size);
+}
+
+@utility pattern-diagonal-lines {
+  opacity: var(--pattern-opacity);
+  background-color: var(--pattern-bg-color);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--pattern-color),
+    var(--pattern-color) calc(var(--pattern-size) * 0.2),
+    var(--pattern-bg-color) calc(var(--pattern-size) * 0.2),
+    var(--pattern-bg-color) var(--pattern-size)
+  );
+}
+
+@utility pattern-size-* {
+  --pattern-size: calc(var(--spacing) * --value(integer));
+}
+
+@utility pattern-opacity-* {
+  --pattern-opacity: calc(--value(integer) * 1%);
+}
+
+@utility pattern-* {
+  --pattern-color: --value(--color-*);
+}
+
+@utility pattern-bg-* {
+  --pattern-bg-color: --value(--color-*);
+}

@@ -1,0 +1,91 @@
+{% if item.uri %}
+  {% with headline="Edit item", save_url=url_for("items.item", uri=item.uri) %}
+    {% include "shared/dialog-headline.jinja" %}
+  {% endwith %}
+{% else %}
+  {% with headline="New item", save_url=url_for("items.new"), save_method="post" %}
+    {% include "shared/dialog-headline.jinja" %}
+  {% endwith %}
+{% endif %}
+<form class="grid w-88 gap-2" onsubmit="return false">
+  <label class="input-outlined col-span-2 input-bg-surface-container-high">
+    <input
+      name="name"
+      required
+      value="{{ item.name or '' }}"
+      placeholder=""
+      autocomplete="off"
+      spellcheck="true"
+      enterkeyhint="next"
+      hx-get="{{ url_for('items.validation', uri=item.uri) }}"
+      hx-trigger="input delay:200ms"
+      hx-target="next error"
+      hx-include="this"
+    />
+    <div>
+      <div>Name</div>
+    </div>
+    <div>
+      <error></error>
+    </div>
+  </label>
+  <label class="input-outlined col-span-2 input-bg-surface-container-high">
+    <input
+      name="value"
+      required
+      value="{{ item.value | input_value }}"
+      placeholder=""
+      autocomplete="off"
+      enterkeyhint="next"
+      inputmode="tel"
+      hx-get="{{ url_for('items.validation', uri=item.uri) }}"
+      hx-trigger="input delay:200ms"
+      hx-target="next error"
+      hx-include="this"
+    />
+    <div>
+      <div>Value</div>
+    </div>
+    <div>
+      <error></error>
+      <span>Just a number</span>
+    </div>
+  </label>
+  <label class="input-outlined col-span-2 input-bg-surface-container-high">
+    <input
+      name="note"
+      value="{{ item.note or '' }}"
+      placeholder=""
+      autocomplete="off"
+      spellcheck="true"
+      enterkeyhint="next"
+      hx-get="{{ url_for('items.validation', uri=item.uri) }}"
+      hx-trigger="input delay:200ms"
+      hx-target="next error"
+      hx-include="this"
+    />
+    <div>
+      <div>Note</div>
+    </div>
+    <div>
+      <error></error>
+    </div>
+  </label>
+</form>
+{% if item.uri %}
+  <div class="flex flex-wrap justify-around" hx-target="#dialog-error">
+    <button
+      class="btn-text-error"
+      hx-delete="{{ url_for('items.item', uri=item.uri) }}"
+      hx-trigger="delete"
+      hx-disabled-elt="this"
+      onclick="items.confirmDelete(event)"
+    >
+      Delete
+    </button>
+  </div>
+{% endif %}
+<div id="dialog-error" class="status-error"></div>
+<script>
+  dialog.onLoad();
+</script>
