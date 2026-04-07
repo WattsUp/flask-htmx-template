@@ -6,7 +6,39 @@ from pathlib import Path
 
 import flask
 
+from flask_htmx_template import web, web_theme
 from flask_htmx_template.controllers import auth, base
+from flask_htmx_template.models.config import Config, ConfigKey
+
+
+def theme() -> flask.Response:
+    """GET theme CSS override for Tailwind CSS.
+
+    Returns:
+        CSS response with Material Design 3 theme variables as :root and dark overrides
+
+    """
+    with web.db.begin_session():
+        swatch = Config.fetch(ConfigKey.WEB_THEME_SWATCH)
+        mood = Config.web_theme_mood()
+
+    t = web_theme.generate(swatch, mood)
+
+    def css_vars(colors: web_theme.Colors | web_theme.FixedColors) -> list[str]:
+        return [f"  --color-{k.replace('_', '-')}: {v};" for k, v in colors.items()]
+
+    lines: list[str] = [
+        "@layer theme {",
+        ":root {",
+    ]
+    lines.extend(css_vars(t["fixed"]))
+    lines.extend(css_vars(t["light"]))
+    lines.extend(["}", "}", "", "@layer base {", "html:where(.dark, .dark *) {"])
+    lines.extend(css_vars(t["dark"]))
+    lines.extend(["}", "}"])
+    css = "\n".join(lines) + "\n"
+
+    return flask.Response(css, content_type="text/css; charset=utf-8")
 
 
 def page_dashboard() -> flask.Response:
@@ -59,5 +91,6 @@ ROUTES: base.Routes = {
     "/index": (page_dashboard, ["GET"]),
     "/favicon.ico": (favicon, ["GET"]),
     "/status": (page_status, ["GET"]),
+    "/theme.css": (theme, ["GET"]),
     "/d/style-test": (page_style_test, ["GET"]),
 }

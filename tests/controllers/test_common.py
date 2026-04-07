@@ -32,3 +32,15 @@ def test_favicon(web_client: WebClient) -> None:
         "common.favicon",
         content_type="image/vnd.microsoft.icon",
     )
+
+
+def test_theme(web_client: WebClient) -> None:
+    result, _ = web_client.GET("common.theme", content_type="text/css; charset=utf-8")
+    css = result.decode()
+    assert css.startswith("@layer theme {")
+    assert ":root {" in css
+    assert "@layer base {" in css
+    assert "--color-primary:" in css
+    assert "--color-primary-fixed:" in css
+    assert "html:where(.dark, .dark *) {" in css
+    assert css.endswith("}\n")
