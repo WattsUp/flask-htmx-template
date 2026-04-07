@@ -162,9 +162,9 @@ Versioning of this projects adheres to [Semantic Versioning](https://semver.org/
 
 [pypi-image]: https://img.shields.io/pypi/v/flask-htmx-template.svg
 [pypi-url]: https://pypi.org/project/flask-htmx-template/
-[unittest-image]: https://github.com/WattsUp/flask-htmx-templateows/test.yml/badge.svg
-[unittest-url]: https://github.com/WattsUp/flask-htmx-templateows/test.yml
-[static-analysis-image]: https://github.com/WattsUp/flask-htmx-templateows/static-analysis.yml/badge.svg
-[static-analysis-url]: https://github.com/WattsUp/flask-htmx-templateows/static-analysis.yml
+[unittest-image]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/test.yml/badge.svg
+[unittest-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/test.yml
+[static-analysis-image]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml/badge.svg
+[static-analysis-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml
 [coverage-image]: https://gist.githubusercontent.com/WattsUp/36d9705addcd44fb0fccec1d23dc1338/raw/flask-htmx-template__heads_master.svg
-[coverage-url]: https://github.com/WattsUp/flask-htmx-templateows/coverage.yml
+[coverage-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/coverage.yml
