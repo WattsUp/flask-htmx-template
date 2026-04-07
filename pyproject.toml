@@ -21,6 +21,7 @@ dependencies = [
   "argcomplete",
   "prometheus-flask-exporter",
   "packaging",
+  "tqdm",
 ]
 description = "A template repository for flask with htmx"
 license = "MIT"
