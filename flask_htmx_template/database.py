@@ -21,7 +21,7 @@ from packaging.version import Version
 from sqlalchemy import func, orm
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, utils
+from flask_htmx_template import sql, utils, web_theme
 from flask_htmx_template.encryption.top import Encryption, ENCRYPTION_AVAILABLE
 from flask_htmx_template.migrations.top import MIGRATORS
 from flask_htmx_template.models.base import Base
@@ -59,11 +59,9 @@ class Database:
         """
         self._path_db = Path(path).resolve().with_suffix(".db")
         self._path_salt = self._path_db.with_suffix(".nacl")
-        self._path_importers = self._path_db.with_suffix(".importers")
         if not self._path_db.exists():
             msg = f"Database at {self._path_db} does not exist, use Database.create()"
             raise FileNotFoundError(msg)
-        self._path_importers.mkdir(exist_ok=True)  # Make if it doesn't exist
 
         if key is None:
             self._enc = None
@@ -139,10 +137,8 @@ class Database:
             msg = f"Database already exists at {path_db}"
             raise FileExistsError(msg)
         path_salt = path_db.with_suffix(".nacl")
-        path_importers = path_db.with_suffix(".importers")
 
         path_db.parent.mkdir(parents=True, exist_ok=True)
-        path_importers.mkdir(exist_ok=True)
 
         enc = None
         enc_config = None
@@ -180,6 +176,9 @@ class Database:
                 Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
                 Config.set_(ConfigKey.CIPHER, cipher_b64)
                 Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
+
+                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
+                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
 
                 if enc is not None and key is not None:
                     Config.set_(ConfigKey.WEB_KEY, enc.encrypt(key))
@@ -426,8 +425,6 @@ class Database:
         for file in parent.iterdir():
             if file in {path_backup, path_backup_optimized}:
                 continue
-            if file == self._path_importers:
-                continue
             if file.name.startswith(f"{name}."):
                 if file.is_dir():
                     shutil.rmtree(file)
@@ -550,10 +547,6 @@ class Database:
         """
         path_db.unlink(missing_ok=True)
         path_db.with_suffix(".nacl").unlink(missing_ok=True)
-
-        path = path_db.with_suffix(".importers")
-        if path.exists() and not path.is_symlink():
-            shutil.rmtree(path)
 
     @staticmethod
     def _copy_tables(

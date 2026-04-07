@@ -32,6 +32,10 @@ class Mood(BaseEnum):
     FRUIT_SALAD = 9
 
 
+DEFAULT_SWATCH = "#3f6837"
+DEFAULT_MOOD = Mood.TONAL_SPOT
+
+
 class FixedColors(TypedDict):
     """Fixed color scheme definition."""
 
@@ -179,7 +183,7 @@ def _make_fixed(get: Callable[[str], HexColor]) -> FixedColors:
     }
 
 
-def generate(swatch: HexColor, mood: Mood = Mood.TONAL_SPOT) -> Theme:
+def generate(swatch: HexColor, mood: Mood = DEFAULT_MOOD) -> Theme:
     """Generate a theme from a swatch color.
 
     Args:

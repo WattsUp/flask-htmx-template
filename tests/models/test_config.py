@@ -6,7 +6,7 @@ import pytest
 from packaging.version import Version
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql
+from flask_htmx_template import sql, web_theme
 from flask_htmx_template.migrations.top import MIGRATORS
 from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.version import __version__
@@ -76,3 +76,7 @@ def test_db_version() -> None:
     ]
     target = versions[0] if len(versions) == 1 else max(versions)
     assert Config.db_version() == target
+
+
+def test_web_theme_mood() -> None:
+    assert Config.web_theme_mood() == web_theme.DEFAULT_MOOD
