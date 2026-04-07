@@ -37,9 +37,7 @@ def test_unauth_static(web_client_encrypted: WebClientEncrypted) -> None:
         ("static", {"filename": "dist/main.css"}),
         content_type="text/css; charset=utf-8",
     )
-    if isinstance(result, bytes):
-        result = result.decode()
-    assert "/*! tailwindcss" in result
+    assert "/*! tailwindcss" in result.decode()
 
 
 @pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")
