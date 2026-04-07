@@ -393,13 +393,12 @@ def test_metrics(web_client: WebClient, item: Item) -> None:
         "prometheus_metrics",
         content_type="text/plain; version=0.0.4; charset=utf-8",
     )
-    if isinstance(result, bytes):
-        result = result.decode()
-    assert "flask_exporter_info" in result
-    assert "flask_htmx_template_info" in result
-    assert "flask_http_request_duration_seconds_count" in result
-    assert 'endpoint="items.page"' in result
-    assert 'endpoint="items.page_all"' in result
+    result_str = result.decode()
+    assert "flask_exporter_info" in result_str
+    assert "flask_htmx_template_info" in result_str
+    assert "flask_http_request_duration_seconds_count" in result_str
+    assert 'endpoint="items.page"' in result_str
+    assert 'endpoint="items.page_all"' in result_str
 
 
 def test_follow_links(web_client: WebClient) -> None:

@@ -127,3 +127,39 @@ def test_edit_invalid_name(
         "Item name must be at least 2 characters long",
     ]
     assert result == {"errors": target}
+
+
+def test_new_empty(web_client: WebClient) -> None:
+    result, _ = web_client.POST_J(
+        "items.json_new",
+        rc=HTTP_CODE_BAD_REQUEST,
+        json={},
+    )
+    target = [
+        "json.name is missing",
+        "json.note is missing",
+        "json.value is missing",
+    ]
+    assert result == {"errors": target}
+
+
+def test_new_duplicate_name(web_client: WebClient, item: Item) -> None:
+    j = {
+        "name": item.name,
+        "value": "1234",
+        "note": "New note",
+    }
+    result, _ = web_client.POST_J(
+        "items.json_new",
+        rc=HTTP_CODE_BAD_REQUEST,
+        json=j,
+    )
+    assert "errors" in result
+
+
+def test_get_not_found(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J(
+        ("items.json", {"uri": "bad-uri"}),
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+    assert "errors" in result

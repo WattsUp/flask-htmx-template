@@ -133,8 +133,6 @@ class TreeNode(NamedTuple):
             # Better trigger than default
             assert 'hx-trigger="blur changed"' in self.attributes
 
-            return True
-
         return True
 
     def has_preferred_attribute_order(self) -> bool:
@@ -459,7 +457,7 @@ class WebClient:
         self,
         endpoint: str | tuple[str, Queries],
         *,
-        rc: int,
+        rc: int = HTTP_CODE_OK,
         content_type: str,
         **kwargs: object,
     ) -> tuple[bytes, werkzeug.datastructures.Headers]: ...

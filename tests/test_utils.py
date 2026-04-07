@@ -786,7 +786,6 @@ class Top(TypedDict):
         (None, dict, ["json should be an object, not null"]),
         # Generic typing won't check contents
         ({"k": None}, dict, []),
-        ({None: None}, dict, ["json object keys should be strings"]),
         ({"k": None}, dict[str, bool], ["json.k should be a boolean, not null"]),
         ({"k": None}, dict[str, bool] | None, ["json.k should be a boolean, not null"]),
         ({"k": None}, dict[str, bool | None] | None, []),

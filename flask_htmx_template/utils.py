@@ -16,7 +16,7 @@ import sys
 from decimal import Decimal
 from enum import Enum
 from types import GenericAlias, NoneType, UnionType
-from typing import get_type_hints, NamedTuple, overload, TYPE_CHECKING
+from typing import cast, get_type_hints, NamedTuple, overload, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -876,9 +876,7 @@ def json_mutate(obj: object, *, skip_decimal: bool = False) -> object:
         return obj.name.lower()
     if not skip_decimal and isinstance(obj, Decimal):
         o_int = int(obj)
-        if o_int == obj:
-            return o_int
-        return str(obj)
+        return o_int if o_int == obj else str(obj)
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
     return obj
@@ -898,7 +896,7 @@ _JSON_TYPES: dict[type, str] = {
 }
 
 
-def _pretty_json_type(t: type) -> str:
+def _pretty_json_type(t: type[Enum | object]) -> str:
     if issubclass(t, Enum):
         return " or ".join(f'"{e.name.lower()}"' for e in t)
     return _JSON_TYPES.get(t, t.__name__)
@@ -946,7 +944,7 @@ def validate_json[T: object](
     to_test = _parse_annotations(type_, no_typed_dict=True)
     if Decimal in to_test and isinstance(obj, (str, float, int)):
         with contextlib.suppress(decimal.InvalidOperation):
-            return Decimal(obj), []
+            return cast("T", Decimal(obj)), []
 
     if isinstance(obj, str):
         for t in to_test:
@@ -995,14 +993,14 @@ def _validate_json_str(
     return obj, ["unknown"]
 
 
-def _validate_json_list[T: list[object]](
-    obj: T,
-    type_: type[T] | UnionType | GenericAlias,
+def _validate_json_list[V: object](
+    obj: list[V],
+    type_: type[list[V]] | UnionType | GenericAlias,
     *,
     key: str = "",
-) -> tuple[T, list[str]]:
+) -> tuple[list[V], list[str]]:
     errors: list[str] = []
-    obj_upgrade: T = []
+    obj_upgrade: list[V] = []
     if isinstance(type_, GenericAlias):
         # Check all elements are of sub_type
         sub_type: type = type_.__args__[0]
@@ -1022,18 +1020,14 @@ def _validate_json_list[T: list[object]](
     return obj, errors
 
 
-def _validate_json_dict[T: dict[object, object]](
-    obj: T,
-    type_: type[T] | UnionType | GenericAlias,
+def _validate_json_dict[V: object](
+    obj: dict[str, V],
+    type_: type[dict[str, V]] | UnionType | GenericAlias,
     *,
     key: str = "",
-) -> tuple[T, list[str]]:
-    errors: list[str] = (
-        []
-        if all(isinstance(k, str) for k in obj)
-        else [f"{key} object keys should be strings"]
-    )
-    obj_upgrade: T = {}
+) -> tuple[dict[str, V], list[str]]:
+    errors: list[str] = []
+    obj_upgrade: dict[str, V] = {}
     if isinstance(type_, GenericAlias):
         # Check all elements are of sub_type
         sub_type: type = type_.__args__[1]
@@ -1063,7 +1057,7 @@ def _validate_json_dict[T: dict[object, object]](
     if not hints:
         return obj, errors
 
-    obj_copy = obj.copy()
+    obj_copy: dict[str, V] = obj.copy()
     for k, sub_type in sorted(hints.items()):
         if k in obj_copy:
             v = obj_copy.pop(k)

@@ -19,9 +19,7 @@ def test_page_status(web_client: WebClient) -> None:
         "prometheus_metrics",
         content_type="text/plain; version=0.0.4; charset=utf-8",
     )
-    if isinstance(result, bytes):
-        result = result.decode()
-    assert 'endpoint="common.page_status"' not in result
+    assert 'endpoint="common.page_status"' not in result.decode()
 
 
 def test_page_style_test(web_client: WebClient) -> None:
