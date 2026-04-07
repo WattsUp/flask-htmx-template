@@ -13,6 +13,13 @@
     hx-on::response-error="appResponseError(event)"
   >
     {% include "shared/hx-error.jinja" %}
+    <div id="snackbar" onclick="snackbar.hide()"></div>
+    <script id="snackbar-script"></script>
+    <div class="dialog-wrapper z-48">
+      <div id="dialog" class="dialog"></div>
+    </div>
+    <div id="scrim" class="scrim z-47" onclick="dialog.close()"></div>
+    <script id="dialog-script"></script>
     <div id="main-sizer" class="p-0 pb-28">
       <main id="main" class="flex flex-col items-center justify-center">
         <form
