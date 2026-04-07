@@ -10,5 +10,11 @@ from materialyoucolor.dynamiccolor.dynamic_scheme import (
 from materialyoucolor.hct.hct import Hct
 
 class SchemeFruitSalad(DynamicScheme):
-    def __init__(self, source_color_hct: Hct, is_dark: bool, contrast_level: float, spec_version: SpecVersion = ..., platform: Platform = ...) -> None:
-        ...
+    def __init__(
+        self,
+        source_color_hct: Hct,
+        is_dark: bool,
+        contrast_level: float,
+        spec_version: SpecVersion = ...,
+        platform: Platform = ...,
+    ) -> None: ...

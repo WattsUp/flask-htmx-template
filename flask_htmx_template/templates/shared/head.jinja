@@ -15,7 +15,12 @@
   {% assets "css" %}
     <link rel="stylesheet" href="{{ ASSET_URL }}" />
   {% endassets %}
-  <link rel="stylesheet" href="{{ url_for('common.theme') }}" />
+  <link
+    id="theme-stylesheet"
+    rel="stylesheet"
+    href="{{ url_for('common.theme_css') }}"
+  />
+  <link id="theme-live" rel="stylesheet" />
   <script
     defer
     src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.6/dist/htmx.min.js"

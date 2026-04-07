@@ -6,6 +6,7 @@ class Blend:
     """
     Functions for blending in HCT and CAM16.
     """
+
     @staticmethod
     def harmonize(design_color: int, source_color: int) -> int:
         """
