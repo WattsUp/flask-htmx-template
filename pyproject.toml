@@ -22,6 +22,7 @@ dependencies = [
   "prometheus-flask-exporter",
   "packaging",
   "tqdm",
+  "materialyoucolor>=3.0.2",
 ]
 description = "A template repository for flask with htmx"
 license = "MIT"
@@ -136,8 +137,8 @@ float_to_top = true
 force_alphabetical_sort_within_sections = true
 
 [tool.basedpyright]
-include = ["flask_htmx_template", "tests", "tools"]
-exclude = ["**/__pycache__", "typing"]
+include = ["flask_htmx_template", "tests", "tools", "typings"]
+exclude = ["**/__pycache__"]
 venvPath = "."
 typeCheckingMode = "strict"
 
@@ -252,3 +253,6 @@ flask_htmx_template = [
 
 [tool.setuptools_scm]
 version_file = "flask_htmx_template/version.py"
+
+[dependency-groups]
+dev = ["materialyoucolor>=3.0.2"]
