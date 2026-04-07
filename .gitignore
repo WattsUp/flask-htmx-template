@@ -1,6 +1,7 @@
 # IDE files
 .venv*
 .env*
+.nvim*
 
 # Build artifacts
 __pycache__
