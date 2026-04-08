@@ -136,7 +136,6 @@
 
   #nav-footer {
     @apply fixed bottom-0 h-28 w-full p-2;
-    @apply border-primary bg-primary-container;
-    @apply border-t-4 text-left text-sm md:text-center;
+    @apply border-t-4 border-outline text-left text-sm md:text-center;
   }
 }

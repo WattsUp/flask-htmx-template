@@ -1,16 +1,7 @@
 <footer id="nav-footer">
-  <p>Copyright © {{ current_year }} SEL</p>
+  <p>Copyright © {{ current_year }}</p>
   <p>Version: {{ version }}</p>
   {% include "shared/theme-selector.jinja" %}
-  <button
-    hx-get="{{ url_for('common.theme') }}"
-    hx-disabled-elt="this"
-    hx-target="#dialog"
-    hx-swap="innerHTML show:#dialog:top"
-    hx-push-url="#dialog"
-  >
-    <icon>palette</icon>
-  </button>
   {# Set radio buttons once buttons load #}
   <script>
     onLoad(() => {

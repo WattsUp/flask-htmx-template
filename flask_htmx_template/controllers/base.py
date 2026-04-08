@@ -172,7 +172,6 @@ def ctx_base_page(
                         if is_encrypted
                         else None
                     ),
-                    "Theme": Page("palette", "common.theme", LinkType.DIALOG),
                     "Style test": (
                         Page("style", "common.page_style_test") if debug else None
                     ),

@@ -1,35 +1,47 @@
-<fieldset class="mx-auto radioset max-w-min">
-  <label>
-    <input
-      class="theme-system"
-      name="theme"
-      type="radio"
-      value="system"
-      autocomplete="off"
-      onclick="updateTheme('system')"
-    />
-    <icon>devices</icon>
-  </label>
-  <label>
-    <input
-      class="theme-light"
-      name="theme"
-      type="radio"
-      value="light"
-      autocomplete="off"
-      onclick="updateTheme('light')"
-    />
-    <icon>light_mode</icon>
-  </label>
-  <label>
-    <input
-      class="theme-dark"
-      name="theme"
-      type="radio"
-      value="dark"
-      autocomplete="off"
-      onclick="updateTheme('dark')"
-    />
-    <icon>dark_mode</icon>
-  </label>
-</fieldset>
+<div class="flex justify-center gap-4">
+  <fieldset class="radioset max-w-min">
+    <label>
+      <input
+        class="theme-system"
+        name="theme"
+        type="radio"
+        value="system"
+        autocomplete="off"
+        onclick="updateTheme('system')"
+      />
+      <icon>devices</icon>
+    </label>
+    <label>
+      <input
+        class="theme-light"
+        name="theme"
+        type="radio"
+        value="light"
+        autocomplete="off"
+        onclick="updateTheme('light')"
+      />
+      <icon>light_mode</icon>
+    </label>
+    <label>
+      <input
+        class="theme-dark"
+        name="theme"
+        type="radio"
+        value="dark"
+        autocomplete="off"
+        onclick="updateTheme('dark')"
+      />
+      <icon>dark_mode</icon>
+    </label>
+  </fieldset>
+  <button
+    class="btn-text btn-sq"
+    hx-get="{{ url_for('common.theme') }}"
+    hx-disabled-elt="this"
+    hx-target="#dialog"
+    hx-swap="innerHTML show:#dialog:top"
+    hx-push-url="#dialog"
+  >
+    <icon>palette</icon>
+  </button>
+</div>

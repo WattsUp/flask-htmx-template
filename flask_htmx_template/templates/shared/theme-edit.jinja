@@ -1,39 +1,26 @@
 {% with headline="Theme", save_url=url_for("common.theme"), save_method="put" %}
   {% include "shared/dialog-headline.jinja" %}
 {% endwith %}
-<form class="grid w-80 gap-4 p-2" onsubmit="return false">
+<form class="grid w-88 grid-cols-4 gap-2" onsubmit="return false">
   <input id="theme-swatch" name="swatch" type="hidden" value="{{ swatch }}" />
   <input id="theme-mood-hidden" name="mood" type="hidden" value="{{ mood }}" />
-
-  {# Hue slider #}
-  <div class="grid gap-2">
-    <div class="flex items-center justify-between">
-      <span class="text-sm text-on-surface-variant">Color</span>
-      <div
-        id="theme-preview-swatch"
-        class="h-6 w-6 rounded-full border border-outline"
-      ></div>
-    </div>
-    {# djlint:off H021 #}
-    <input
-      id="theme-hue"
-      class="w-full cursor-pointer"
-      style="background: linear-gradient(to right,hsl(0,60%,40%),hsl(30,60%,40%),hsl(60,60%,40%),hsl(90,60%,40%),hsl(120,60%,40%),hsl(150,60%,40%),hsl(180,60%,40%),hsl(210,60%,40%),hsl(240,60%,40%),hsl(270,60%,40%),hsl(300,60%,40%),hsl(330,60%,40%),hsl(359,60%,40%)); height:6px; border-radius:3px; appearance:auto"
-      type="range"
-      min="0"
-      max="359"
-      autocomplete="off"
-    />
-    {# djlint:on #}
-  </div>
-
-  {# Mood dropdown #}
-  <label class="input-outlined">
+  <div class="col-span-3">Color</div>
+  <div
+    id="theme-preview-swatch"
+    class="ml-auto h-6 w-6 rounded-full border border-outline"
+  ></div>
+  <input
+    id="theme-hue"
+    class="col-span-full"
+    type="range"
+    min="0"
+    max="359"
+    autocomplete="off"
+  />
+  <label class="input-outlined col-span-full input-bg-surface-container-high">
     <select id="theme-mood-select" autocomplete="off">
       {% for m in moods %}
-        <option value="{{ m.name }}">
-          {{ m.name.replace("_", " ").title() }}
-        </option>
+        <option value="{{ m.name }}">{{ m.pretty }}</option>
       {% endfor %}
     </select>
     <div>
@@ -42,38 +29,20 @@
   </label>
 
   {# Live palette preview — updates automatically as CSS variables change #}
-  <div class="grid grid-cols-4 gap-1 text-xs select-none">
-    <div class="h-8 rounded bg-primary p-1 text-on-primary">P</div>
-    <div class="h-8 rounded bg-secondary p-1 text-on-secondary">S</div>
-    <div class="h-8 rounded bg-tertiary p-1 text-on-tertiary">T</div>
-    <div class="h-8 rounded bg-error p-1 text-on-error">E</div>
-    <div class="h-8 rounded bg-primary-container p-1 text-on-primary-container">
-      PC
-    </div>
-    <div
-      class="h-8 rounded bg-secondary-container p-1 text-on-secondary-container"
-    >
-      SC
-    </div>
-    <div
-      class="h-8 rounded bg-tertiary-container p-1 text-on-tertiary-container"
-    >
-      TC
-    </div>
-    <div class="h-8 rounded bg-error-container p-1 text-on-error-container">
-      EC
-    </div>
-    <div
-      class="col-span-2 h-8 rounded bg-surface-container p-1 text-on-surface"
-    >
-      Surface
-    </div>
-    <div
-      class="col-span-2 h-8 rounded bg-surface-container-high p-1 text-on-surface"
-    >
-      Container High
-    </div>
+  <div class="rounded bg-primary p-1 text-on-primary">Text</div>
+  <div class="rounded bg-secondary p-1 text-on-secondary">Text</div>
+  <div class="rounded bg-tertiary p-1 text-on-tertiary">Text</div>
+  <div class="rounded bg-error p-1 text-on-error">Text</div>
+  <div class="rounded bg-primary-container p-1 text-on-primary-container">
+    Text
   </div>
+  <div class="rounded bg-secondary-container p-1 text-on-secondary-container">
+    Text
+  </div>
+  <div class="rounded bg-tertiary-container p-1 text-on-tertiary-container">
+    Text
+  </div>
+  <div class="rounded bg-error-container p-1 text-on-error-container">Text</div>
 </form>
 <div id="dialog-error" class="status-error"></div>
 <script>

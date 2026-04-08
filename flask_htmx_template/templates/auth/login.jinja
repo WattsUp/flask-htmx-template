@@ -7,24 +7,16 @@
     {% include "shared/head.jinja" %}
   {% endwith %}
   <body
-    class="bg-primary-container text-on-primary-container"
     hx-on::config-request="addTimezone(event)"
     hx-on::send-error="appSendError(event)"
     hx-on::response-error="appResponseError(event)"
   >
     {% include "shared/hx-error.jinja" %}
-    <div id="snackbar" onclick="snackbar.hide()"></div>
-    <script id="snackbar-script"></script>
-    <div class="dialog-wrapper z-48">
-      <div id="dialog" class="dialog"></div>
-    </div>
-    <div id="scrim" class="scrim z-47" onclick="dialog.close()"></div>
-    <script id="dialog-script"></script>
     <div id="main-sizer" class="p-0 pb-28">
       <main id="main" class="flex flex-col items-center justify-center">
         <form
           id="form-login"
-          class="mx-2 my-8 flex max-h-96 w-full max-w-96 grow flex-col items-center rounded-2xl bg-surface p-2"
+          class="mx-2 my-8 flex max-h-96 w-full max-w-96 grow flex-col items-center rounded-2xl bg-surface-container-high p-2"
           hx-post="{{ url_for('auth.login') }}"
           hx-disabled-elt="find button"
           hx-target="#login-error"
@@ -38,7 +30,9 @@
           {% if next_url %}
             <input name="next" type="hidden" value="{{ next_url }}" />
           {% endif %}
-          <label class="input-outlined my-2 w-full">
+          <label
+            class="input-outlined my-2 w-full input-bg-surface-container-high"
+          >
             <input
               class="scroll-mb-20"
               name="password"
@@ -58,6 +52,25 @@
         </form>
       </main>
     </div>
+    <div id="snackbar" onclick="snackbar.hide()"></div>
+    <script id="snackbar-script"></script>
+    <div class="dialog-wrapper z-48">{% include "shared/dialog.jinja" %}</div>
+    <div
+      id="scrim"
+      class="scrim z-47"
+      onclick="dialog.close();nav.closeDrawer()"
+    ></div>
+    <script id="dialog-script"></script>
+    <div class="dialog-wrapper z-50">
+      <div id="confirm-dialog" class="dialog max-w-80"></div>
+    </div>
+    <div
+      id="confirm-scrim"
+      class="scrim z-49"
+      onclick="dialog.closeConfirm()"
+    ></div>
+    {# Dummy element when no response from server expected #}
+    <div id="no-target"></div>
     {% block footer %}
       {% include "shared/footer.jinja" %}
     {% endblock footer %}
