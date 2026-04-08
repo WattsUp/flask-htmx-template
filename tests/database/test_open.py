@@ -40,13 +40,10 @@ def test_already_exists(tmp_path: Path) -> None:
 
 def test_unencrypted(tmp_path: Path) -> None:
     path = tmp_path / "database.db"
-    path_importers = path.with_suffix(".importers")
     path_salt = path.with_suffix(".nacl")
     d = Database.create(path)
 
     assert path.exists()
-    assert path_importers.exists()
-    assert path_importers.is_dir()
     assert not path_salt.exists()
     assert d.path == path
 
@@ -54,7 +51,7 @@ def test_unencrypted(tmp_path: Path) -> None:
     assert not Database.is_encrypted_path(path)
 
     with d.begin_session():
-        assert sql.count(Config.query()) == 4
+        assert sql.count(Config.query()) == 6
 
     with pytest.raises(exc.NotEncryptedError):
         d.encrypt("")
@@ -106,13 +103,10 @@ def test_bad_encryption_test(empty_database: Database) -> None:
 @pytest.mark.encryption
 def test_encrypted(tmp_path: Path, rand_str: str) -> None:
     path = tmp_path / "database.db"
-    path_importers = path.with_suffix(".importers")
     path_salt = path.with_suffix(".nacl")
     d = Database.create(path, rand_str)
 
     assert path.exists()
-    assert path_importers.exists()
-    assert path_importers.is_dir()
     assert path_salt.exists()
     assert path_salt.is_file()
 
@@ -120,7 +114,7 @@ def test_encrypted(tmp_path: Path, rand_str: str) -> None:
     assert Database.is_encrypted_path(path)
 
     with d.begin_session():
-        assert sql.count(Config.query()) == 5
+        assert sql.count(Config.query()) == 7
 
 
 @pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")

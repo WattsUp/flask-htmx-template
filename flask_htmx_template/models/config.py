@@ -8,7 +8,7 @@ from packaging.version import Version
 from sqlalchemy import orm
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql
+from flask_htmx_template import sql, web_theme
 from flask_htmx_template.models.base import (
     Base,
     BaseEnum,
@@ -26,8 +26,9 @@ class ConfigKey(BaseEnum):
     CIPHER = 3
     SECRET_KEY = 4
     WEB_KEY = 5
-    LAST_HEALTH_CHECK_TS = 6
-    BASE_CURRENCY = 7
+
+    WEB_THEME_SWATCH = 6
+    WEB_THEME_MOOD = 7
 
 
 class Config(Base):
@@ -129,3 +130,13 @@ class Config(Base):
 
         """
         return Version(Config.fetch(ConfigKey.VERSION))
+
+    @classmethod
+    def web_theme_mood(cls) -> web_theme.Mood:
+        """Query the database web theme mood.
+
+        Returns:
+            Mood of theme
+
+        """
+        return web_theme.Mood[Config.fetch(ConfigKey.WEB_THEME_MOOD)]

@@ -43,6 +43,7 @@ def test_v0_1_migration(
         "Database is unlocked\n"
         "Created Item table\n"
         "Database migrated to v0.1.0\n"
+        "Database migrated to v0.3.0\n"
         "Database model schemas updated\n"
     )
     assert captured.out == target

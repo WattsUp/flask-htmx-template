@@ -1,0 +1,66 @@
+from materialyoucolor.dynamiccolor.dynamic_color import DynamicColor
+
+class MaterialDynamicColors:
+    content_accent_tone_delta: float
+    background: DynamicColor
+    onBackground: DynamicColor
+    surface: DynamicColor
+    surfaceDim: DynamicColor
+    surfaceBright: DynamicColor
+    surfaceContainerLowest: DynamicColor
+    surfaceContainerLow: DynamicColor
+    surfaceContainer: DynamicColor
+    surfaceContainerHigh: DynamicColor
+    surfaceContainerHighest: DynamicColor
+    onSurface: DynamicColor
+    surfaceVariant: DynamicColor
+    onSurfaceVariant: DynamicColor
+    outline: DynamicColor
+    outlineVariant: DynamicColor
+    inverseSurface: DynamicColor
+    inverseOnSurface: DynamicColor
+    shadow: DynamicColor
+    scrim: DynamicColor
+    surfaceTint: DynamicColor
+    primary: DynamicColor
+    primaryDim: DynamicColor
+    onPrimary: DynamicColor
+    primaryContainer: DynamicColor
+    onPrimaryContainer: DynamicColor
+    inversePrimary: DynamicColor
+    primaryFixed: DynamicColor
+    primaryFixedDim: DynamicColor
+    onPrimaryFixed: DynamicColor
+    onPrimaryFixedVariant: DynamicColor
+    secondary: DynamicColor
+    secondaryDim: DynamicColor
+    onSecondary: DynamicColor
+    secondaryContainer: DynamicColor
+    onSecondaryContainer: DynamicColor
+    secondaryFixed: DynamicColor
+    secondaryFixedDim: DynamicColor
+    onSecondaryFixed: DynamicColor
+    onSecondaryFixedVariant: DynamicColor
+    tertiary: DynamicColor
+    tertiaryDim: DynamicColor
+    onTertiary: DynamicColor
+    tertiaryContainer: DynamicColor
+    onTertiaryContainer: DynamicColor
+    tertiaryFixed: DynamicColor
+    tertiaryFixedDim: DynamicColor
+    onTertiaryFixed: DynamicColor
+    onTertiaryFixedVariant: DynamicColor
+    error: DynamicColor
+    errorDim: DynamicColor
+    onError: DynamicColor
+    errorContainer: DynamicColor
+    onErrorContainer: DynamicColor
+    primaryPaletteKeyColor: DynamicColor
+    secondaryPaletteKeyColor: DynamicColor
+    tertiaryPaletteKeyColor: DynamicColor
+    neutralPaletteKeyColor: DynamicColor
+    neutralVariantPaletteKeyColor: DynamicColor
+    errorPaletteKeyColor: DynamicColor
+
+    def __init__(self, spec: str = ...) -> None: ...
+    def all_colors(self) -> list[DynamicColor]: ...

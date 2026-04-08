@@ -1,0 +1,51 @@
+{% with headline="Theme", save_url=url_for("common.theme"), save_method="put" %}
+  {% include "shared/dialog-headline.jinja" %}
+{% endwith %}
+<form class="grid w-88 grid-cols-4 gap-2" onsubmit="return false">
+  <input id="theme-swatch" name="swatch" type="hidden" value="{{ swatch }}" />
+  <input id="theme-mood-hidden" name="mood" type="hidden" value="{{ mood }}" />
+  <div class="col-span-3">Color</div>
+  <div
+    id="theme-preview-swatch"
+    class="ml-auto h-6 w-6 rounded-full border border-outline"
+  ></div>
+  <input
+    id="theme-hue"
+    class="col-span-full"
+    type="range"
+    min="0"
+    max="359"
+    autocomplete="off"
+  />
+  <label class="input-outlined col-span-full input-bg-surface-container-high">
+    <select id="theme-mood-select" autocomplete="off">
+      {% for m in moods %}
+        <option value="{{ m.name }}">{{ m.pretty }}</option>
+      {% endfor %}
+    </select>
+    <div>
+      <div>Mood</div>
+    </div>
+  </label>
+
+  {# Live palette preview — updates automatically as CSS variables change #}
+  <div class="rounded bg-primary p-1 text-on-primary">Text</div>
+  <div class="rounded bg-secondary p-1 text-on-secondary">Text</div>
+  <div class="rounded bg-tertiary p-1 text-on-tertiary">Text</div>
+  <div class="rounded bg-error p-1 text-on-error">Text</div>
+  <div class="rounded bg-primary-container p-1 text-on-primary-container">
+    Text
+  </div>
+  <div class="rounded bg-secondary-container p-1 text-on-secondary-container">
+    Text
+  </div>
+  <div class="rounded bg-tertiary-container p-1 text-on-tertiary-container">
+    Text
+  </div>
+  <div class="rounded bg-error-container p-1 text-on-error-container">Text</div>
+</form>
+<div id="dialog-error" class="status-error"></div>
+<script>
+  themeEdit.init("{{ swatch }}", "{{ mood }}");
+  dialog.onLoad();
+</script>
