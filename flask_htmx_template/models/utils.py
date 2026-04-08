@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
 import sqlalchemy
 from sqlalchemy import (
@@ -75,8 +75,9 @@ def dump_table_configs(model: type[Base]) -> list[str]:
             type='table'
             AND name='{model.__tablename__}'
         """.strip()  # noqa: S608
-    query: orm.query.RowReturningQuery[tuple[str]] = model.session().execute(  # type: ignore[attr-defined]
-        sqlalchemy.text(stmt),
+    query: orm.query.RowReturningQuery[tuple[str]] = cast(
+        "orm.query.RowReturningQuery[tuple[str]]",
+        model.session().execute(sqlalchemy.text(stmt)),
     )
     result: str = sql.one(query)
     return [s.replace("\t", "    ") for s in result.splitlines()]

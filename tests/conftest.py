@@ -8,7 +8,7 @@ import string
 from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
-from typing import override, TYPE_CHECKING
+from typing import cast, override, TYPE_CHECKING
 
 import flask
 import pytest
@@ -30,7 +30,7 @@ def id_func(val: object) -> str | None:
     if isinstance(val, datetime.date):
         return val.isoformat()
     if isinstance(val, Iterable | Decimal | Path):
-        return str(val)  # type: ignore[attr-defined]
+        return str(cast("Iterable[object] | Decimal | Path", val))
     if callable(val):
         return val.__name__
     return None

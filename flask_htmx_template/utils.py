@@ -869,9 +869,13 @@ def json_mutate(obj: object, *, skip_decimal: bool = False) -> object:
 
     """
     if isinstance(obj, dict):
-        return {k: json_mutate(v, skip_decimal=skip_decimal) for k, v in obj.items()}  # type: ignore[attr-defined]
+        obj_dict = cast("dict[object, object]", obj)
+        return {
+            k: json_mutate(v, skip_decimal=skip_decimal) for k, v in obj_dict.items()
+        }
     if isinstance(obj, list | tuple):
-        return [json_mutate(v, skip_decimal=skip_decimal) for v in obj]  # type: ignore[attr-defined]
+        obj_seq = cast("list[object] | tuple[object, ...]", obj)
+        return [json_mutate(v, skip_decimal=skip_decimal) for v in obj_seq]
     if isinstance(obj, Enum):
         return obj.name.lower()
     if not skip_decimal and isinstance(obj, Decimal):
@@ -1046,7 +1050,7 @@ def _validate_json_dict[V: object](
             ):
                 obj_upgrade, union_errors = _validate_json_dict(
                     obj,
-                    t,  # type: ignore[attr-defined]
+                    cast("type[dict[str, V]] | GenericAlias", t),
                     key=key,
                 )
                 if not union_errors:

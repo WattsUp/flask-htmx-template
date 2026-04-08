@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import sys
 from collections.abc import Sequence
-from typing import overload, TYPE_CHECKING
+from typing import cast, overload, TYPE_CHECKING
 
 import sqlalchemy
 import sqlalchemy.event
@@ -215,9 +215,10 @@ def one[T](query: orm.Query[T]) -> object:
     ret: T | Sequence[T] = query.one()  # flask_htmx_template: ignore
     if not isinstance(ret, Sequence):
         return ret
-    if len(ret) == 1:  # type: ignore[attr-defined]
-        return ret[0]  # type: ignore[attr-defined]
-    return ret[0:]  # type: ignore[attr-defined]
+    seq = cast("Sequence[T]", ret)
+    if len(seq) == 1:
+        return seq[0]
+    return seq[0:]
 
 
 @overload
