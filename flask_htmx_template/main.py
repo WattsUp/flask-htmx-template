@@ -30,9 +30,7 @@ def main(command_line: list[str] | None = None) -> int:
         non-zero on failure
 
     """
-    desc = """A personal financial information aggregator and planning tool.
-Collects and categorizes transactions, manages budgets, tracks investments,
-calculates net worth, and predicts future performance."""
+    desc = "A template repository for Flask with HTMX."
     home = Path("~").expanduser()
     default_path = str(home.joinpath(".flask-htmx-template", "database.db"))
     parser = argparse.ArgumentParser(prog="flask_htmx_template", description=desc)
