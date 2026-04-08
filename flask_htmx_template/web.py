@@ -9,7 +9,7 @@ import logging
 import os
 from decimal import Decimal
 from pathlib import Path
-from typing import override, TYPE_CHECKING
+from typing import Any, cast, override, TYPE_CHECKING
 
 import flask
 import flask_login
@@ -39,11 +39,11 @@ class JSONEncoder(flask.json.provider.JSONProvider):
 
     @override
     def dumps(self, obj: object, **kwargs: object) -> str:
-        return json.dumps(utils.json_mutate(obj), **kwargs)  # type: ignore[attr-defined]
+        return json.dumps(utils.json_mutate(obj), **cast("Any", kwargs))
 
     @override
     def loads(self, s: str | bytes, **kwargs: object) -> object:
-        return json.loads(s, **kwargs)  # type: ignore[attr-defined]
+        return json.loads(s, **cast("Any", kwargs))
 
 
 class FlaskExtension:
