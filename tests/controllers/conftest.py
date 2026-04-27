@@ -54,6 +54,9 @@ class TreeNode(NamedTuple):
         return self.parent.has_hx_target()
 
     def has_valid_inner_html(self, inner_html: str) -> bool:
+        assert (
+            "placeholder" not in self.attributes or 'placeholder=""' in self.attributes
+        )
         if self.tag == "script":
             attributes = self.attributes
             assert not inner_html or "onLoad" in inner_html or "src" in attributes
