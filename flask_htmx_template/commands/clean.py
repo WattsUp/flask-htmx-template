@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import override, TYPE_CHECKING
 
 from colorama import Fore
@@ -22,13 +23,13 @@ class Clean(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
     ) -> None:
         """Initialize clean command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
 
         """
@@ -42,6 +43,12 @@ class Clean(Command):
 
     @override
     def run(self) -> int:
+        if self._d.is_postgres:
+            print(
+                f"{Fore.RED}clean is not supported for postgres databases",
+                file=sys.stderr,
+            )
+            return -1
         size_before, size_after = self._d.clean()
         print(f"{Fore.GREEN}Database cleaned")
         p_change = size_before - size_after

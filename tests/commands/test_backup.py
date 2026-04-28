@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     import pytest
 
     from flask_htmx_template.database import Database
+    from tests.conftest import PostgresDatabaseGenerator
 
 
 def test_backup(capsys: pytest.CaptureFixture[str], empty_database: Database) -> None:
@@ -80,3 +81,31 @@ def test_restore_list(
     target = f"Backup # 1 created at {ts_local} (0.0 seconds ago)\n"
     assert captured.out == target
     assert not captured.err
+
+
+def test_backup_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """Backup.run() returns -1 with an error message for postgres databases."""
+    postgres_database_generator()
+    c = Backup(postgres_database_generator.url, None)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert "Database is unlocked" in captured.out
+    assert "backup is not supported for postgres databases" in captured.err
+
+
+def test_restore_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """Restore.run() returns -1 with an error message for postgres databases."""
+    postgres_database_generator()
+    c = Restore(postgres_database_generator.url, None, tar_ver=None, list_ver=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "restore is not supported for postgres databases" in captured.err

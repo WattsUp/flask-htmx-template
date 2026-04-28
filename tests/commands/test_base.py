@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from flask_htmx_template.database import Database
+    from tests.conftest import PostgresDatabaseGenerator
 
 
 class MockCommand(Command):
@@ -238,3 +239,24 @@ def test_args(
 
     # Make sure all args from parse_args are given to constructor
     cmd_class(**args_d)
+
+
+def test_postgres_url_normalized_in_command(pg_url: str) -> None:
+    """Command.__init__ normalizes a postgres URL and stores it as a string."""
+    c = MockCommand(pg_url, None, do_unlock=False)
+    assert isinstance(c._path_db, str)
+    assert c._path_db.startswith("postgresql+psycopg://")
+
+
+def test_unlock_postgres_with_key(
+    postgres_database_generator: PostgresDatabaseGenerator,
+    pg_url_no_creds: str,
+    pg_key: str,
+    tmp_path: Path,
+) -> None:
+    """_unlock with a key file injects credentials and returns a postgres Database."""
+    postgres_database_generator()
+    path_key = tmp_path / "key.secret"
+    path_key.write_text(pg_key, "utf-8")
+    c = MockCommand(pg_url_no_creds, path_key)
+    assert c._d.is_postgres

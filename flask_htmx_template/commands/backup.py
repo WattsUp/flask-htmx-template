@@ -24,13 +24,13 @@ class Backup(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
     ) -> None:
         """Initialize backup command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
 
         """
@@ -44,6 +44,12 @@ class Backup(Command):
 
     @override
     def run(self) -> int:
+        if self._d.is_postgres:
+            print(
+                f"{Fore.RED}backup is not supported for postgres databases",
+                file=sys.stderr,
+            )
+            return -1
         backup_tar, _ = self._d.backup()
         print(f"{Fore.GREEN}Database backed up to {backup_tar}")
         return 0
@@ -58,7 +64,7 @@ class Restore(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
         tar_ver: int | None,
         *,
@@ -67,7 +73,7 @@ class Restore(Command):
         """Initialize restore command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
             tar_ver: Backup tar version to restore from, None will restore latest
             list_ver: True will list backups available, False will restore
@@ -99,7 +105,16 @@ class Restore(Command):
     @override
     def run(self) -> int:
         # Defer for faster time to main
-        from flask_htmx_template import database, utils
+        from flask_htmx_template import database
+        from flask_htmx_template import sql as sql_mod
+        from flask_htmx_template import utils
+
+        if sql_mod.is_postgres_url(str(self._path_db)):
+            print(
+                f"{Fore.RED}restore is not supported for postgres databases",
+                file=sys.stderr,
+            )
+            return -1
 
         try:
             if self._list_ver:

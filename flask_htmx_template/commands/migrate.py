@@ -23,11 +23,15 @@ class Migrate(Command):
     HELP = "migrate database"
     DESCRIPTION = "Migrate database to latest version"
 
-    def __init__(self, path_db: Path, path_password: Path | None) -> None:
+    def __init__(
+        self,
+        path_db: Path | str,
+        path_password: Path | None,
+    ) -> None:
         """Initialize migrate command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
 
         """
@@ -51,8 +55,10 @@ class Migrate(Command):
 
         d = self._d
 
-        # Back up Database
-        _, tar_ver = d.backup()
+        # Back up Database (SQLite only)
+        tar_ver: int | None = None
+        if not d.is_postgres:
+            _, tar_ver = d.backup()
 
         with d.begin_session():
             v_db = Config.db_version()
@@ -87,8 +93,9 @@ class Migrate(Command):
                 Config.set_(ConfigKey.VERSION, str(v))
         except Exception:  # pragma: no cover
             # No immediate exception thrown, can't easily test
-            database.Database.restore(d, tar_ver=tar_ver)
-            print(f"{Fore.RED}Abandoned migrate, restored from backup")
+            if tar_ver is not None:
+                database.Database.restore(d, tar_ver=tar_ver)
+                print(f"{Fore.RED}Abandoned migrate, restored from backup")
             raise
 
         if not any_migrated:

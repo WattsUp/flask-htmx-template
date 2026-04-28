@@ -48,31 +48,45 @@ class Database:
         """Initialize Database.
 
         Args:
-            path: Path to database file
+            path: Path to database file, or postgres connection URL
             key: String password to unlock database encryption
+                for postgres: Credentials in `user:password` format to inject into URL
             check_migration: True will check if migration is required
 
         Raises:
-            FileNotFoundError: If database does not exist
+            FileNotFoundError: If SQLite database does not exist
             MigrationRequiredError: If migration is required
 
         """
-        self._path_db = Path(path).resolve().with_suffix(".db")
-        self._path_salt = self._path_db.with_suffix(".nacl")
-        if not self._path_db.exists():
-            msg = f"Database at {self._path_db} does not exist, use Database.create()"
-            raise FileNotFoundError(msg)
-
-        if key is None:
+        path_str = str(path)
+        if sql.is_postgres_url(path_str):
+            pg_url = sql.normalize_postgres_url(path_str)
+            if key is not None and not sql.postgres_url_has_credentials(pg_url):
+                pg_url = sql.inject_postgres_credentials(pg_url, key)
+            self._postgres_url: str | None = pg_url
             self._enc = None
-        elif self._path_salt.exists():
-            enc_config = self._path_salt.read_bytes()
-            self._enc = Encryption(key, enc_config)
+            self._session_maker = orm.sessionmaker(self.get_engine())
+            configs = self._unlock()
         else:
-            msg = f"Database at {self._path_db} does not have salt file"
-            raise FileNotFoundError(msg)
-        self._session_maker = orm.sessionmaker(self.get_engine())
-        configs = self._unlock()
+            self._postgres_url = None
+            self._path_db = Path(path).resolve().with_suffix(".db")
+            self._path_salt = self._path_db.with_suffix(".nacl")
+            if not self._path_db.exists():
+                msg = (
+                    f"Database at {self._path_db} does not exist, use Database.create()"
+                )
+                raise FileNotFoundError(msg)
+
+            if key is None:
+                self._enc = None
+            elif self._path_salt.exists():
+                enc_config = self._path_salt.read_bytes()
+                self._enc = Encryption(key, enc_config)
+            else:
+                msg = f"Database at {self._path_db} does not have salt file"
+                raise FileNotFoundError(msg)
+            self._session_maker = orm.sessionmaker(self.get_engine())
+            configs = self._unlock()
 
         version_str = configs.get(ConfigKey.VERSION)
         if check_migration and (v := self.migration_required(version_str)):
@@ -80,29 +94,55 @@ class Database:
             raise exc.MigrationRequiredError(msg)
 
     @property
+    def is_postgres(self) -> bool:
+        """Check if database is postgres."""
+        return self._postgres_url is not None
+
+    @property
     def path(self) -> Path:
-        """Path to Database database."""
+        """Path to SQLite database file.
+
+        Raises:
+            NotImplementedError: For postgres databases
+
+        """
+        if self.is_postgres:
+            msg = "Postgres databases do not have a file path"
+            raise NotImplementedError(msg)
         return self._path_db
 
     @property
     def path_salt(self) -> Path:
-        """Path to Database salt database."""
+        """Path to SQLite database salt file.
+
+        Raises:
+            NotImplementedError: For postgres databases
+
+        """
+        if self.is_postgres:
+            msg = "Postgres databases do not have a salt file"
+            raise NotImplementedError(msg)
         return self._path_salt
 
     @classmethod
     def is_encrypted_path(cls, path: str | Path) -> bool:
         """Check Database's config for encryption status.
 
+        Postgres databases are never encrypted via this mechanism.
+
         Args:
-            path: Path to database file
+            path: Path to database file, or postgres connection URL
 
         Returns:
             True if Database is encrypted
 
         Raises:
-            FileNotFoundError: If database or configuration does not exist
+            FileNotFoundError: If SQLite database or configuration does not exist
 
         """
+        path_str = str(path)
+        if sql.is_postgres_url(path_str):
+            return False
         path_db = Path(path)
         if not path_db.exists():
             msg = f"Database does not exist at {path_db}"
@@ -119,11 +159,13 @@ class Database:
     def create(cls, path: str | Path, key: str | None = None) -> Database:
         """Create a new Database.
 
-        Saves database and configuration file
+        For SQLite, saves database and configuration file.
+        For postgres, creates tables in the existing server.
 
         Args:
-            path: Path to database file
+            path: Path to database file, or postgres connection URL
             key: String password to unlock database encryption
+                for postgres: Credentials in `user:password` format to inject into URL
 
         Returns:
             Database linked to newly created database
@@ -132,6 +174,10 @@ class Database:
             FileExistsError: If database already exists
 
         """
+        path_str = str(path)
+        if sql.is_postgres_url(path_str):
+            return cls._create_postgres(sql.normalize_postgres_url(path_str), key)
+
         path_db = Path(path).resolve()
         if path_db.exists():
             msg = f"Database already exists at {path_db}"
@@ -186,6 +232,55 @@ class Database:
 
         return Database(path_db, key)
 
+    @classmethod
+    def _create_postgres(cls, url: str, key: str | None = None) -> Database:
+        """Create a new postgres-backed Database.
+
+        Args:
+            url: Normalized postgres connection URL
+            key: Credentials in `user:password` format to inject into URL
+
+        Returns:
+            Database linked to the postgres server
+
+        Raises:
+            FileExistsError: If config table is already populated
+
+        """
+        if key is not None and not sql.postgres_url_has_credentials(url):
+            url = sql.inject_postgres_credentials(url, key)
+
+        cipher_bytes = Cipher.generate().to_bytes()
+        cipher_b64 = base64.b64encode(cipher_bytes).decode()
+        test_value = Database._ENCRYPTION_TEST_VALUE
+
+        engine = sql.get_engine_postgres(url)
+        with orm.Session(engine) as s, Base.set_session(s):
+            with s.begin():
+                Base.metadata_create_all()
+
+            with s.begin():
+                existing = Config.first()
+                if existing is not None:
+                    msg = "Postgres database is already initialized"
+                    raise FileExistsError(msg)
+
+                versions = [
+                    Version(__version__),
+                    *[m.min_version() for m in MIGRATORS],
+                ]
+                v = versions[0] if len(versions) == 1 else max(versions)
+
+                Config.set_(ConfigKey.VERSION, str(v))
+                Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
+                Config.set_(ConfigKey.CIPHER, cipher_b64)
+                Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
+
+                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
+                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
+
+        return Database(url, None)
+
     def _unlock(self) -> dict[ConfigKey, str]:
         """Unlock the database.
 
@@ -202,7 +297,8 @@ class Database:
                 query = Config.query(Config.key, Config.value)
                 configs: dict[ConfigKey, str] = sql.to_dict(query)
         except exc.DatabaseError as e:
-            msg = f"Failed to open database {self._path_db}"
+            target = self._postgres_url or self._path_db
+            msg = f"Failed to open database {target}"
             raise exc.UnlockingError(msg) from e
 
         value = configs.get(ConfigKey.ENCRYPTION_TEST)
@@ -236,6 +332,8 @@ class Database:
             Engine
 
         """
+        if self._postgres_url is not None:
+            return sql.get_engine_postgres(self._postgres_url)
         return sql.get_engine(self._path_db, self._enc)
 
     @contextlib.contextmanager
@@ -323,7 +421,13 @@ class Database:
         Returns:
             (Path to newly created backup tar, backup version)
 
+        Raises:
+            NotImplementedError: For postgres databases
+
         """
+        if self.is_postgres:
+            msg = "backup is not supported for postgres databases"
+            raise NotImplementedError(msg)
         # Find latest backup file for this Database
         i = 0
         parent = self._path_db.parent
@@ -366,8 +470,15 @@ class Database:
 
         Raises:
             InvalidBackupTarError: If backup is missing timestamp
+            NotImplementedError: For postgres databases
 
         """
+        if isinstance(d, Database) and d.is_postgres:
+            msg = "backups is not supported for postgres databases"
+            raise NotImplementedError(msg)
+        if isinstance(d, str) and sql.is_postgres_url(d):
+            msg = "backups is not supported for postgres databases"
+            raise NotImplementedError(msg)
         backups: list[tuple[int, datetime.datetime]] = []
 
         path_db = Path(d.path if isinstance(d, Database) else d)
@@ -406,7 +517,13 @@ class Database:
             Size of files in bytes:
             (database before, database after)
 
+        Raises:
+            NotImplementedError: For postgres databases
+
         """
+        if self.is_postgres:
+            msg = "clean is not supported for postgres databases"
+            raise NotImplementedError(msg)
         parent = self._path_db.parent
         name = self._path_db.with_suffix("").name
 
@@ -458,8 +575,15 @@ class Database:
         Raises:
             FileNotFoundError: If backup does not exist
             InvalidBackupTarError: If backup is missing required files
+            NotImplementedError: For postgres databases
 
         """
+        if isinstance(d, Database) and d.is_postgres:
+            msg = "restore is not supported for postgres databases"
+            raise NotImplementedError(msg)
+        if isinstance(d, str) and sql.is_postgres_url(d):
+            msg = "restore is not supported for postgres databases"
+            raise NotImplementedError(msg)
         path_db = Path(d.path if isinstance(d, Database) else d)
         path_db = path_db.resolve()
         parent = path_db.parent
@@ -614,8 +738,12 @@ class Database:
 
         Raises:
             InvalidKeyError: If key does not match minimum requirements
+            NotImplementedError: For postgres databases
 
         """
+        if self.is_postgres:
+            msg = "change_key is not supported for postgres databases"
+            raise NotImplementedError(msg)
         if len(key) < utils.MIN_PASS_LEN:
             msg = f"Password must be at least {utils.MIN_PASS_LEN} characters"
             raise exc.InvalidKeyError(msg)

@@ -21,14 +21,14 @@ class ChangePassword(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
         path_password_new: Path | None,
     ) -> None:
         """Initialize create command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
             path_password_new: Path to new password file,
                 None will prompt when necessary
@@ -54,6 +54,13 @@ class ChangePassword(Command):
         from flask_htmx_template import database
 
         p = self._d
+
+        if p.is_postgres:
+            print(
+                f"{Fore.RED}change-password is not supported for postgres databases",
+                file=sys.stderr,
+            )
+            return -1
 
         new_db_key, new_web_key = self._get_keys()
         if new_db_key is None and new_web_key is None:

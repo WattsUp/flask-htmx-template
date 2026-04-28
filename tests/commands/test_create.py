@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 
     import pytest
 
+    from tests.conftest import PostgresDatabaseGenerator
+
 
 class MockDatabase(Database):
 
@@ -149,3 +151,45 @@ def test_create_encrypted_cancelled(
     captured = capsys.readouterr()
     assert not captured.out
     assert not captured.err
+
+
+def test_create_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """Create.run() initializes a postgres database and returns 0."""
+    postgres_database_generator.drop()
+    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    assert c.run() == 0
+
+    captured = capsys.readouterr()
+    assert f"Postgres database initialized at {c._path_db}" in captured.out
+    assert not captured.err
+
+
+def test_create_postgres_already_exists(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """Create.run() returns -1 when postgres database is already initialized."""
+    postgres_database_generator()
+    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert captured.err  # FileExistsError message
+
+
+def test_create_postgres_force(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """Create.run() returns -1 with error when --force used with postgres."""
+    postgres_database_generator()
+    c = Create(postgres_database_generator.url, None, force=True, no_encrypt=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "--force is not supported for postgres databases" in captured.err

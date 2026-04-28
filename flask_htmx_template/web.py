@@ -19,7 +19,7 @@ import prometheus_flask_exporter.multiprocess
 
 from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import utils, web_assets
+from flask_htmx_template import sql, utils, web_assets
 from flask_htmx_template.controllers import (
     auth,
     base,
@@ -79,6 +79,10 @@ class FlaskExtension:
         s = config.get("PATH", "~/.flask-htmx-template/database.db")
         if not isinstance(s, str):
             raise TypeError
+
+        if sql.is_postgres_url(s):
+            return Database(sql.normalize_postgres_url(s), None)
+
         path = Path(s).expanduser().absolute()
 
         key = config.get("KEY")

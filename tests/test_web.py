@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from flask_htmx_template.database import Database
+    from tests.conftest import PostgresDatabaseGenerator
 
 
 class Derived(BaseEnum):
@@ -172,3 +173,12 @@ def test_add_routes() -> None:
         assert rule.rule.startswith("/")
         assert not rule.rule.startswith("/d/")
         assert not (rule.rule != "/" and rule.rule.endswith("/"))
+
+
+def test_open_db_postgres_url(
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """_open_db returns a postgres-backed Database when given a postgres URL."""
+    postgres_database_generator()
+    d = web.FlaskExtension._open_db({"PATH": postgres_database_generator.url})
+    assert d.is_postgres

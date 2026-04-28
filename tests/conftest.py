@@ -11,7 +11,10 @@ from pathlib import Path
 from typing import cast, override, TYPE_CHECKING
 
 import flask
+import psycopg
 import pytest
+import sqlalchemy
+from pytest_postgresql.factories import postgresql_proc
 from sqlalchemy import orm, pool
 
 from flask_htmx_template import sql, web
@@ -24,6 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     import time_machine
+    from pytest_postgresql.executor import PostgreSQLExecutor
 
 
 def id_func(val: object) -> str | None:
@@ -416,3 +420,172 @@ def item(session: orm.Session, today_ord: int) -> Item:
             name="Bananas",
             date_ord=today_ord,
         )
+
+
+# ---------------------------------------------------------------------------
+# Postgres fixtures — spin up a fresh cluster; no system setup needed
+# ---------------------------------------------------------------------------
+
+_pg_proc = postgresql_proc(
+    executable="/usr/lib/postgresql/16/bin/pg_ctl",
+    host="127.0.0.1",
+    user="postgres",
+    password="pgpassword",  # noqa: S106
+    postgres_options="-c listen_addresses='127.0.0.1'",
+)
+
+
+class PostgresDatabaseGenerator:
+    """Drop all application tables and recreate the schema for each test."""
+
+    def __init__(self, pg_url: str) -> None:
+        self._pg_url = pg_url
+
+    @property
+    def url(self) -> str:
+        """Return the postgres URL for this database.
+
+        Returns:
+            postgres URL string
+
+        """
+        return self._pg_url
+
+    def drop(self) -> None:
+        """Drop all application tables, leaving a clean postgres database."""
+        norm = sql.normalize_postgres_url(self._pg_url)
+        engine = sqlalchemy.create_engine(
+            norm,
+            connect_args={"sslmode": "disable"},
+            poolclass=pool.NullPool,
+        )
+        with engine.begin() as conn:
+            Base.metadata.drop_all(conn)
+        engine.dispose()
+
+    def __call__(self) -> Database:
+        """Drop all tables and recreate the schema, returning a fresh Database.
+
+        Returns:
+            Freshly created postgres Database
+
+        """
+        self.drop()
+        return Database.create(self._pg_url)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def disable_ssl() -> Generator[None]:
+    """Disable SSL for local test postgres (no TLS cert configured)."""
+    original = sql._POSTGRES_SSL_MODE
+    sql._POSTGRES_SSL_MODE = "disable"
+    yield
+    sql._POSTGRES_SSL_MODE = original
+
+
+@pytest.fixture(scope="session")
+def pg_proc(_pg_proc: PostgreSQLExecutor) -> PostgreSQLExecutor:
+    """Expose the postgres process under a stable name.
+
+    Returns:
+        PostgreSQL process executor
+
+    """
+    return _pg_proc
+
+
+@pytest.fixture(scope="session")
+def pg_credentials(pg_proc: PostgreSQLExecutor) -> tuple[str, int, str, str, str]:
+    """Create a dedicated test user/database.
+
+    Returns:
+        Tuple of (host, port, dbname, user, password)
+
+    """
+    host = pg_proc.host
+    port = pg_proc.port
+    user = "testuser"
+    password = "testpass"  # noqa: S105
+    dbname = "testdb"
+
+    with (
+        psycopg.connect(
+            host=host,
+            port=port,
+            user="postgres",
+            password="pgpassword",  # noqa: S106
+            dbname="postgres",
+            autocommit=True,
+        ) as conn,
+        conn.cursor() as cur,
+    ):
+        cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,))
+        if cur.fetchone() is None:
+            cur.execute(
+                f"CREATE ROLE {user} WITH LOGIN PASSWORD '{password}'",
+            )
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,))
+        if cur.fetchone() is None:
+            cur.execute(f"CREATE DATABASE {dbname} OWNER {user}")
+
+    return host, port, dbname, user, password
+
+
+@pytest.fixture(scope="session")
+def pg_url(pg_credentials: tuple[str, int, str, str, str]) -> str:
+    """Return a postgres URL with credentials for the test database.
+
+    Returns:
+        postgresql://user:password@host:port/dbname
+
+    """
+    host, port, dbname, user, password = pg_credentials
+    return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
+
+
+@pytest.fixture(scope="session")
+def pg_url_no_creds(pg_credentials: tuple[str, int, str, str, str]) -> str:
+    """Return a postgres URL without credentials for the test database.
+
+    Returns:
+        postgresql://host:port/dbname
+
+    """
+    host, port, dbname, _user, _password = pg_credentials
+    return f"postgresql://{host}:{port}/{dbname}"
+
+
+@pytest.fixture(scope="session")
+def pg_key(pg_credentials: tuple[str, int, str, str, str]) -> str:
+    """Return the key (user:password) for the test postgres database.
+
+    Returns:
+        "user:password" string
+
+    """
+    _host, _port, _dbname, user, password = pg_credentials
+    return f"{user}:{password}"
+
+
+@pytest.fixture(scope="session")
+def postgres_database_generator(pg_url: str) -> PostgresDatabaseGenerator:
+    """Return a generator that resets the postgres database for each test.
+
+    Returns:
+        PostgresDatabaseGenerator instance
+
+    """
+    return PostgresDatabaseGenerator(pg_url)
+
+
+@pytest.fixture
+def postgres_database(
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> Database:
+    """Drop all application tables and recreate the schema.
+
+    Returns:
+        Fresh postgres Database
+
+    """
+    return postgres_database_generator()

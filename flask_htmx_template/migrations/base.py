@@ -70,7 +70,7 @@ class Migrator(ABC):
 
         col_name = sql.escape(column.name)
         col_type = column.type.compile(dialect=engine.dialect)
-        stmt = f'ALTER TABLE "{model.__tablename__}" ADD {col_name} {col_type}'
+        stmt = f'ALTER TABLE "{model.__tablename__}" ADD COLUMN {col_name} {col_type}'
         s.execute(sqlalchemy.text(stmt))
 
         if initial_value is not None:
@@ -94,7 +94,10 @@ class Migrator(ABC):
         """
         old_name = sql.escape(old_name)
         new_name = sql.escape(new_name)
-        stmt = f'ALTER TABLE "{model.__tablename__}" RENAME {old_name} TO {new_name}'
+        stmt = (
+            f'ALTER TABLE "{model.__tablename__}" RENAME COLUMN '
+            f"{old_name} TO {new_name}"
+        )
         model.session().execute(sqlalchemy.text(stmt))
 
         # RENAME modifies column references but not constraint names
@@ -106,21 +109,27 @@ class Migrator(ABC):
         model: type[Base],
         col_name: str,
     ) -> None:
-        """Rename a column in a table.
+        """Drop a column in a table.
 
         Args:
             model: Table to modify
             col_name: Name of column to drop
 
         """
-        constraints = get_constraints(model)
-        if any(col_name in sql_text for _, sql_text in constraints):
-            self.recreate_table(model, drop={col_name})
-        else:
-            # Able to drop directly
-            col_name = sql.escape(col_name)
-            stmt = f'ALTER TABLE "{model.__tablename__}" DROP {col_name}'
-            model.session().execute(sqlalchemy.text(stmt))
+        s = model.session()
+        engine = s.get_bind().engine
+        is_sqlite = engine.dialect.name == "sqlite"
+
+        if is_sqlite:
+            constraints = get_constraints(model)
+            if any(col_name in sql_text for _, sql_text in constraints):
+                self.recreate_table(model, drop={col_name})
+                return
+
+        # Able to drop directly (postgres always; SQLite when no constraints)
+        escaped = sql.escape(col_name)
+        stmt = f'ALTER TABLE "{model.__tablename__}" DROP COLUMN {escaped}'
+        s.execute(sqlalchemy.text(stmt))
 
         # DROP does not need updated schema
 
@@ -133,14 +142,23 @@ class Migrator(ABC):
     ) -> None:
         """Rebuild table, optionally dropping columns.
 
+        SQLite only - postgres supports ALTER TABLE directly.
+
         Args:
             model: Table to modify
             drop: Set of column names to drop
             create_stmt: Statement to execute to create new table,
                 None will modify existing config
 
+        Raises:
+            NotImplementedError: For postgres databases
+
         """
         s = model.session()
+        engine = s.get_bind().engine
+        if engine.dialect.name != "sqlite":
+            msg = "recreate_table is only supported for SQLite databases"
+            raise NotImplementedError(msg)
         drop = drop or set()
         # In SQLite we can do the hacky way or recreate the table
         # Opt for recreate
@@ -225,7 +243,15 @@ class SchemaMigrator(Migrator):
     def migrate(self, d: Database) -> list[str]:
         for model in self.pending_schema_updates:
             with d.begin_session() as s:
-                table: sqlalchemy.Table = model.sql_table()
-                create_stmt = CreateTable(table).compile(s.get_bind()).string.strip()
-                self.recreate_table(model, create_stmt=create_stmt)
+                engine = s.get_bind().engine
+                if engine.dialect.name == "sqlite":
+                    table: sqlalchemy.Table = model.sql_table()
+                    create_stmt = (
+                        CreateTable(table).compile(s.get_bind()).string.strip()
+                    )
+                    self.recreate_table(model, create_stmt=create_stmt)
+                else:
+                    # Postgres: sync schema via create_all with checkfirst
+                    table = model.sql_table()
+                    table.create(bind=engine, checkfirst=True)
         return []

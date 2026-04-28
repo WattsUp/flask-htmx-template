@@ -11,6 +11,8 @@ from flask_htmx_template.database import Database
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.conftest import PostgresDatabaseGenerator
+
 
 class MockDatabase(Database):
 
@@ -119,3 +121,17 @@ def test_get_keys_file(
 
     assert new_db_key == "12345678"
     assert new_web_key == "01010101"
+
+
+def test_change_password_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    """ChangePassword.run() returns -1 for postgres databases."""
+    postgres_database_generator()
+    c = ChangePassword(postgres_database_generator.url, None, None)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert "Database is unlocked" in captured.out
+    assert "change-password is not supported for postgres databases" in captured.err

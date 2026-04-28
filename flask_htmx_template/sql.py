@@ -27,6 +27,10 @@ except ImportError:
 
 _ENGINE_ARGS: dict[str, object] = {}
 
+# SSL mode for postgres connections. Set to "disable" in tests.
+# Valid values: "require", "verify-ca", "verify-full", "disable", "allow", "prefer"
+_POSTGRES_SSL_MODE: str = "require"
+
 Column = (
     orm.InstrumentedAttribute[str]
     | orm.InstrumentedAttribute[str | None]
@@ -37,6 +41,44 @@ ColumnClause = sqlalchemy.ColumnElement[bool]
 
 __all__ = ["case"]
 
+_POSTGRES_PREFIXES = ("postgres://", "postgres+", "postgresql://", "postgresql+")
+
+
+def is_postgres_url(s: str) -> bool:
+    """Check if a string is a postgres connection URL.
+
+    Args:
+        s: String to check
+
+    Returns:
+        True if s looks like a postgres URL
+
+    """
+    return s.startswith(_POSTGRES_PREFIXES)
+
+
+def normalize_postgres_url(url: str) -> str:
+    """Normalize a postgres URL to a SQLAlchemy-compatible form.
+
+    Converts the ``postgres`` scheme to ``postgresql`` and ensures the
+    ``psycopg`` (v3) driver is specified if no driver is present.
+
+    Args:
+        url: postgres connection URL
+
+    Returns:
+        Normalized URL with ``postgresql+psycopg`` scheme
+
+    """
+    if url.startswith(("postgres://", "postgres+")):
+        url = "postgresql" + url[len("postgres") :]
+
+    # If no driver is specified, default to psycopg (v3)
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg" + url[len("postgresql") :]
+
+    return url
+
 
 @sqlalchemy.event.listens_for(sqlalchemy.engine.Engine, "connect")
 def set_sqlite_pragma(db_connection: sqlite3.Connection, *_) -> None:
@@ -46,6 +88,9 @@ def set_sqlite_pragma(db_connection: sqlite3.Connection, *_) -> None:
         db_connection: Connection to SQLite DB
 
     """
+    module = type(db_connection).__module__
+    if "sqlite" not in module and "sqlcipher" not in module:
+        return
     cursor = db_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     # Suppress logging from sqlcipher
@@ -83,6 +128,63 @@ def get_engine(
     return engine
 
 
+def postgres_url_has_credentials(url: str) -> bool:
+    """Check if a postgres URL already contains user and password.
+
+    Args:
+        url: postgres connection URL
+
+    Returns:
+        True if the URL contains both username and password
+
+    """
+    u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
+    return u.username is not None and u.password is not None
+
+
+def inject_postgres_credentials(url: str, key: str) -> str:
+    """Inject credentials from ``key`` into a postgres URL.
+
+    The key is split on the first ``:`` to produce ``user:password``.
+    If no colon is present, the entire key is used as the password only.
+
+    Args:
+        url: postgres connection URL (normalized)
+        key: Credentials in ``user:password`` format, or just ``password``
+
+    Returns:
+        URL with credentials injected
+
+    """
+    u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
+    if ":" in key:
+        user, password = key.split(":", 1)
+        u = u.set(username=user, password=password)
+    else:
+        u = u.set(password=key)
+    return u.render_as_string(hide_password=False)
+
+
+def get_engine_postgres(url: str) -> sqlalchemy.engine.Engine:
+    """Get sqlalchemy Engine for a postgres database.
+
+    Args:
+        url: SQLAlchemy-compatible postgres connection URL
+
+    Returns:
+        sqlalchemy.Engine
+
+    """
+    connect_args: dict[str, object] = {}
+    if _POSTGRES_SSL_MODE:
+        connect_args["sslmode"] = _POSTGRES_SSL_MODE
+    return sqlalchemy.create_engine(
+        normalize_postgres_url(url),
+        connect_args=connect_args,
+        **_ENGINE_ARGS,
+    )
+
+
 def escape(s: str) -> str:
     """Escape a string if it is reserved.
 
@@ -93,7 +195,7 @@ def escape(s: str) -> str:
         `s` if escaping is needed else s
 
     """
-    return f"`{s}`" if s in sqlalchemy.sql.compiler.RESERVED_WORDS else s
+    return f'"{s}"' if s in sqlalchemy.sql.compiler.RESERVED_WORDS else s
 
 
 @overload

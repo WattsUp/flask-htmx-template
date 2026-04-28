@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import colorama
@@ -11,7 +12,6 @@ from colorama import Fore
 
 if TYPE_CHECKING:
     import argparse
-    from pathlib import Path
 
     from flask_htmx_template.database import Database
 
@@ -25,7 +25,7 @@ class Command(ABC):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
         *,
         do_unlock: bool = True,
@@ -34,7 +34,7 @@ class Command(ABC):
         """Initialize base command.
 
         Args:
-            path_db: Path to DB
+            path_db: Path to DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
             do_unlock: True will unlock database, False will not
             check_migration: True will check if migration is required
@@ -43,22 +43,26 @@ class Command(ABC):
         super().__init__()
         colorama.init(autoreset=True)
 
-        path_db = path_db.expanduser().absolute()
+        # Defer for faster time to main
+        from flask_htmx_template import exceptions as exc
+        from flask_htmx_template import sql
+
+        if sql.is_postgres_url(str(path_db)):
+            self._path_db: Path | str = sql.normalize_postgres_url(str(path_db))
+        else:
+            self._path_db = Path(path_db).expanduser().absolute()
+
         if path_password:
             path_password = path_password.expanduser().absolute()
 
-        self._path_db = path_db
         self._path_password = path_password
-
-        # Defer for faster time to main
-        from flask_htmx_template import exceptions as exc
 
         if not do_unlock:
             return
 
-        if not path_db.exists():
+        if isinstance(self._path_db, Path) and not self._path_db.exists():
             print(
-                f"{Fore.RED}Database does not exist at {path_db}. "
+                f"{Fore.RED}Database does not exist at {self._path_db}. "
                 "Run flask_htmx_template create",
                 file=sys.stderr,
             )
@@ -69,7 +73,7 @@ class Command(ABC):
 
         try:
             self._d = self._unlock(
-                path_db,
+                self._path_db,
                 key,
                 check_migration=check_migration,
             )
@@ -108,7 +112,7 @@ class Command(ABC):
     @classmethod
     def _unlock(
         cls,
-        path_db: Path,
+        path_db: Path | str,
         key: str | None,
         *,
         check_migration: bool = True,
@@ -116,7 +120,7 @@ class Command(ABC):
         """Unlock an existing Database.
 
         Args:
-            path_db: Path to Database DB to unlock
+            path_db: Path to Database DB to unlock, or postgres connection URL
             key: Database key, None will prompt when necessary
             check_migration: True will check if migration is required
 
@@ -127,7 +131,10 @@ class Command(ABC):
         # defer for faster time to main
         from flask_htmx_template import database
         from flask_htmx_template import exceptions as exc
-        from flask_htmx_template import utils
+        from flask_htmx_template import sql, utils
+
+        if sql.is_postgres_url(str(path_db)):
+            return database.Database(path_db, key, check_migration=check_migration)
 
         if not database.Database.is_encrypted_path(path_db):
             return database.Database(path_db, None, check_migration=check_migration)

@@ -47,6 +47,7 @@ Issues = "https://github.com/WattsUp/flask_htmx_template/issues"
 
 [project.optional-dependencies]
 encrypt = ["sqlcipher3-binary", "Cipher", "pycryptodomex"]
+postgres = ["psycopg[binary]"]
 deploy = ["gunicorn"]
 test = [
   "pytest",
@@ -57,6 +58,7 @@ test = [
   "pytailwindcss",
   "jsmin",
   "setuptools>=77",
+  "pytest-postgresql",
 ]
 dev = [
   "flask-htmx-template[deploy,test]",

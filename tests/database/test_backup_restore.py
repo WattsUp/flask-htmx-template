@@ -113,7 +113,7 @@ def test_clean(empty_database: Database) -> None:
     assert path_1.stat().st_size == 0
 
     size_b = empty_database.clean()
-    assert size_b[0] == empty_database.path.stat().st_size
+    assert size_b[1] == empty_database.path.stat().st_size
     assert size_b[0] >= size_b[1]
 
     assert path_1.exists()
