@@ -31,7 +31,7 @@ from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator
 
     from flask_htmx_template.encryption.base import EncryptionInterface
 
@@ -203,7 +203,7 @@ class Database(ABC):
         self._engine.dispose()
 
     @contextlib.contextmanager
-    def begin_session(self) -> Iterator[orm.Session]:
+    def begin_session(self) -> Generator[orm.Session]:
         """Get SQL Session to the database.
 
         Yields:

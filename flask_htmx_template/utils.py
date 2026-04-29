@@ -35,7 +35,7 @@ REAL_OPERATORS: dict[type[ast.operator], Callable[[Decimal, Decimal], Decimal]] 
     ast.Add: op.add,
     ast.Sub: op.sub,
     ast.Mult: op.mul,
-    ast.Div: op.truediv,
+    ast.Div: cast("Callable[[Decimal, Decimal], Decimal]", op.truediv),
 }
 REAL_UNARY_OPERATORS: dict[type[ast.unaryop], Callable[[Decimal], Decimal]] = {
     ast.UAdd: op.pos,
