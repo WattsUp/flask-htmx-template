@@ -80,11 +80,6 @@ class FlaskExtension:
         if not isinstance(s, str):
             raise TypeError
 
-        if sql.is_postgres_url(s):
-            return Database(sql.normalize_postgres_url(s), None)
-
-        path = Path(s).expanduser().absolute()
-
         key = config.get("KEY")
         if key is None:
             path_key = config.get("KEY_PATH")
@@ -97,6 +92,11 @@ class FlaskExtension:
                 key = path_key.read_text("utf-8").strip()
         elif not isinstance(key, str):
             raise TypeError
+
+        if sql.is_postgres_url(s):
+            return Database(sql.normalize_postgres_url(s), key)
+
+        path = Path(s).expanduser().absolute()
 
         return Database(path, key)
 

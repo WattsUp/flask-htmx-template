@@ -41,7 +41,7 @@ def main(command_line: list[str] | None = None) -> int:
         dest="path_db",
         metavar="PATH",
         default=default_path,
-        help="specify database.db location or postgres URL (postgres+//server:port/db)",
+        help="specify database.db location or postgres URL (postgres://user:password@server:port/db)",
     )
     parser.add_argument(
         "--pass-file",
