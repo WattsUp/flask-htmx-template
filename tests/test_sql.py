@@ -60,7 +60,7 @@ def test_escape_not_reserved() -> None:
 
 
 def test_escape_reserved() -> None:
-    assert sql.escape("where") == "`where`"
+    assert sql.escape("where") == '"where"'
 
 
 def test_to_dict() -> None:
@@ -174,3 +174,18 @@ def test_col0() -> None:
     query = Config.query(Config.key)
     for r in sql.col0(query):
         assert isinstance(r, ConfigKey)
+
+
+def test_normalize_postgres_url_postgres_scheme() -> None:
+    result = sql.normalize_postgres_url("postgres://user:pass@host/db")
+    assert result == "postgresql+psycopg://user:pass@host/db"
+
+
+def test_get_engine_postgres_no_ssl() -> None:
+    original = sql._POSTGRES_SSL_MODE
+    sql._POSTGRES_SSL_MODE = ""
+    try:
+        engine = sql.get_engine_postgres("postgresql+psycopg://user:pass@localhost/db")
+        assert engine is not None
+    finally:
+        sql._POSTGRES_SSL_MODE = original

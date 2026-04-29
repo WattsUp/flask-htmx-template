@@ -30,6 +30,13 @@ def when_ready(_) -> None:
     )
 
 
+def post_fork(_, _worker: gunicorn.workers.base.Worker) -> None:
+    """Dispose inherited DB connections after fork to prevent SSL corruption."""
+    from flask_htmx_template import web  # noqa: PLC0415
+
+    web.ext.db.dispose()
+
+
 def child_exit(_, worker: gunicorn.workers.base.Worker) -> None:
     """When gunicorn worker exits, kill metrics server."""
     GunicornPrometheusMetrics.mark_process_dead_on_child_exit(worker.pid)

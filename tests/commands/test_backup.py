@@ -9,10 +9,14 @@ if TYPE_CHECKING:
 
     import pytest
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
+    from tests.conftest import PostgresDatabaseGenerator
 
 
-def test_backup(capsys: pytest.CaptureFixture[str], empty_database: Database) -> None:
+def test_backup(
+    capsys: pytest.CaptureFixture[str],
+    empty_database: SQLiteDatabase,
+) -> None:
     c = Backup(empty_database.path, None)
     assert c.run() == 0
 
@@ -27,7 +31,7 @@ def test_backup(capsys: pytest.CaptureFixture[str], empty_database: Database) ->
 
 def test_restore(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
     empty_database.backup()
     c = Restore(empty_database.path, None, tar_ver=None, list_ver=False)
@@ -41,7 +45,7 @@ def test_restore(
 
 def test_restore_missing(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
     c = Restore(empty_database.path, None, tar_ver=None, list_ver=False)
     assert c.run() != 0
@@ -54,7 +58,7 @@ def test_restore_missing(
 
 def test_restore_list_empty(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
     c = Restore(empty_database.path, None, tar_ver=None, list_ver=True)
     assert c.run() == 0
@@ -67,7 +71,7 @@ def test_restore_list_empty(
 
 def test_restore_list(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     utc_frozen: datetime.datetime,
 ) -> None:
     empty_database.backup()
@@ -80,3 +84,29 @@ def test_restore_list(
     target = f"Backup # 1 created at {ts_local} (0.0 seconds ago)\n"
     assert captured.out == target
     assert not captured.err
+
+
+def test_backup_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator()
+    c = Backup(postgres_database_generator.url, None)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert "Database is unlocked" in captured.out
+    assert "backup is not supported for postgres databases" in captured.err
+
+
+def test_restore_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator()
+    c = Restore(postgres_database_generator.url, None, tar_ver=None, list_ver=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "restore is not supported for postgres databases" in captured.err

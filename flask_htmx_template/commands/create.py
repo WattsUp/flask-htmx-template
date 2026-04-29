@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import override, TYPE_CHECKING
+from pathlib import Path
+from typing import override
 
 from colorama import Fore
 
 from flask_htmx_template.commands.base import Command
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class Create(Command):
@@ -23,7 +21,7 @@ class Create(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
         *,
         force: bool,
@@ -32,7 +30,7 @@ class Create(Command):
         """Initialize create command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
             force: True will overwrite existing if necessary
             no_encrypt: True will not encrypt the Database
@@ -62,14 +60,34 @@ class Create(Command):
     @override
     def run(self) -> int:
         # Defer for faster time to main
-        from flask_htmx_template import database, utils
+        from flask_htmx_template import database, sql, utils
 
-        if self._path_db.exists():
+        if sql.is_postgres_url(str(self._path_db)):
+            pg_key: str | None = None
+            if self._path_password is not None and self._path_password.exists():
+                pg_key = self._path_password.read_text("utf-8").strip()
+            try:
+                database.PostgresDatabase.create(self._path_db, pg_key)
+            except FileExistsError as e:
+                if self._force:
+                    print(
+                        f"{Fore.RED}--force is not supported for postgres databases",
+                        file=sys.stderr,
+                    )
+                    return -1
+                print(f"{Fore.RED}{e}", file=sys.stderr)
+                return -1
+            print(f"{Fore.GREEN}Postgres database initialized at {self._path_db}")
+            return 0
+
+        # SQLite: self._path_db is a Path (set by base Command.__init__)
+        path_db = Path(self._path_db)
+        if path_db.exists():
             if self._force:
-                self._path_db.unlink()
+                path_db.unlink()
             else:
                 print(
-                    f"{Fore.RED}Cannot overwrite database at {self._path_db}. "
+                    f"{Fore.RED}Cannot overwrite database at {path_db}. "
                     "Try with --force",
                     file=sys.stderr,
                 )
@@ -86,7 +104,7 @@ class Create(Command):
                 # Canceled
                 return -1
 
-        database.Database.create(self._path_db, key)
-        print(f"{Fore.GREEN}Database created at {self._path_db}")
+        database.SQLiteDatabase.create(path_db, key)
+        print(f"{Fore.GREEN}Database created at {path_db}")
 
         return 0

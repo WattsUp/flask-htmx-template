@@ -40,9 +40,8 @@ def main(command_line: list[str] | None = None) -> int:
         "-p",
         dest="path_db",
         metavar="PATH",
-        type=Path,
         default=default_path,
-        help="specify database.db location",
+        help="specify database.db location or postgres URL (postgres://user:password@server:port/db)",
     )
     parser.add_argument(
         "--pass-file",

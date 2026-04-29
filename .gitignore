@@ -2,6 +2,7 @@
 .venv*
 .env*
 .nvim*
+prompt.md
 
 # Build artifacts
 __pycache__

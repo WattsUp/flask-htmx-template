@@ -19,19 +19,21 @@ import prometheus_flask_exporter.multiprocess
 
 from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import utils, web_assets
+from flask_htmx_template import sql, utils, web_assets
 from flask_htmx_template.controllers import (
     auth,
     base,
     common,
     items,
 )
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import PostgresDatabase, SQLiteDatabase
 from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     import jinja2
+
+    from flask_htmx_template.database import Database
 
 
 class JSONEncoder(flask.json.provider.JSONProvider):
@@ -79,7 +81,6 @@ class FlaskExtension:
         s = config.get("PATH", "~/.flask-htmx-template/database.db")
         if not isinstance(s, str):
             raise TypeError
-        path = Path(s).expanduser().absolute()
 
         key = config.get("KEY")
         if key is None:
@@ -94,7 +95,12 @@ class FlaskExtension:
         elif not isinstance(key, str):
             raise TypeError
 
-        return Database(path, key)
+        if sql.is_postgres_url(s):
+            return PostgresDatabase(s, key)
+
+        path = Path(s).expanduser().absolute()
+
+        return SQLiteDatabase(path, key)
 
     @classmethod
     def _add_routes(cls, app: flask.Flask) -> None:

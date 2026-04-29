@@ -8,12 +8,12 @@ if TYPE_CHECKING:
 
     import pytest
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
 
 
 def test_empty(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
 
     c = Unlock(empty_database.path, None)

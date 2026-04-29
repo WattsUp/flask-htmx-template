@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import SQLiteDatabase
 from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 from flask_htmx_template.models.config import Config, ConfigKey
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_backup(utc_frozen: datetime.datetime, empty_database: Database) -> None:
+def test_backup(utc_frozen: datetime.datetime, empty_database: SQLiteDatabase) -> None:
     path_db = empty_database.path
     path_salt = path_db.with_suffix(".nacl")
 
@@ -39,7 +39,7 @@ def test_backup(utc_frozen: datetime.datetime, empty_database: Database) -> None
         assert path_salt.name not in tar.getnames()
 
 
-def test_backup_second(empty_database: Database) -> None:
+def test_backup_second(empty_database: SQLiteDatabase) -> None:
     empty_database.backup()
     path_tar, tar_ver = empty_database.backup()
     assert path_tar.exists()
@@ -48,29 +48,29 @@ def test_backup_second(empty_database: Database) -> None:
     assert tar_ver == 2
 
 
-def test_backups_empty(empty_database: Database) -> None:
-    assert not Database.backups(empty_database)
+def test_backups_empty(empty_database: SQLiteDatabase) -> None:
+    assert not SQLiteDatabase.backups(empty_database)
 
 
-def test_backups(utc_frozen: datetime.datetime, empty_database: Database) -> None:
+def test_backups(utc_frozen: datetime.datetime, empty_database: SQLiteDatabase) -> None:
     empty_database.backup()
     empty_database.backup()
     empty_database.backup()
 
     target = [(i + 1, utc_frozen) for i in range(3)]
-    assert Database.backups(empty_database) == target
+    assert SQLiteDatabase.backups(empty_database) == target
 
 
-def test_backups_no_ts(empty_database: Database) -> None:
+def test_backups_no_ts(empty_database: SQLiteDatabase) -> None:
     path = empty_database.path.with_suffix(".backup1.tar")
     with tarfile.open(path, "w") as _:
         pass
 
     with pytest.raises(exc.InvalidBackupTarError):
-        Database.backups(empty_database.path)
+        SQLiteDatabase.backups(empty_database.path)
 
 
-def test_backups_ts_dir(empty_database: Database) -> None:
+def test_backups_ts_dir(empty_database: SQLiteDatabase) -> None:
     path = empty_database.path.with_suffix(".backup1.tar")
     with tarfile.open(path, "w") as tar:
         info = tarfile.TarInfo("_timestamp")
@@ -78,12 +78,12 @@ def test_backups_ts_dir(empty_database: Database) -> None:
         tar.addfile(info)
 
     with pytest.raises(exc.InvalidBackupTarError):
-        Database.backups(empty_database.path)
+        SQLiteDatabase.backups(empty_database.path)
 
 
 @pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")
 @pytest.mark.encryption
-def test_backup_encrypted(empty_database_encrypted: tuple[Database, str]) -> None:
+def test_backup_encrypted(empty_database_encrypted: tuple[SQLiteDatabase, str]) -> None:
     d, _ = empty_database_encrypted
     path_db = d.path
     path_salt = path_db.with_suffix(".nacl")
@@ -103,7 +103,7 @@ def test_backup_encrypted(empty_database_encrypted: tuple[Database, str]) -> Non
         assert path_salt.name in tar.getnames()
 
 
-def test_clean(empty_database: Database) -> None:
+def test_clean(empty_database: SQLiteDatabase) -> None:
     path_1 = empty_database.path.with_suffix(".backup1.tar")
     path_2 = empty_database.path.with_suffix(".backup2.tar")
     path_dir = empty_database.path.with_suffix(".things")
@@ -113,7 +113,7 @@ def test_clean(empty_database: Database) -> None:
     assert path_1.stat().st_size == 0
 
     size_b = empty_database.clean()
-    assert size_b[0] == empty_database.path.stat().st_size
+    assert size_b[1] == empty_database.path.stat().st_size
     assert size_b[0] >= size_b[1]
 
     assert path_1.exists()
@@ -125,7 +125,7 @@ def test_clean(empty_database: Database) -> None:
 def test_restore_non_existant(tmp_path: Path) -> None:
     path = tmp_path / "database.db"
     with pytest.raises(FileNotFoundError):
-        Database.restore(path)
+        SQLiteDatabase.restore(path)
 
 
 def test_restore_no_ts(tmp_path: Path) -> None:
@@ -135,7 +135,7 @@ def test_restore_no_ts(tmp_path: Path) -> None:
         pass
 
     with pytest.raises(exc.InvalidBackupTarError):
-        Database.restore(path)
+        SQLiteDatabase.restore(path)
 
 
 def test_restore_path_traversal(tmp_path: Path) -> None:
@@ -151,10 +151,10 @@ def test_restore_path_traversal(tmp_path: Path) -> None:
         tar.addfile(info)
 
     with pytest.raises(exc.InvalidBackupTarError):
-        Database.restore(path)
+        SQLiteDatabase.restore(path)
 
 
-def test_restore(empty_database: Database) -> None:
+def test_restore(empty_database: SQLiteDatabase) -> None:
     # Delete ENCRYPTION_TEST so reload fails
     with empty_database.begin_session():
         Config.query().where(Config.key == ConfigKey.ENCRYPTION_TEST).delete()
@@ -162,19 +162,19 @@ def test_restore(empty_database: Database) -> None:
     empty_database.path.unlink()
 
     with pytest.raises(exc.ProtectedObjectNotFoundError):
-        Database.restore(empty_database)
+        SQLiteDatabase.restore(empty_database)
 
     assert empty_database.path.exists()
 
 
-def test_restore_path(empty_database: Database) -> None:
+def test_restore_path(empty_database: SQLiteDatabase) -> None:
     # Delete ENCRYPTION_TEST so reload fails
     with empty_database.begin_session():
         Config.query().where(Config.key == ConfigKey.ENCRYPTION_TEST).delete()
     empty_database.backup()
     empty_database.path.unlink()
 
-    Database.restore(empty_database.path)
+    SQLiteDatabase.restore(empty_database.path)
 
     assert empty_database.path.exists()
 
@@ -182,6 +182,6 @@ def test_restore_path(empty_database: Database) -> None:
         empty_database._unlock()
 
 
-def test_restore_version_not_found(empty_database: Database) -> None:
+def test_restore_version_not_found(empty_database: SQLiteDatabase) -> None:
     with pytest.raises(FileNotFoundError):
-        Database.restore(empty_database, tar_ver=100)
+        SQLiteDatabase.restore(empty_database, tar_ver=100)

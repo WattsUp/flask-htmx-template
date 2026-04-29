@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import override, TYPE_CHECKING
+import sys
+from typing import cast, override, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -11,6 +12,8 @@ from flask_htmx_template.commands.base import Command
 if TYPE_CHECKING:
     import argparse
     from pathlib import Path
+
+    from flask_htmx_template.database import SQLiteDatabase
 
 
 class Clean(Command):
@@ -22,13 +25,13 @@ class Clean(Command):
 
     def __init__(
         self,
-        path_db: Path,
+        path_db: Path | str,
         path_password: Path | None,
     ) -> None:
         """Initialize clean command.
 
         Args:
-            path_db: Path to Database DB
+            path_db: Path to Database DB or postgres connection URL
             path_password: Path to password file, None will prompt when necessary
 
         """
@@ -42,7 +45,15 @@ class Clean(Command):
 
     @override
     def run(self) -> int:
-        size_before, size_after = self._d.clean()
+        if self._d.is_postgres:
+            print(
+                f"{Fore.RED}clean is not supported for postgres databases",
+                file=sys.stderr,
+            )
+            return -1
+
+        d = cast("SQLiteDatabase", self._d)
+        size_before, size_after = d.clean()
         print(f"{Fore.GREEN}Database cleaned")
         p_change = size_before - size_after
         print(

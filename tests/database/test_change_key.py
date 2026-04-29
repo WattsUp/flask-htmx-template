@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import SQLiteDatabase
 from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.models.item import Item
@@ -13,7 +13,7 @@ from flask_htmx_template.models.item import Item
 @pytest.mark.encryption
 def test_change_db_key(
     capsys: pytest.CaptureFixture[str],
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
     rand_str: str,
     today_ord: int,
 ) -> None:
@@ -41,14 +41,14 @@ def test_change_db_key(
     assert new_web_key != new_key
 
     # Unlocking with new_key works
-    Database(d.path, new_key)
+    SQLiteDatabase(d.path, new_key)
 
     # Unlocking with key doesn't work
     with pytest.raises(exc.UnlockingError):
-        Database(d.path, old_key)
+        SQLiteDatabase(d.path, old_key)
 
 
-def test_change_db_key_short(empty_database: Database) -> None:
+def test_change_db_key_short(empty_database: SQLiteDatabase) -> None:
     with pytest.raises(exc.InvalidKeyError):
         empty_database.change_key("a")
 
@@ -56,7 +56,7 @@ def test_change_db_key_short(empty_database: Database) -> None:
 @pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")
 @pytest.mark.encryption
 def test_change_web_key(
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
     rand_str: str,
 ) -> None:
     new_key = rand_str
@@ -70,6 +70,6 @@ def test_change_web_key(
     assert web_key != db_key
 
 
-def test_change_web_key_short(empty_database: Database) -> None:
+def test_change_web_key_short(empty_database: SQLiteDatabase) -> None:
     with pytest.raises(exc.InvalidKeyError):
         empty_database.change_web_key("a")

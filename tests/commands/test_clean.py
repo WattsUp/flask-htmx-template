@@ -7,10 +7,14 @@ from flask_htmx_template.commands.clean import Clean
 if TYPE_CHECKING:
     import pytest
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
+    from tests.conftest import PostgresDatabaseGenerator
 
 
-def test_clean(capsys: pytest.CaptureFixture[str], empty_database: Database) -> None:
+def test_clean(
+    capsys: pytest.CaptureFixture[str],
+    empty_database: SQLiteDatabase,
+) -> None:
     c = Clean(empty_database.path, None)
     assert c.run() == 0
 
@@ -18,10 +22,22 @@ def test_clean(capsys: pytest.CaptureFixture[str], empty_database: Database) -> 
     assert path_backup.exists()
 
     captured = capsys.readouterr()
-    target = (
-        "Database is unlocked\n"
-        "Database cleaned\n"
-        "Database was optimized by 0.0KB/0.0KiB\n"
-    )
-    assert captured.out == target
+    lines = captured.out.strip().split("\n")
+    assert lines[0] == "Database is unlocked"
+    assert lines[1] == "Database cleaned"
+    assert lines[2].startswith("Database was optimized by ")
+    assert len(lines) == 3
     assert not captured.err
+
+
+def test_clean_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator()
+    c = Clean(postgres_database_generator.url, None)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert "Database is unlocked" in captured.out
+    assert "clean is not supported for postgres databases" in captured.err

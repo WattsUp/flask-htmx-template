@@ -4,23 +4,28 @@ import sys
 from typing import override, TYPE_CHECKING
 
 from flask_htmx_template.commands.create import Create
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import SQLiteDatabase
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
 
+    from tests.conftest import PostgresDatabaseGenerator
 
-class MockDatabase(Database):
 
-    def __init__(self) -> None:
+class MockDatabase(SQLiteDatabase):
+
+    def __new__(cls, *_args: object, **_kwargs: object) -> MockDatabase:  # noqa: PYI034
+        return object.__new__(cls)
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
         pass
 
     # Creating takes a long time so mock actual function
     @override
     @classmethod
-    def create(cls, path: str | Path, key: str | None = None) -> Database:
+    def create(cls, path: str | Path, key: str | None = None) -> MockDatabase:
         print(f"Creating {path} with {key}", file=sys.stderr)
         return MockDatabase()
 
@@ -48,7 +53,7 @@ def test_create_unencrypted_forced(
 ) -> None:
     path = tmp_path / "new.db"
     path.touch()
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
     c = Create(path, None, force=True, no_encrypt=True)
     assert c.run() == 0
@@ -66,7 +71,7 @@ def test_create_unencrypted(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
     c = Create(path, None, force=False, no_encrypt=True)
     assert c.run() == 0
@@ -85,7 +90,7 @@ def test_create_encrypted(
     rand_str: str,
 ) -> None:
     path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
     queue = [rand_str, rand_str]
 
@@ -112,7 +117,7 @@ def test_create_encrypted_pass_file(
     rand_str: str,
 ) -> None:
     path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
     path_password = tmp_path / "password.secret"
     path_password.write_text(rand_str, "utf-8")
@@ -133,7 +138,7 @@ def test_create_encrypted_cancelled(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
     queue = [None]
 
@@ -149,3 +154,56 @@ def test_create_encrypted_cancelled(
     captured = capsys.readouterr()
     assert not captured.out
     assert not captured.err
+
+
+def test_create_postgres(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator.drop()
+    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    assert c.run() == 0
+
+
+def test_create_postgres_with_key(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+    pg_url_no_password: str,
+    pg_key: str,
+    tmp_path: Path,
+) -> None:
+    postgres_database_generator.drop()
+    path_key = tmp_path / "key.secret"
+    path_key.write_text(pg_key, "utf-8")
+    c = Create(pg_url_no_password, path_key, force=False, no_encrypt=False)
+    assert c.run() == 0
+
+    captured = capsys.readouterr()
+    assert f"Postgres database initialized at {c._path_db}" in captured.out
+    assert not captured.err
+
+
+def test_create_postgres_already_exists(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator()
+    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert captured.err  # FileExistsError message
+
+
+def test_create_postgres_force(
+    capsys: pytest.CaptureFixture[str],
+    postgres_database_generator: PostgresDatabaseGenerator,
+) -> None:
+    postgres_database_generator()
+    c = Create(postgres_database_generator.url, None, force=True, no_encrypt=False)
+    assert c.run() == -1
+
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert "--force is not supported for postgres databases" in captured.err

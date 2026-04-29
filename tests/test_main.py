@@ -10,7 +10,7 @@ import pytest
 from flask_htmx_template import main, version
 
 if TYPE_CHECKING:
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
 
 
 def test_entrypoints() -> None:
@@ -29,7 +29,7 @@ def test_entrypoints() -> None:
         assert stdout == version.__version__
 
 
-def test_unlock_non_existant(empty_database: Database) -> None:
+def test_unlock_non_existant(empty_database: SQLiteDatabase) -> None:
     # Try unlocking non-existent Database
     args = [
         "--database",
@@ -42,7 +42,7 @@ def test_unlock_non_existant(empty_database: Database) -> None:
 
 def test_unlock_successful(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
     args = ["--database", str(empty_database.path), "unlock"]
     assert main.main(args) == 0
