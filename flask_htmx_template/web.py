@@ -26,12 +26,14 @@ from flask_htmx_template.controllers import (
     common,
     items,
 )
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import PostgresDatabase, SQLiteDatabase
 from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     import jinja2
+
+    from flask_htmx_template.database import Database
 
 
 class JSONEncoder(flask.json.provider.JSONProvider):
@@ -94,11 +96,11 @@ class FlaskExtension:
             raise TypeError
 
         if sql.is_postgres_url(s):
-            return Database(sql.normalize_postgres_url(s), key)
+            return PostgresDatabase(s, key)
 
         path = Path(s).expanduser().absolute()
 
-        return Database(path, key)
+        return SQLiteDatabase(path, key)
 
     @classmethod
     def _add_routes(cls, app: flask.Flask) -> None:

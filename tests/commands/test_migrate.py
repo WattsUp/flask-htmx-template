@@ -10,15 +10,14 @@ if TYPE_CHECKING:
 
     import pytest
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
     from tests.conftest import PostgresDatabaseGenerator
 
 
 def test_not_required(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
-
     c = Migrate(empty_database.path, None)
     assert c.run() == 0
 
@@ -55,7 +54,6 @@ def test_migrate_postgres(
     capsys: pytest.CaptureFixture[str],
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
-    """Migrate.run() skips backup for postgres and succeeds on up-to-date database."""
     postgres_database_generator()
     c = Migrate(postgres_database_generator.url, None)
     assert c.run() == 0

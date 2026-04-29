@@ -19,7 +19,7 @@ from flask_htmx_template.migrations.top import MIGRATORS
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
     from tests.conftest import PostgresDatabaseGenerator
 
 
@@ -49,7 +49,10 @@ def test_no_file(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     assert captured.err == target
 
 
-def test_unlock(capsys: pytest.CaptureFixture[str], empty_database: Database) -> None:
+def test_unlock(
+    capsys: pytest.CaptureFixture[str],
+    empty_database: SQLiteDatabase,
+) -> None:
     MockCommand(empty_database.path, None)
 
     captured = capsys.readouterr()
@@ -79,7 +82,7 @@ def test_migration_required(
 @pytest.mark.encryption
 def test_unlock_encrypted_path(
     capsys: pytest.CaptureFixture[str],
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
     tmp_path: Path,
 ) -> None:
     d, key = empty_database_encrypted
@@ -98,7 +101,7 @@ def test_unlock_encrypted_path(
 @pytest.mark.encryption
 def test_unlock_encrypted_path_bad_key(
     capsys: pytest.CaptureFixture[str],
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
     tmp_path: Path,
 ) -> None:
     d, _ = empty_database_encrypted
@@ -119,7 +122,7 @@ def test_unlock_encrypted_path_bad_key(
 def test_unlock_encrypted(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
 ) -> None:
     d, key = empty_database_encrypted
     queue = ["not key", key]
@@ -147,7 +150,7 @@ def test_unlock_encrypted(
 def test_unlock_encrypted_cancel(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
 ) -> None:
     d, _ = empty_database_encrypted
 
@@ -171,7 +174,7 @@ def test_unlock_encrypted_cancel(
 def test_unlock_encrypted_failed(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
 ) -> None:
     d, _ = empty_database_encrypted
 
@@ -211,7 +214,7 @@ def test_unlock_encrypted_failed(
     ],
 )
 def test_args(
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     cmd_class: type[Command],
     extra_args: list[str],
 ) -> None:
@@ -242,7 +245,6 @@ def test_args(
 
 
 def test_postgres_url_normalized_in_command(pg_url: str) -> None:
-    """Command.__init__ normalizes a postgres URL and stores it as a string."""
     c = MockCommand(pg_url, None, do_unlock=False)
     assert isinstance(c._path_db, str)
     assert c._path_db.startswith("postgresql+psycopg://")
@@ -250,13 +252,12 @@ def test_postgres_url_normalized_in_command(pg_url: str) -> None:
 
 def test_unlock_postgres_with_key(
     postgres_database_generator: PostgresDatabaseGenerator,
-    pg_url_no_creds: str,
+    pg_url_no_password: str,
     pg_key: str,
     tmp_path: Path,
 ) -> None:
-    """_unlock with a key file injects credentials and returns a postgres Database."""
     postgres_database_generator()
     path_key = tmp_path / "key.secret"
     path_key.write_text(pg_key, "utf-8")
-    c = MockCommand(pg_url_no_creds, path_key)
+    c = MockCommand(pg_url_no_password, path_key)
     assert c._d.is_postgres

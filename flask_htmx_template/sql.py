@@ -128,40 +128,35 @@ def get_engine(
     return engine
 
 
-def postgres_url_has_credentials(url: str) -> bool:
-    """Check if a postgres URL already contains user and password.
+def postgres_url_has_password(url: str) -> bool:
+    """Check if a postgres URL already contains a password.
 
     Args:
         url: postgres connection URL
 
     Returns:
-        True if the URL contains both username and password
+        True if the URL contains a password
 
     """
     u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
-    return u.username is not None and u.password is not None
+    return u.password is not None
 
 
-def inject_postgres_credentials(url: str, key: str) -> str:
-    """Inject credentials from ``key`` into a postgres URL.
+def inject_postgres_password(url: str, password: str) -> str:
+    """Inject a password into a postgres URL.
 
-    The key is split on the first ``:`` to produce ``user:password``.
-    If no colon is present, the entire key is used as the password only.
+    The username must already be present in the URL.
 
     Args:
-        url: postgres connection URL (normalized)
-        key: Credentials in ``user:password`` format, or just ``password``
+        url: postgres connection URL (username must be embedded)
+        password: Password to inject
 
     Returns:
-        URL with credentials injected
+        URL with password injected
 
     """
     u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
-    if ":" in key:
-        user, password = key.split(":", 1)
-        u = u.set(username=user, password=password)
-    else:
-        u = u.set(password=key)
+    u = u.set(password=password)
     return u.render_as_string(hide_password=False)
 
 

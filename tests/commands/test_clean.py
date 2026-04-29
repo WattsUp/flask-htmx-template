@@ -7,11 +7,14 @@ from flask_htmx_template.commands.clean import Clean
 if TYPE_CHECKING:
     import pytest
 
-    from flask_htmx_template.database import Database
+    from flask_htmx_template.database import SQLiteDatabase
     from tests.conftest import PostgresDatabaseGenerator
 
 
-def test_clean(capsys: pytest.CaptureFixture[str], empty_database: Database) -> None:
+def test_clean(
+    capsys: pytest.CaptureFixture[str],
+    empty_database: SQLiteDatabase,
+) -> None:
     c = Clean(empty_database.path, None)
     assert c.run() == 0
 
@@ -31,7 +34,6 @@ def test_clean_postgres(
     capsys: pytest.CaptureFixture[str],
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
-    """Clean.run() returns -1 for postgres databases."""
     postgres_database_generator()
     c = Clean(postgres_database_generator.url, None)
     assert c.run() == -1

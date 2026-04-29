@@ -12,8 +12,9 @@ import secrets
 import shutil
 import sys
 import tarfile
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import override, Self, TYPE_CHECKING
 
 import sqlalchemy
 import tqdm
@@ -32,12 +33,19 @@ from flask_htmx_template.version import __version__
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from flask_htmx_template.encryption.base import EncryptionInterface
 
-class Database:
-    """Database."""
+
+class Database(ABC):
+    """Database base class.
+
+    Use as a factory: Database(path, key) returns SQLiteDatabase or
+    PostgresDatabase depending on the path.
+    """
 
     _ENCRYPTION_TEST_VALUE = "flask_htmx_template encryption test string"
 
+    @abstractmethod
     def __init__(
         self,
         path: str | Path,
@@ -49,8 +57,8 @@ class Database:
 
         Args:
             path: Path to database file, or postgres connection URL
-            key: String password to unlock database encryption
-                for postgres: Credentials in `user:password` format to inject into URL
+            key: String password to unlock database encryption.
+                For postgres: password to inject (username must be embedded in the URL)
             check_migration: True will check if migration is required
 
         Raises:
@@ -58,71 +66,45 @@ class Database:
             MigrationRequiredError: If migration is required
 
         """
-        path_str = str(path)
-        if sql.is_postgres_url(path_str):
-            pg_url = sql.normalize_postgres_url(path_str)
-            if key is not None and not sql.postgres_url_has_credentials(pg_url):
-                pg_url = sql.inject_postgres_credentials(pg_url, key)
-            self._postgres_url: str | None = pg_url
-            self._enc = None
-            self._session_maker = orm.sessionmaker(self.get_engine())
-            configs = self._unlock()
-        else:
-            self._postgres_url = None
-            self._path_db = Path(path).resolve().with_suffix(".db")
-            self._path_salt = self._path_db.with_suffix(".nacl")
-            if not self._path_db.exists():
-                msg = (
-                    f"Database at {self._path_db} does not exist, use Database.create()"
-                )
-                raise FileNotFoundError(msg)
+        super().__init__()
+        self._postgres_url: str
+        self._enc: EncryptionInterface | None
 
-            if key is None:
-                self._enc = None
-            elif self._path_salt.exists():
-                enc_config = self._path_salt.read_bytes()
-                self._enc = Encryption(key, enc_config)
-            else:
-                msg = f"Database at {self._path_db} does not have salt file"
-                raise FileNotFoundError(msg)
-            self._session_maker = orm.sessionmaker(self.get_engine())
-            configs = self._unlock()
+        self._engine = self.get_engine()
+        self._session_maker = orm.sessionmaker(self._engine)
+        configs = self._unlock()
 
         version_str = configs.get(ConfigKey.VERSION)
         if check_migration and (v := self.migration_required(version_str)):
             msg = f"Database requires migration to v{v}"
             raise exc.MigrationRequiredError(msg)
 
+    @classmethod
+    def create(cls, path: str | Path, key: str | None = None) -> Self:
+        """Create a new Database.
+
+        For SQLite, saves database and configuration file.
+        For postgres, creates tables in the existing server.
+
+        Args:
+            path: Path to database file, or postgres connection URL
+            key: String password to unlock database encryption.
+                For postgres: password to inject (username must be embedded in the URL)
+
+        Returns:
+            Database linked to newly created database
+
+        Raises:
+            FileExistsError: If database already exists
+
+        """
+        raise NotImplementedError
+
     @property
+    @abstractmethod
     def is_postgres(self) -> bool:
         """Check if database is postgres."""
-        return self._postgres_url is not None
-
-    @property
-    def path(self) -> Path:
-        """Path to SQLite database file.
-
-        Raises:
-            NotImplementedError: For postgres databases
-
-        """
-        if self.is_postgres:
-            msg = "Postgres databases do not have a file path"
-            raise NotImplementedError(msg)
-        return self._path_db
-
-    @property
-    def path_salt(self) -> Path:
-        """Path to SQLite database salt file.
-
-        Raises:
-            NotImplementedError: For postgres databases
-
-        """
-        if self.is_postgres:
-            msg = "Postgres databases do not have a salt file"
-            raise NotImplementedError(msg)
-        return self._path_salt
+        raise NotImplementedError
 
     @classmethod
     def is_encrypted_path(cls, path: str | Path) -> bool:
@@ -155,132 +137,6 @@ class Database:
         """Check if database is encrypted."""
         return self._enc is not None
 
-    @classmethod
-    def create(cls, path: str | Path, key: str | None = None) -> Database:
-        """Create a new Database.
-
-        For SQLite, saves database and configuration file.
-        For postgres, creates tables in the existing server.
-
-        Args:
-            path: Path to database file, or postgres connection URL
-            key: String password to unlock database encryption
-                for postgres: Credentials in `user:password` format to inject into URL
-
-        Returns:
-            Database linked to newly created database
-
-        Raises:
-            FileExistsError: If database already exists
-
-        """
-        path_str = str(path)
-        if sql.is_postgres_url(path_str):
-            return cls._create_postgres(sql.normalize_postgres_url(path_str), key)
-
-        path_db = Path(path).resolve()
-        if path_db.exists():
-            msg = f"Database already exists at {path_db}"
-            raise FileExistsError(msg)
-        path_salt = path_db.with_suffix(".nacl")
-
-        path_db.parent.mkdir(parents=True, exist_ok=True)
-
-        enc = None
-        enc_config = None
-        if ENCRYPTION_AVAILABLE and key is not None:
-            enc, enc_config = Encryption.create(key)
-            path_salt.write_bytes(enc_config)
-            path_salt.chmod(0o600)  # Only owner can read/write
-        else:
-            # Remove salt if unencrypted
-            path_salt.unlink(missing_ok=True)
-
-        cipher_bytes = Cipher.generate().to_bytes()
-        cipher_b64 = base64.b64encode(cipher_bytes).decode()
-
-        if enc is None:
-            test_value = Database._ENCRYPTION_TEST_VALUE
-        else:
-            test_value = enc.encrypt(Database._ENCRYPTION_TEST_VALUE)
-
-        engine = sql.get_engine(path_db, enc)
-        with orm.Session(engine) as s, Base.set_session(s):
-            with s.begin():
-                Base.metadata_create_all()
-
-            with s.begin():
-                # If developing a migration, current version will be less
-                # Set new database to max of __version__ and Migrator.all()
-                versions = [
-                    Version(__version__),
-                    *[m.min_version() for m in MIGRATORS],
-                ]
-                v = versions[0] if len(versions) == 1 else max(versions)
-
-                Config.set_(ConfigKey.VERSION, str(v))
-                Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
-                Config.set_(ConfigKey.CIPHER, cipher_b64)
-                Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
-
-                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
-                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
-
-                if enc is not None and key is not None:
-                    Config.set_(ConfigKey.WEB_KEY, enc.encrypt(key))
-        path_db.chmod(0o600)  # Only owner can read/write
-
-        return Database(path_db, key)
-
-    @classmethod
-    def _create_postgres(cls, url: str, key: str | None = None) -> Database:
-        """Create a new postgres-backed Database.
-
-        Args:
-            url: Normalized postgres connection URL
-            key: Credentials in `user:password` format to inject into URL
-
-        Returns:
-            Database linked to the postgres server
-
-        Raises:
-            FileExistsError: If config table is already populated
-
-        """
-        if key is not None and not sql.postgres_url_has_credentials(url):
-            url = sql.inject_postgres_credentials(url, key)
-
-        cipher_bytes = Cipher.generate().to_bytes()
-        cipher_b64 = base64.b64encode(cipher_bytes).decode()
-        test_value = Database._ENCRYPTION_TEST_VALUE
-
-        engine = sql.get_engine_postgres(url)
-        with orm.Session(engine) as s, Base.set_session(s):
-            with s.begin():
-                Base.metadata_create_all()
-
-            with s.begin():
-                existing = Config.first()
-                if existing is not None:
-                    msg = "Postgres database is already initialized"
-                    raise FileExistsError(msg)
-
-                versions = [
-                    Version(__version__),
-                    *[m.min_version() for m in MIGRATORS],
-                ]
-                v = versions[0] if len(versions) == 1 else max(versions)
-
-                Config.set_(ConfigKey.VERSION, str(v))
-                Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
-                Config.set_(ConfigKey.CIPHER, cipher_b64)
-                Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
-
-                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
-                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
-
-        return Database(url, None)
-
     def _unlock(self) -> dict[ConfigKey, str]:
         """Unlock the database.
 
@@ -297,8 +153,7 @@ class Database:
                 query = Config.query(Config.key, Config.value)
                 configs: dict[ConfigKey, str] = sql.to_dict(query)
         except exc.DatabaseError as e:
-            target = self._postgres_url or self._path_db
-            msg = f"Failed to open database {target}"
+            msg = f"Failed to open database {self}"
             raise exc.UnlockingError(msg) from e
 
         value = configs.get(ConfigKey.ENCRYPTION_TEST)
@@ -325,6 +180,7 @@ class Database:
         # All good :)
         return configs
 
+    @abstractmethod
     def get_engine(self) -> sqlalchemy.Engine:
         """Get SQL Engine to the database.
 
@@ -332,9 +188,19 @@ class Database:
             Engine
 
         """
+        raise NotImplementedError
         if self._postgres_url is not None:
             return sql.get_engine_postgres(self._postgres_url)
         return sql.get_engine(self._path_db, self._enc)
+
+    def dispose(self) -> None:
+        """Dispose of the connection pool.
+
+        Must be called in each worker process after forking (e.g. gunicorn
+        post_fork) to prevent workers from sharing inherited SSL connections.
+
+        """
+        self._engine.dispose()
 
     @contextlib.contextmanager
     def begin_session(self) -> Iterator[orm.Session]:
@@ -415,19 +281,145 @@ class Database:
                 return v_m
         return None
 
+    def change_web_key(self, key: str) -> None:
+        """Change password used to access web.
+
+        Args:
+            key: New web key
+
+        Raises:
+            InvalidKeyError: If key does not match minimum requirements
+
+        """
+        if len(key) < utils.MIN_PASS_LEN:
+            msg = f"Password must be at least {utils.MIN_PASS_LEN} characters"
+            raise exc.InvalidKeyError(msg)
+
+        key_encrypted = self.encrypt(key)
+        with self.begin_session():
+            Config.set_(ConfigKey.WEB_KEY, key_encrypted)
+
+
+class SQLiteDatabase(Database):
+    """SQLite-backed database with backup, restore, clean, and change_key support."""
+
+    @override
+    def __init__(
+        self,
+        path: str | Path,
+        key: str | None,
+        *,
+        check_migration: bool = True,
+    ) -> None:
+        path_str = str(path)
+        if sql.is_postgres_url(path_str):
+            msg = "Can only create a SQLiteDatabase with a file path"
+            raise exc.UnlockingError(msg)
+
+        self._path_db = Path(path).resolve().with_suffix(".db")
+        self._path_salt = self._path_db.with_suffix(".nacl")
+        if not self._path_db.exists():
+            msg = f"Database at {self._path_db} does not exist, use Database.create()"
+            raise FileNotFoundError(msg)
+
+        if key is None:
+            self._enc = None
+        elif self._path_salt.exists():
+            enc_config = self._path_salt.read_bytes()
+            self._enc = Encryption(key, enc_config)
+        else:
+            msg = f"Database at {self._path_db} does not have salt file"
+            raise FileNotFoundError(msg)
+
+        super().__init__(path=path, key=key, check_migration=check_migration)
+
+    @override
+    @classmethod
+    def create(cls, path: str | Path, key: str | None = None) -> Self:
+        path_db = Path(path).resolve()
+        if path_db.exists():
+            msg = f"Database already exists at {path_db}"
+            raise FileExistsError(msg)
+        path_salt = path_db.with_suffix(".nacl")
+
+        path_db.parent.mkdir(parents=True, exist_ok=True)
+
+        enc = None
+        enc_config = None
+        if ENCRYPTION_AVAILABLE and key is not None:
+            enc, enc_config = Encryption.create(key)
+            path_salt.write_bytes(enc_config)
+            path_salt.chmod(0o600)  # Only owner can read/write
+        else:
+            # Remove salt if unencrypted
+            path_salt.unlink(missing_ok=True)
+
+        cipher_bytes = Cipher.generate().to_bytes()
+        cipher_b64 = base64.b64encode(cipher_bytes).decode()
+
+        if enc is None:
+            test_value = cls._ENCRYPTION_TEST_VALUE
+        else:
+            test_value = enc.encrypt(cls._ENCRYPTION_TEST_VALUE)
+
+        engine = sql.get_engine(path_db, enc)
+        with orm.Session(engine) as s, Base.set_session(s):
+            with s.begin():
+                Base.metadata_create_all()
+
+            with s.begin():
+                # If developing a migration, current version will be less
+                # Set new database to max of __version__ and Migrator.all()
+                versions = [
+                    Version(__version__),
+                    *[m.min_version() for m in MIGRATORS],
+                ]
+                v = versions[0] if len(versions) == 1 else max(versions)
+
+                Config.set_(ConfigKey.VERSION, str(v))
+                Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
+                Config.set_(ConfigKey.CIPHER, cipher_b64)
+                Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
+
+                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
+                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
+
+                if enc is not None and key is not None:
+                    Config.set_(ConfigKey.WEB_KEY, enc.encrypt(key))
+        path_db.chmod(0o600)  # Only owner can read/write
+
+        return cls(path_db, key)
+
+    @property
+    @override
+    def is_postgres(self) -> bool:
+        return False
+
+    @override
+    def get_engine(self) -> sqlalchemy.Engine:
+        return sql.get_engine(self._path_db, self._enc)
+
+    @override
+    def __str__(self) -> str:
+        return f"<SQLiteDatabase@{self.path}>"
+
+    @property
+    def path(self) -> Path:
+        """Path to SQLite database file."""
+        return self._path_db
+
+    @property
+    def path_salt(self) -> Path:
+        """Path to SQLite database salt file."""
+        return self._path_salt
+
     def backup(self) -> tuple[Path, int]:
         """Back up database, duplicates files.
 
         Returns:
             (Path to newly created backup tar, backup version)
 
-        Raises:
-            NotImplementedError: For postgres databases
-
         """
-        if self.is_postgres:
-            msg = "backup is not supported for postgres databases"
-            raise NotImplementedError(msg)
         # Find latest backup file for this Database
         i = 0
         parent = self._path_db.parent
@@ -470,19 +462,12 @@ class Database:
 
         Raises:
             InvalidBackupTarError: If backup is missing timestamp
-            NotImplementedError: For postgres databases
 
         """
-        if isinstance(d, Database) and d.is_postgres:
-            msg = "backups is not supported for postgres databases"
-            raise NotImplementedError(msg)
-        if isinstance(d, str) and sql.is_postgres_url(d):
-            msg = "backups is not supported for postgres databases"
-            raise NotImplementedError(msg)
         backups: list[tuple[int, datetime.datetime]] = []
 
-        path_db = Path(d.path if isinstance(d, Database) else d)
-        path_db = path_db.resolve().with_suffix(".db")
+        path_raw: str | Path = d.path if isinstance(d, cls) else d  # type: ignore[assignment]
+        path_db = Path(path_raw).resolve().with_suffix(".db")
         parent = path_db.parent
         name = path_db.with_suffix("").name
 
@@ -517,13 +502,7 @@ class Database:
             Size of files in bytes:
             (database before, database after)
 
-        Raises:
-            NotImplementedError: For postgres databases
-
         """
-        if self.is_postgres:
-            msg = "clean is not supported for postgres databases"
-            raise NotImplementedError(msg)
         parent = self._path_db.parent
         name = self._path_db.with_suffix("").name
 
@@ -557,7 +536,7 @@ class Database:
         shutil.move(path_backup_optimized, path_new)
 
         # Restore the optimized version
-        Database.restore(self, tar_ver=2)
+        self.restore(self, tar_ver=2)
 
         # Delete optimized backup version since that is the live version
         path_new.unlink()
@@ -575,17 +554,10 @@ class Database:
         Raises:
             FileNotFoundError: If backup does not exist
             InvalidBackupTarError: If backup is missing required files
-            NotImplementedError: For postgres databases
 
         """
-        if isinstance(d, Database) and d.is_postgres:
-            msg = "restore is not supported for postgres databases"
-            raise NotImplementedError(msg)
-        if isinstance(d, str) and sql.is_postgres_url(d):
-            msg = "restore is not supported for postgres databases"
-            raise NotImplementedError(msg)
-        path_db = Path(d.path if isinstance(d, Database) else d)
-        path_db = path_db.resolve()
+        path_raw: str | Path = d.path if isinstance(d, cls) else d  # type: ignore[assignment]
+        path_db = Path(path_raw).resolve()
         parent = path_db.parent
         stem = path_db.stem
 
@@ -631,7 +603,7 @@ class Database:
                     tar.extract(member, parent)
 
         # Reload Database
-        if isinstance(d, Database):
+        if isinstance(d, cls):
             d._unlock()  # noqa: SLF001
 
     @classmethod
@@ -738,19 +710,15 @@ class Database:
 
         Raises:
             InvalidKeyError: If key does not match minimum requirements
-            NotImplementedError: For postgres databases
 
         """
-        if self.is_postgres:
-            msg = "change_key is not supported for postgres databases"
-            raise NotImplementedError(msg)
         if len(key) < utils.MIN_PASS_LEN:
             msg = f"Password must be at least {utils.MIN_PASS_LEN} characters"
             raise exc.InvalidKeyError(msg)
 
         # Changing database password requires recreating it
         path_new = self._path_db.with_suffix(".new.db")
-        dst = Database.create(path_new, key)
+        dst = SQLiteDatabase.create(path_new, key)
 
         engine_src = self.get_engine()
         engine_dst = dst.get_engine()
@@ -769,26 +737,85 @@ class Database:
 
         # Test unlock
         self._enc = dst._enc  # noqa: SLF001
-        self._session_maker = orm.sessionmaker(self.get_engine())
+        self._engine = self.get_engine()
+        self._session_maker = orm.sessionmaker(self._engine)
         self._unlock()
 
         # And delete temporary
         self.delete_files(dst.path)
 
-    def change_web_key(self, key: str) -> None:
-        """Change password used to access web.
 
-        Args:
-            key: New web key
+class PostgresDatabase(Database):
+    """Postgres-backed database."""
 
-        Raises:
-            InvalidKeyError: If key does not match minimum requirements
+    @override
+    def __init__(
+        self,
+        path: str | Path,
+        key: str | None,
+        *,
+        check_migration: bool = True,
+    ) -> None:
+        path_str = str(path)
+        if not sql.is_postgres_url(path_str):
+            msg = "Can only create a PostgresDatabase with a postgres URL"
+            raise exc.UnlockingError(msg)
 
-        """
-        if len(key) < utils.MIN_PASS_LEN:
-            msg = f"Password must be at least {utils.MIN_PASS_LEN} characters"
-            raise exc.InvalidKeyError(msg)
+        pg_url = sql.normalize_postgres_url(path_str)
+        if key is not None and not sql.postgres_url_has_password(pg_url):
+            pg_url = sql.inject_postgres_password(pg_url, key)
+        self._postgres_url = pg_url
+        self._enc = None
 
-        key_encrypted = self.encrypt(key)
-        with self.begin_session():
-            Config.set_(ConfigKey.WEB_KEY, key_encrypted)
+        super().__init__(path=path, key=key, check_migration=check_migration)
+
+    @override
+    @classmethod
+    def create(cls, path: str | Path, key: str | None = None) -> Self:
+        url = str(path)
+        if key is not None and not sql.postgres_url_has_password(url):
+            url = sql.inject_postgres_password(url, key)
+
+        cipher_bytes = Cipher.generate().to_bytes()
+        cipher_b64 = base64.b64encode(cipher_bytes).decode()
+        test_value = cls._ENCRYPTION_TEST_VALUE
+
+        engine = sql.get_engine_postgres(url)
+        with orm.Session(engine) as s, Base.set_session(s):
+            with s.begin():
+                Base.metadata_create_all()
+
+            with s.begin():
+                existing = Config.first()
+                if existing is not None:
+                    msg = "Postgres database is already initialized"
+                    raise FileExistsError(msg)
+
+                versions = [
+                    Version(__version__),
+                    *[m.min_version() for m in MIGRATORS],
+                ]
+                v = versions[0] if len(versions) == 1 else max(versions)
+
+                Config.set_(ConfigKey.VERSION, str(v))
+                Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
+                Config.set_(ConfigKey.CIPHER, cipher_b64)
+                Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
+
+                Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
+                Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
+
+        return cls(url, None)
+
+    @property
+    @override
+    def is_postgres(self) -> bool:
+        return True
+
+    @override
+    def get_engine(self) -> sqlalchemy.Engine:
+        return sql.get_engine_postgres(self._postgres_url)
+
+    @override
+    def __str__(self) -> str:
+        return f"<PostgresDatabase@{self._postgres_url}>"

@@ -134,15 +134,27 @@ class Command(ABC):
         from flask_htmx_template import sql, utils
 
         if sql.is_postgres_url(str(path_db)):
-            return database.Database(path_db, key, check_migration=check_migration)
+            return database.PostgresDatabase(
+                path_db,
+                key,
+                check_migration=check_migration,
+            )
 
         if not database.Database.is_encrypted_path(path_db):
-            return database.Database(path_db, None, check_migration=check_migration)
+            return database.SQLiteDatabase(
+                path_db,
+                None,
+                check_migration=check_migration,
+            )
 
         if key is not None:
             # Try once with password file
             try:
-                d = database.Database(path_db, key, check_migration=check_migration)
+                d = database.SQLiteDatabase(
+                    path_db,
+                    key,
+                    check_migration=check_migration,
+                )
             except exc.UnlockingError:
                 print(
                     f"{Fore.RED}Could not decrypt with password file",
@@ -158,7 +170,11 @@ class Command(ABC):
             if key is None:
                 sys.exit(1)
             try:
-                d = database.Database(path_db, key, check_migration=check_migration)
+                d = database.SQLiteDatabase(
+                    path_db,
+                    key,
+                    check_migration=check_migration,
+                )
             except exc.UnlockingError:
                 print(f"{Fore.RED}Incorrect password", file=sys.stderr)
                 # Try again

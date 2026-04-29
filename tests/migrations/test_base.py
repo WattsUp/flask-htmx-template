@@ -79,7 +79,6 @@ def migrator_db(request: pytest.FixtureRequest, empty_database: Database) -> Dat
 
 
 def test_drop_column_simple(migrator_db: Database) -> None:
-    """drop_column removes a plain column on both backends."""
     m = MockMigrator()
     with migrator_db.begin_session():
         m.drop_column(Item, "date_ord")
@@ -88,11 +87,6 @@ def test_drop_column_simple(migrator_db: Database) -> None:
 
 
 def test_drop_column_constrained(migrator_db: Database) -> None:
-    """drop_column removes a constrained column on both backends.
-
-    SQLite uses recreate_table (adds to pending_schema_updates).
-    Postgres drops directly (no pending_schema_updates entry).
-    """
     m = MockMigrator()
     with migrator_db.begin_session():
         m.drop_column(Item, "other_id")
@@ -102,7 +96,6 @@ def test_drop_column_constrained(migrator_db: Database) -> None:
 
 
 def test_add_column_no_value(migrator_db: Database, today_ord: int) -> None:
-    """add_column re-adds a dropped column; existing rows have NULL."""
     m = MockMigrator()
     with migrator_db.begin_session():
         Item.create(name="add-col-no-val", date_ord=today_ord)
@@ -119,7 +112,6 @@ def test_add_column_no_value(migrator_db: Database, today_ord: int) -> None:
 
 
 def test_add_column_with_value(migrator_db: Database, today_ord: int) -> None:
-    """add_column backfills existing rows with the supplied initial value."""
     m = MockMigrator()
     with migrator_db.begin_session():
         Item.create(name="add-col-with-val", date_ord=today_ord)
@@ -135,7 +127,6 @@ def test_add_column_with_value(migrator_db: Database, today_ord: int) -> None:
 
 
 def test_rename_column(migrator_db: Database) -> None:
-    """rename_column swaps the column name on both backends."""
     m = MockMigrator()
     with migrator_db.begin_session():
         m.rename_column(Item, "date_ord", "date_renamed")
@@ -151,7 +142,6 @@ def test_rename_column(migrator_db: Database) -> None:
 
 
 def test_drop_column_with_constraints_sqlite(session: orm.Session) -> None:
-    """On SQLite, dropping a constrained column uses recreate_table."""
     m = MockMigrator()
     with session.begin_nested():
         m.drop_column(Item, "other_id")
@@ -162,7 +152,6 @@ def test_drop_column_with_constraints_sqlite(session: orm.Session) -> None:
 
 
 def test_add_column_no_value_sqlite(session: orm.Session, item: Item) -> None:
-    """On SQLite, add_column without a value leaves existing rows NULL."""
     m = MockMigrator()
     with session.begin_nested():
         m.drop_column(Item, "date_ord")
@@ -184,7 +173,6 @@ def test_add_column_with_value_sqlite(
     item: Item,
     today_ord: int,
 ) -> None:
-    """On SQLite, add_column with initial_value backfills existing rows."""
     m = MockMigrator()
     with session.begin_nested():
         m.drop_column(Item, "date_ord")
@@ -202,7 +190,6 @@ def test_add_column_with_value_sqlite(
 
 
 def test_rename_column_sqlite(session: orm.Session) -> None:
-    """On SQLite, rename_column updates the sqlite_master schema string."""
     m = MockMigrator()
     with session.begin_nested():
         m.rename_column(Item, "date_ord", "class")
@@ -244,13 +231,11 @@ def test_migrate_schemas_value_set(
 
 
 def test_recreate_table_not_sqlite(postgres_database: Database) -> None:
-    """recreate_table raises NotImplementedError for non-SQLite databases."""
     m = SchemaMigrator(set())
     with postgres_database.begin_session(), pytest.raises(NotImplementedError):
         m.recreate_table(Item)
 
 
 def test_migrate_schemas_postgres(postgres_database: Database) -> None:
-    """SchemaMigrator.migrate() runs the postgres path (create_all checkfirst)."""
     m = SchemaMigrator({Item})
     assert m.migrate(postgres_database) == []

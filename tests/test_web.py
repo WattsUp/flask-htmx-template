@@ -8,6 +8,7 @@ import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import web
+from flask_htmx_template.database import SQLiteDatabase
 from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.models.config import Config, ConfigKey
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
     import datetime
     from pathlib import Path
 
-    from flask_htmx_template.database import Database
     from tests.conftest import PostgresDatabaseGenerator
 
 
@@ -27,18 +27,19 @@ class Derived(BaseEnum):
     SEAFOAM_GREEN = 3
 
 
-def test_create_app(empty_database: Database, flask_app: flask.Flask) -> None:
+def test_create_app(empty_database: SQLiteDatabase, flask_app: flask.Flask) -> None:
     with empty_database.begin_session():
         secret_key = Config.fetch(ConfigKey.SECRET_KEY)
     assert flask_app.secret_key == secret_key
     assert len(flask_app.before_request_funcs[None]) == 1
 
+    assert isinstance(web.db, SQLiteDatabase)
     assert web.db.path == empty_database.path
 
 
 def test_no_secret_key(
     monkeypatch: pytest.MonkeyPatch,
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
 ) -> None:
     monkeypatch.setenv("DB_PATH", str(empty_database.path))
     with empty_database.begin_session():
@@ -52,7 +53,7 @@ def test_no_secret_key(
 @pytest.mark.encryption
 def test_create_app_encrypted(
     monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
 ) -> None:
     d, key = empty_database_encrypted
     monkeypatch.setenv("DB_PATH", str(d.path))
@@ -66,7 +67,7 @@ def test_create_app_encrypted(
 @pytest.mark.encryption
 def test_create_app_encrypted_key_file(
     monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[Database, str],
+    empty_database_encrypted: tuple[SQLiteDatabase, str],
     tmp_path: Path,
 ) -> None:
     d, key = empty_database_encrypted
@@ -178,7 +179,6 @@ def test_add_routes() -> None:
 def test_open_db_postgres_url(
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
-    """_open_db returns a postgres-backed Database when given a postgres URL."""
     postgres_database_generator()
     d = web.FlaskExtension._open_db({"PATH": postgres_database_generator.url})
     assert d.is_postgres

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import override, TYPE_CHECKING
+from typing import cast, override, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -58,7 +58,7 @@ class Migrate(Command):
         # Back up Database (SQLite only)
         tar_ver: int | None = None
         if not d.is_postgres:
-            _, tar_ver = d.backup()
+            _, tar_ver = cast("database.SQLiteDatabase", d).backup()
 
         with d.begin_session():
             v_db = Config.db_version()
@@ -94,7 +94,7 @@ class Migrate(Command):
         except Exception:  # pragma: no cover
             # No immediate exception thrown, can't easily test
             if tar_ver is not None:
-                database.Database.restore(d, tar_ver=tar_ver)
+                database.SQLiteDatabase.restore(d, tar_ver=tar_ver)
                 print(f"{Fore.RED}Abandoned migrate, restored from backup")
             raise
 

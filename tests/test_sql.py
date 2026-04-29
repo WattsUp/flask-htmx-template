@@ -177,13 +177,11 @@ def test_col0() -> None:
 
 
 def test_normalize_postgres_url_postgres_scheme() -> None:
-    """postgres:// prefix is converted to postgresql+psycopg://."""
     result = sql.normalize_postgres_url("postgres://user:pass@host/db")
     assert result == "postgresql+psycopg://user:pass@host/db"
 
 
 def test_get_engine_postgres_no_ssl() -> None:
-    """Empty _POSTGRES_SSL_MODE creates engine without sslmode connect arg."""
     original = sql._POSTGRES_SSL_MODE
     sql._POSTGRES_SSL_MODE = ""
     try:

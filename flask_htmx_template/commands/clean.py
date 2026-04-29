@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import override, TYPE_CHECKING
+from typing import cast, override, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -12,6 +12,8 @@ from flask_htmx_template.commands.base import Command
 if TYPE_CHECKING:
     import argparse
     from pathlib import Path
+
+    from flask_htmx_template.database import SQLiteDatabase
 
 
 class Clean(Command):
@@ -49,7 +51,9 @@ class Clean(Command):
                 file=sys.stderr,
             )
             return -1
-        size_before, size_after = self._d.clean()
+
+        d = cast("SQLiteDatabase", self._d)
+        size_before, size_after = d.clean()
         print(f"{Fore.GREEN}Database cleaned")
         p_change = size_before - size_after
         print(

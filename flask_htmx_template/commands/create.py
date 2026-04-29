@@ -63,8 +63,11 @@ class Create(Command):
         from flask_htmx_template import database, sql, utils
 
         if sql.is_postgres_url(str(self._path_db)):
+            pg_key: str | None = None
+            if self._path_password is not None and self._path_password.exists():
+                pg_key = self._path_password.read_text("utf-8").strip()
             try:
-                database.Database.create(self._path_db)
+                database.PostgresDatabase.create(self._path_db, pg_key)
             except FileExistsError as e:
                 if self._force:
                     print(
@@ -101,7 +104,7 @@ class Create(Command):
                 # Canceled
                 return -1
 
-        database.Database.create(path_db, key)
+        database.SQLiteDatabase.create(path_db, key)
         print(f"{Fore.GREEN}Database created at {path_db}")
 
         return 0

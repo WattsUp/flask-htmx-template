@@ -18,7 +18,7 @@ from pytest_postgresql.factories import postgresql_proc
 from sqlalchemy import orm, pool
 
 from flask_htmx_template import sql, web
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import PostgresDatabase, SQLiteDatabase
 from flask_htmx_template.models import base_uri
 from flask_htmx_template.models.base import Base
 from flask_htmx_template.models.item import Item
@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
     import time_machine
     from pytest_postgresql.executor import PostgreSQLExecutor
+
+    from flask_htmx_template.database import Database
 
 
 def id_func(val: object) -> str | None:
@@ -125,9 +127,9 @@ class EmptyDatabaseGenerator:
         self._path = tmp_path_factory.mktemp("data") / "database.db"
         self._rand_str_generator = rand_str_generator
         self._key = key
-        Database.create(self._path, key)
+        SQLiteDatabase.create(self._path, key)
 
-    def __call__(self) -> tuple[Database, str | None]:
+    def __call__(self) -> tuple[SQLiteDatabase, str | None]:
         tmp_path = self._path.with_name(f"{self._rand_str_generator()}.db")
         shutil.copyfile(self._path, tmp_path)
         if self._key is not None:
@@ -136,7 +138,7 @@ class EmptyDatabaseGenerator:
                 self._path.with_suffix(".nacl"),
                 tmp_path.with_suffix(".nacl"),
             )
-        return Database(tmp_path, self._key), self._key
+        return SQLiteDatabase(tmp_path, self._key), self._key
 
 
 @pytest.fixture(scope="session")
@@ -172,7 +174,9 @@ def empty_database_encrypted_generator(
 
 
 @pytest.fixture
-def empty_database(empty_database_generator: EmptyDatabaseGenerator) -> Database:
+def empty_database(
+    empty_database_generator: EmptyDatabaseGenerator,
+) -> SQLiteDatabase:
     """Return an empty database.
 
     Returns:
@@ -185,7 +189,7 @@ def empty_database(empty_database_generator: EmptyDatabaseGenerator) -> Database
 @pytest.fixture
 def empty_database_encrypted(
     empty_database_encrypted_generator: EmptyDatabaseGenerator,
-) -> tuple[Database, str]:
+) -> tuple[SQLiteDatabase, str]:
     """Return an empty encrypted database.
 
     Returns:
@@ -198,7 +202,7 @@ def empty_database_encrypted(
 
 
 @pytest.fixture(autouse=True)
-def session(empty_database: Database) -> Generator[orm.Session]:
+def session(empty_database: SQLiteDatabase) -> Generator[orm.Session]:
     """Create SQL session.
 
     Yields:
@@ -463,7 +467,7 @@ class PostgresDatabaseGenerator:
             Base.metadata.drop_all(conn)
         engine.dispose()
 
-    def __call__(self) -> Database:
+    def __call__(self) -> PostgresDatabase:
         """Drop all tables and recreate the schema, returning a fresh Database.
 
         Returns:
@@ -471,7 +475,7 @@ class PostgresDatabaseGenerator:
 
         """
         self.drop()
-        return Database.create(self._pg_url)
+        return PostgresDatabase.create(self._pg_url)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -544,27 +548,27 @@ def pg_url(pg_credentials: tuple[str, int, str, str, str]) -> str:
 
 
 @pytest.fixture(scope="session")
-def pg_url_no_creds(pg_credentials: tuple[str, int, str, str, str]) -> str:
-    """Return a postgres URL without credentials for the test database.
+def pg_url_no_password(pg_credentials: tuple[str, int, str, str, str]) -> str:
+    """Return a postgres URL with username but no password for the test database.
 
     Returns:
-        postgresql://host:port/dbname
+        postgresql://user@host:port/dbname
 
     """
-    host, port, dbname, _user, _password = pg_credentials
-    return f"postgresql://{host}:{port}/{dbname}"
+    host, port, dbname, user, _password = pg_credentials
+    return f"postgresql://{user}@{host}:{port}/{dbname}"
 
 
 @pytest.fixture(scope="session")
 def pg_key(pg_credentials: tuple[str, int, str, str, str]) -> str:
-    """Return the key (user:password) for the test postgres database.
+    """Return the password for the test postgres database.
 
     Returns:
-        "user:password" string
+        password string
 
     """
-    _host, _port, _dbname, user, password = pg_credentials
-    return f"{user}:{password}"
+    _host, _port, _dbname, _user, password = pg_credentials
+    return password
 
 
 @pytest.fixture(scope="session")
@@ -581,7 +585,7 @@ def postgres_database_generator(pg_url: str) -> PostgresDatabaseGenerator:
 @pytest.fixture
 def postgres_database(
     postgres_database_generator: PostgresDatabaseGenerator,
-) -> Database:
+) -> PostgresDatabase:
     """Drop all application tables and recreate the schema.
 
     Returns:

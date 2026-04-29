@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from packaging.version import Version
 
 from flask_htmx_template import sql
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import SQLiteDatabase
 from flask_htmx_template.migrations.v0_1 import MigratorV0_1
 from flask_htmx_template.models.config import Config
 from flask_htmx_template.models.item import Item
@@ -24,7 +24,7 @@ def test_migrate(tmp_path: Path, data_path: Path) -> None:
     path_db = tmp_path / "portfolio.new.db"
     shutil.copyfile(path_original, path_db)
 
-    d = Database(path_db, None, check_migration=False)
+    d = SQLiteDatabase(path_db, None, check_migration=False)
     m = MigratorV0_1()
     result = m.migrate(d)
     target = [

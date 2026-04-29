@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import sys
-from typing import override, TYPE_CHECKING
+from typing import cast, override, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -13,6 +13,8 @@ from flask_htmx_template.commands.base import Command
 if TYPE_CHECKING:
     import argparse
     from pathlib import Path
+
+    from flask_htmx_template.database import SQLiteDatabase
 
 
 class Backup(Command):
@@ -50,7 +52,9 @@ class Backup(Command):
                 file=sys.stderr,
             )
             return -1
-        backup_tar, _ = self._d.backup()
+
+        d = cast("SQLiteDatabase", self._d)
+        backup_tar, _ = d.backup()
         print(f"{Fore.GREEN}Database backed up to {backup_tar}")
         return 0
 
@@ -118,7 +122,7 @@ class Restore(Command):
 
         try:
             if self._list_ver:
-                backups = database.Database.backups(self._path_db)
+                backups = database.SQLiteDatabase.backups(self._path_db)
                 if len(backups) == 0:
                     print(
                         f"{Fore.RED}No backups found, run 'flask_htmx_template backup'",
@@ -136,7 +140,7 @@ class Restore(Command):
                         f"{Fore.CYAN}Backup #{ver:2} created at {ts_local} ({ago} ago)",
                     )
                 return 0
-            database.Database.restore(self._path_db, tar_ver=self._tar_ver)
+            database.SQLiteDatabase.restore(self._path_db, tar_ver=self._tar_ver)
             print(f"{Fore.CYAN}Extracted backup tar")
         except FileNotFoundError as e:
             print(f"{Fore.RED}{e}", file=sys.stderr)

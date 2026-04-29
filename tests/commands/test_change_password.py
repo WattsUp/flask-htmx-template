@@ -6,7 +6,7 @@ from typing import override, TYPE_CHECKING
 import pytest
 
 from flask_htmx_template.commands.change_password import ChangePassword
-from flask_htmx_template.database import Database
+from flask_htmx_template.database import SQLiteDatabase
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from tests.conftest import PostgresDatabaseGenerator
 
 
-class MockDatabase(Database):
+class MockDatabase(SQLiteDatabase):
 
     # Changing password takes a while so mock the actual function
     @override
@@ -28,7 +28,7 @@ class MockDatabase(Database):
 
 def test_no_change_unencrypted(
     capsys: pytest.CaptureFixture[str],
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     tmp_path: Path,
 ) -> None:
     path_password_new = tmp_path / "password.secret"
@@ -52,7 +52,7 @@ def test_no_change_unencrypted(
 def test_change(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     tmp_path: Path,
     new_db_key: str,
     new_web_key: str,
@@ -60,7 +60,10 @@ def test_change(
 ) -> None:
     path_password_new = tmp_path / "password.secret"
     path_password_new.write_text(f"db:{new_db_key}\nweb:{new_web_key}\n", "utf-8")
-    monkeypatch.setattr("flask_htmx_template.database.Database", MockDatabase)
+    monkeypatch.setattr(
+        "flask_htmx_template.database.SQLiteDatabase",
+        MockDatabase,
+    )
 
     c = ChangePassword(empty_database.path, None, path_password_new)
     assert c.run() == 0
@@ -91,7 +94,7 @@ def test_change(
 )
 def test_get_keys_input(
     monkeypatch: pytest.MonkeyPatch,
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     queue: list[str],
     target_db: str | None,
     target_web: str | None,
@@ -110,7 +113,7 @@ def test_get_keys_input(
 
 
 def test_get_keys_file(
-    empty_database: Database,
+    empty_database: SQLiteDatabase,
     tmp_path: Path,
 ) -> None:
     path_password_new = tmp_path / "password.secret"
@@ -127,7 +130,6 @@ def test_change_password_postgres(
     capsys: pytest.CaptureFixture[str],
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
-    """ChangePassword.run() returns -1 for postgres databases."""
     postgres_database_generator()
     c = ChangePassword(postgres_database_generator.url, None, None)
     assert c.run() == -1

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import override
+from typing import cast, override
 
 from colorama import Fore
 
@@ -53,14 +53,14 @@ class ChangePassword(Command):
         # Defer for faster time to main
         from flask_htmx_template import database
 
-        p = self._d
-
-        if p.is_postgres:
+        if self._d.is_postgres:
             print(
                 f"{Fore.RED}change-password is not supported for postgres databases",
                 file=sys.stderr,
             )
             return -1
+
+        d = cast("database.SQLiteDatabase", self._d)
 
         new_db_key, new_web_key = self._get_keys()
         if new_db_key is None and new_web_key is None:
@@ -68,16 +68,16 @@ class ChangePassword(Command):
             return -1
 
         # Back up Database
-        _, tar_ver = p.backup()
+        _, tar_ver = d.backup()
         try:
             if new_db_key is not None:
-                p.change_key(new_db_key)
+                d.change_key(new_db_key)
 
             if new_web_key is not None:
-                p.change_web_key(new_web_key)
+                d.change_web_key(new_web_key)
         except Exception:  # pragma: no cover
             # No immediate exception thrown, can't easily test
-            database.Database.restore(p, tar_ver=tar_ver)
+            database.SQLiteDatabase.restore(d, tar_ver=tar_ver)
             print(f"{Fore.RED}Abandoned password change, restored from backup")
             raise
         print(f"{Fore.GREEN}Changed password(s)")

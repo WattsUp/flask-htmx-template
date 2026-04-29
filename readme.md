@@ -11,7 +11,7 @@ A production-ready Flask + HTMX template for building modern web applications wi
 | Feature               | Details                                                                        |
 | --------------------- | ------------------------------------------------------------------------------ |
 | **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator             |
-| **Database**          | SQLAlchemy 2 with active-record helpers, optional SQLCipher encryption         |
+| **Database**          | SQLAlchemy 2 with active-record helpers, optional SQLCipher encryption, PostgreSQL support |
 | **Migrations**        | Versioned schema migrations with auto-detection on startup                     |
 | **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector       |
 | **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies          |
@@ -124,16 +124,95 @@ docker run \
 
 ### Configuration
 
-| Env                | Default             | Description                                   |
-| ------------------ | ------------------- | --------------------------------------------- |
-| `DB_PATH`          | `/data/database.db` | Path to database inside `data` volume         |
-| `DB_KEY_PATH`      | `/data/.key.secret` | File containing database encryption key       |
-| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database |
-| `WEB_PORT`         | `8000`              | Port to bind server to                        |
-| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                |
-| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                    |
-| `WEB_N_THREADS`    | `1`                 | Threads per worker                            |
-| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)               |
+| Env                | Default             | Description                                                              |
+| ------------------ | ------------------- | ------------------------------------------------------------------------ |
+| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL                                 |
+| `DB_KEY_PATH`      | `/data/.key.secret` | File containing the encryption key (SQLite) or postgres password         |
+| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database                            |
+| `WEB_PORT`         | `8000`              | Port to bind server to                                                   |
+| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                                           |
+| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                                               |
+| `WEB_N_THREADS`    | `1`                 | Threads per worker                                                       |
+| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)                                          |
+
+> For PostgreSQL the `DB_KEY_PATH` file contains only the **password** when the username is already embedded in the URL (e.g. `postgresql://appuser@host/db`), or `user:password` when the URL has no username.
+
+---
+
+## PostgreSQL Deployment
+
+PostgreSQL is supported as an alternative to SQLite. Connections always use TLS (`sslmode=require`).
+
+### 1. Generate a Self-Signed Certificate
+
+```bash
+mkdir -p certs
+
+openssl req -new -x509 -days 3650 -nodes \
+  -out certs/server.crt \
+  -keyout certs/server.key \
+  -subj "/CN=postgres"
+
+# The official postgres Docker image runs as UID/GID 999.
+# The key file must be owned by that user or postgres will refuse to start.
+sudo chown 999:999 certs/server.crt certs/server.key
+chmod 600 certs/server.key
+```
+
+### 2. Create a Password Secret
+
+```bash
+mkdir -p secrets
+python3 -c "import secrets; print(secrets.token_hex())" > secrets/db_password.txt
+```
+
+### 3. docker-compose.yml
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: appdb
+    secrets:
+      - db_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./certs/server.crt:/var/lib/postgresql/server.crt:ro
+      - ./certs/server.key:/var/lib/postgresql/server.key:ro
+    command: >
+      postgres
+        -c ssl=on
+        -c ssl_cert_file=/var/lib/postgresql/server.crt
+        -c ssl_key_file=/var/lib/postgresql/server.key
+    restart: unless-stopped
+
+  app:
+    image: flask_htmx_template
+    depends_on:
+      - postgres
+    environment:
+      DB_PATH: postgresql://appuser@postgres:5432/appdb
+      DB_KEY_PATH: /run/secrets/db_password
+      DB_WEB_KEY: web-admin
+    secrets:
+      - db_password
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+    restart: unless-stopped
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  postgres-data:
+```
+
+The app uses `sslmode=require` by default so no extra configuration is needed on the app side. The schema is created automatically on first start; subsequent starts skip creation and run migrations only.
 
 ---
 
