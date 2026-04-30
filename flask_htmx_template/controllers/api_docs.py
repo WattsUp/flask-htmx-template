@@ -84,10 +84,57 @@ class _ResponseInfo(NamedTuple):
         return json.dumps(self.example, indent=2)
 
 
+def _extract_url_args(
+    path: str,
+    view: Callable[..., object],
+) -> dict[str, str]:
+    """Extract URL argument descriptions from a view's pydoc ``Args:`` section.
+
+    Only args whose names appear as path parameters (e.g. ``<path:uri>``) are
+    included; function-only parameters are ignored.
+
+    Args:
+        path: URL rule string, e.g. ``/j/items/i/<path:uri>``.
+        view: View function whose docstring is parsed.
+
+    Returns:
+        Dict mapping each URL arg name to its description string.
+
+    """
+    url_arg_names = {
+        segment.split(">")[0].split(":")[-1]
+        for segment in path.split("<")[1:]
+        if ">" in segment
+    }
+    if not url_arg_names:
+        return {}
+
+    raw_doc = inspect.getdoc(view) or ""
+    in_args = False
+    result: dict[str, str] = {}
+    for line in raw_doc.splitlines():
+        if line.startswith("Args:"):
+            in_args = True
+            continue
+        if not in_args:
+            continue
+        if line and not line[0].isspace():
+            break
+        stripped = line.strip()
+        if not stripped or ":" not in stripped:
+            continue
+        name, _, desc = stripped.partition(":")
+        name = name.strip()
+        if name in url_arg_names:
+            result[name] = desc.strip()
+    return result
+
+
 class _Operation(NamedTuple):
     url: str
     method: _Method
     description: list[str]
+    url_args: dict[str, str]
     request_schema: dict[str, object] | None
     request_example: dict[str, object] | None
     responses: dict[str, _ResponseInfo]
@@ -120,6 +167,7 @@ class _Operation(NamedTuple):
                 paragraphs[-1] += " " + line
         desc = [p.strip() for p in paragraphs if p.strip()]
 
+        url_args = _extract_url_args(path, view)
         request_td = _extract_request_type(view)
         response_anns = _extract_response_annotations(view)
 
@@ -146,7 +194,7 @@ class _Operation(NamedTuple):
             )
             for status, ann in response_anns.items()
         }
-        return cls(path, method, desc, req_schema, req_example, responses)
+        return cls(path, method, desc, url_args, req_schema, req_example, responses)
 
 
 class _Group(NamedTuple):
@@ -162,6 +210,7 @@ class _ResponseInfoJSON(TypedDict):
 
 class _OperationJSON(TypedDict):
     description: list[str]
+    url_args: dict[str, str]
     request_schema: dict[str, object] | None
     request_example: dict[str, object] | None
     responses: dict[Status, _ResponseInfoJSON]
@@ -745,6 +794,7 @@ def json_api() -> dict[URL, dict[Method, _OperationJSON]]:
             methods = result.setdefault(URL(op.url), {})
             methods[Method(op.method.name)] = _OperationJSON(
                 description=op.description,
+                url_args=op.url_args,
                 request_schema=op.request_schema,
                 request_example=op.request_example,
                 responses={
@@ -762,4 +812,3 @@ ROUTES: base.Routes = {
     "/api": (page, ["GET"]),
     "/j/api": (cast("base.RouteCallable", json_api), ["GET"]),
 }
-# TODO (Bradley): #0 Describe URL args

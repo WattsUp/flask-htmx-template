@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 class ItemContext(TypedDict):
     """Type definition for Item context."""
 
-    uri: NotRequired[str | None]
+    uri: NotRequired[str]
     name: str
     value: Decimal
     date: NotRequired[datetime.date]
@@ -85,7 +85,6 @@ def new() -> str | flask.Response:
     with web.db.begin_session() as s:
         if flask.request.method == "GET":
             ctx: ItemContext = {
-                "uri": None,
                 "name": "",
                 "date": today,
                 "value": Decimal(),

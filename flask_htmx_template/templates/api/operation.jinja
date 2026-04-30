@@ -14,7 +14,19 @@
   <div class="mx-auto prose px-2">
     {% for p in op.description %}<p>{{ p }}</p>{% endfor %}
   </div>
-
+  {% if op.url_args %}
+    <div class="px-2">
+      <h2 class="font-bold">URL Parameters</h2>
+      <dl>
+        {% for name, desc in op.url_args.items() %}
+          <dt>
+            <code>{{ name | e }}</code>
+          </dt>
+          <dd class="italic">{{ desc | e }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
   <div class="px-2">
     <h2 class="font-bold">Request</h2>
     {% if op.request_schema_json %}
@@ -46,7 +58,6 @@
     {% else %}
       <div class="italic">no body needed</div>
     {% endif %}
-
     <h2 class="font-bold">Response</h2>
     {% for status, resp in op.responses.items() %}
       <div class="flex items-center gap-1 border-t py-1">
