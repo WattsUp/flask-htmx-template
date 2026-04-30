@@ -166,6 +166,7 @@ class TreeNode(NamedTuple):
             "list",
             "min",
             "max",
+            "rows",
             "placeholder",
             "autocomplete",
             "spellcheck",
@@ -188,6 +189,8 @@ class TreeNode(NamedTuple):
             "content",
             "src",
             "alt",
+            "data-method",
+            "data-path",
             # HTMX Methods
             "hx-get",
             "hx-post",

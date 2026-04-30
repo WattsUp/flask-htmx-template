@@ -17,6 +17,7 @@ __all__ = [
     "EvaluationError",
     "IntegrityError",
     "InvalidBackupTarError",
+    "InvalidEndpointError",
     "InvalidKeyError",
     "InvalidORMValueError",
     "InvalidURIError",
@@ -50,6 +51,10 @@ class InvalidBackupTarError(Exception):
 
 class InvalidKeyError(Exception):
     """Error when a key does not meet minimum requirements."""
+
+
+class InvalidEndpointError(Exception):
+    """Error when an endpoint is not constructed properly."""
 
 
 class DuplicateURLError(Exception):

@@ -162,6 +162,7 @@ def ctx_base_page(
                 {
                     "Dashboard": Page("dashboard", "common.page_dashboard"),
                     "Items": Page("stacks", "items.page_all"),
+                    "API": Page("api", "api_docs.page"),
                 },
             ),
             (

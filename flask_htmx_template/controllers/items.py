@@ -195,7 +195,7 @@ def validation() -> str:
 
 
 def json_all() -> AllItemsContext | base.JSONResponse:
-    """GET all items via JSON.
+    """Get all items.
 
     Returns:
         JSON response
@@ -206,7 +206,7 @@ def json_all() -> AllItemsContext | base.JSONResponse:
 
 
 def json_new() -> ItemContext | base.JSONResponse:
-    """POST new item via JSON.
+    """Create new item.
 
     Returns:
         JSON response
@@ -237,7 +237,9 @@ def json_new() -> ItemContext | base.JSONResponse:
 
 
 def json(uri: str) -> ItemContext | base.JSONResponse:
-    """GET & PUT settings via JSON.
+    """Get and edit settings.
+
+    Date will always be updated to today
 
     Args:
         uri: Item URI
