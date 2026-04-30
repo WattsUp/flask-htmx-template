@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import NamedTuple, TYPE_CHECKING, TypedDict
 
 import flask
-import flask.typing
+from flask.typing import RouteCallable
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils, web
@@ -51,7 +51,7 @@ class DuplicateCheck(NamedTuple):
         return ""
 
 
-type Routes = dict[str, tuple[flask.typing.RouteCallable, list[str]]]
+type Routes = dict[str, tuple[RouteCallable, list[str]]]
 
 type JSONResponse = dict[str, object] | tuple[ErrorJSON, int]
 

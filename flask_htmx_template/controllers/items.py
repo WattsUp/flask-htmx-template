@@ -1,4 +1,7 @@
-"""Item controllers."""
+"""Item controllers.
+
+Does things to Items.
+"""
 
 from __future__ import annotations
 
@@ -195,7 +198,7 @@ def validation() -> str:
 
 
 def json_all() -> AllItemsContext | base.JSONResponse:
-    """Get all items.
+    """GET all items.
 
     Returns:
         JSON response
@@ -206,7 +209,7 @@ def json_all() -> AllItemsContext | base.JSONResponse:
 
 
 def json_new() -> ItemContext | base.JSONResponse:
-    """Create new item.
+    """POST new item.
 
     Returns:
         JSON response
@@ -235,7 +238,7 @@ def json_new() -> ItemContext | base.JSONResponse:
 
 
 def json_get(uri: str) -> ItemContext | base.JSONResponse:
-    """Get item by URI.
+    """GET item by URI.
 
     Args:
         uri: Item URI
@@ -253,7 +256,7 @@ def json_get(uri: str) -> ItemContext | base.JSONResponse:
 
 
 def json_put(uri: str) -> ItemContext | base.JSONResponse:
-    """Edit item by URI.
+    """PUT edited item by URI.
 
     Date will always be updated to today
 

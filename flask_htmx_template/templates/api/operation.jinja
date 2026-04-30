@@ -3,7 +3,7 @@
     class="{{ op.method.container }} flex items-center gap-2 rounded-md p-2"
   >
     <div
-      class="{{ op.method.badge }} min-w-20 rounded p-2 text-center font-mono"
+      class="{{ op.method.badge }} min-w-20 rounded p-1 text-center font-mono"
     >
       {{ op.method.name }}
     </div>
@@ -17,37 +17,67 @@
 
   <div class="px-2">
     <h2 class="font-bold">Request</h2>
-    {% if op.request_schema %}
-      <h3 class="text-sm font-semibold text-on-surface-variant">Schema</h3>
-      <pre class="bg-surface-container-highest font-mono">
-{{- op.request_schema | e -}}</pre
+    {% if op.request_schema_json %}
+      <div class="flex items-center gap-1 py-1">
+        <span>Schema</span>
+        <button
+          class="btn-example btn-tonal"
+          onclick="apiDocs.loadSnippet(event)"
+        >
+          Example
+        </button>
+        <button
+          class="btn-schema btn-text"
+          onclick="apiDocs.loadSnippet(event)"
+        >
+          Schema
+        </button>
+      </div>
+      <pre
+        class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
       >
-      <h3 class="text-sm font-semibold text-on-surface-variant">Example</h3>
-      <textarea
-        class="api-request-body w-full resize-none bg-surface-container-highest font-mono"
-        rows="{{ op.request_example.count('\n') + 1 }}"
-        autocomplete="off"
-        spellcheck="false"
+{{- op.request_example_json | e -}}</pre
       >
-{{- op.request_example | e -}}</textarea
+      <pre
+        class="snippet-schema hidden rounded-md bg-surface-container-highest p-1 font-mono"
+      >
+{{- op.request_schema_json | e -}}</pre
       >
     {% else %}
       <div class="italic">no body needed</div>
     {% endif %}
 
     <h2 class="font-bold">Response</h2>
-    <h3 class="text-sm font-semibold text-on-surface-variant">Schema</h3>
-    <pre class="bg-surface-container-highest font-mono">
-{{- op.response_schema | e -}}</pre
-    >
-    <h3 class="text-sm font-semibold text-on-surface-variant">Example</h3>
-    <textarea
-      class="w-full resize-none bg-surface-container-highest font-mono"
-      rows="{{ op.response_example.count('\n') + 1 }}"
-      autocomplete="off"
-      spellcheck="false"
-    >
-{{- op.response_example | e -}}</textarea
-    >
+    {% for status, resp in op.responses.items() %}
+      <div class="flex items-center gap-1 border-t py-1">
+        <div
+          class="min-w-20 rounded bg-secondary p-0.5 text-center font-mono text-on-secondary"
+        >
+          {{ status }}
+        </div>
+        <button
+          class="btn-example btn-tonal"
+          onclick="apiDocs.loadSnippet(event)"
+        >
+          Example
+        </button>
+        <button
+          class="btn-schema btn-text"
+          onclick="apiDocs.loadSnippet(event)"
+        >
+          Schema
+        </button>
+      </div>
+      <pre
+        class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
+      >
+{{- resp.example_json | e -}}</pre
+      >
+      <pre
+        class="snippet-schema hidden rounded-md bg-surface-container-highest p-1 font-mono"
+      >
+{{- resp.schema_json | e -}}</pre
+      >
+    {% endfor %}
   </div>
 </details>

@@ -1,4 +1,7 @@
-"""Interactive JSON API documentation controller."""
+"""Interactive JSON API documentation controller.
+
+Title: API Documentation
+"""
 
 from __future__ import annotations
 
@@ -18,9 +21,11 @@ from typing import (
     get_origin,
     get_type_hints,
     NamedTuple,
+    NewType,
     NotRequired,
     Self,
     TYPE_CHECKING,
+    TypedDict,
 )
 
 from flask_htmx_template import exceptions as exc
@@ -59,14 +64,47 @@ class _Method(BaseEnum):
         }[self]
 
 
+URL = NewType("URL", str)
+Method = NewType("Method", str)
+Status = NewType("Status", str)
+
+
+class _ResponseInfo(NamedTuple):
+    schema: str | dict[str, object] | list[object]
+    example: object
+
+    @property
+    def schema_json(self) -> str:
+        """Serialized schema."""
+        return json.dumps(self.schema, indent=2)
+
+    @property
+    def example_json(self) -> str:
+        """Serialized example."""
+        return json.dumps(self.example, indent=2)
+
+
 class _Operation(NamedTuple):
     url: str
     method: _Method
     description: list[str]
-    request_schema: str | None
-    request_example: str | None
-    response_schema: str | None
-    response_example: str | None
+    request_schema: dict[str, object] | None
+    request_example: dict[str, object] | None
+    responses: dict[str, _ResponseInfo]
+
+    @property
+    def request_schema_json(self) -> str | None:
+        """Serialized request schema, or None if no request body."""
+        if self.request_schema is None:
+            return None
+        return json.dumps(self.request_schema, indent=2)
+
+    @property
+    def request_example_json(self) -> str | None:
+        """Serialized request example, or None if no request body."""
+        if self.request_example is None:
+            return None
+        return json.dumps(self.request_example, indent=2)
 
     @classmethod
     def extract(cls, path: str, method: _Method, view: Callable[..., object]) -> Self:
@@ -80,43 +118,53 @@ class _Operation(NamedTuple):
                 paragraphs.append("")
             else:
                 paragraphs[-1] += " " + line
-        desc = [p for p in paragraphs if p]
+        desc = [p.strip() for p in paragraphs if p.strip()]
 
         request_td = _extract_request_type(view)
-        response_td = _extract_response_type(view)
+        response_anns = _extract_response_annotations(view)
 
-        if response_td is None:
+        if not response_anns:
             msg = f"{method.name} {path} is missing a response type"
             raise exc.InvalidEndpointError(msg)
 
         if request_td:
             req_schema = _schema_from_typed_dict(request_td, skip_not_required=True)
-            req_example = (
-                _example_from_typed_dict(request_td, skip_not_required=True),
+            req_example = cast(
+                "dict[str, object]",
+                utils.json_mutate(
+                    _example_from_typed_dict(request_td, skip_not_required=True),
+                ),
             )
         else:
             req_schema = None
             req_example = None
-        res_schema = _schema_from_typed_dict(response_td)
-        res_example = _example_from_typed_dict(response_td)
-        return cls(
-            path,
-            method,
-            desc,
-            json.dumps(req_schema, indent=2) if req_schema is not None else None,
-            (
-                json.dumps(utils.json_mutate(req_example), indent=2)
-                if req_example is not None
-                else None
-            ),
-            json.dumps(res_schema, indent=2),
-            json.dumps(utils.json_mutate(res_example), indent=2),
-        )
+
+        responses: dict[str, _ResponseInfo] = {
+            status: _ResponseInfo(
+                _schema_type(ann),
+                utils.json_mutate(_example_value(ann)),
+            )
+            for status, ann in response_anns.items()
+        }
+        return cls(path, method, desc, req_schema, req_example, responses)
 
 
 class _Group(NamedTuple):
     name: str
+    description: list[str]
     operations: list[_Operation]
+
+
+class _ResponseInfoJSON(TypedDict):
+    schema: object
+    example: object
+
+
+class _OperationJSON(TypedDict):
+    description: list[str]
+    request_schema: dict[str, object] | None
+    request_example: dict[str, object] | None
+    responses: dict[Status, _ResponseInfoJSON]
 
 
 GROUPS: list[_Group] = []
@@ -140,12 +188,20 @@ _FIELD_HINTS: dict[str, object] = {
     "uri": "1a32f309",
 }
 
+# NOTE: Dict-key examples provide meaningful seed values for NewType key aliases.
+_KEY_EXAMPLES: dict[str, str] = {
+    "url": "/j/api",
+    "method": "GET",
+    "status": "200",
+}
+
 _PRIMITIVE_EXAMPLES: dict[type, object | Callable[[], object]] = {
+    object: dict,
     bool: False,
-    str: "",
-    int: 0,
-    float: 0.0,
-    Decimal: Decimal(),
+    str: "a string of words",
+    int: 3,
+    float: 3.1,
+    Decimal: Decimal("3.14159"),
     datetime.date: lambda: datetime.datetime.now(datetime.UTC).date(),
     datetime.datetime: lambda: datetime.datetime.now(datetime.UTC),
 }
@@ -160,7 +216,7 @@ def _is_typed_dict(t: object) -> bool:
 
 
 def _find_typed_dict(t: object) -> type[dict[str, object]] | None:
-    """Find the first TypedDict in a (possibly union) type annotation.
+    """Find the first TypedDict in a (possibly union or generic) type annotation.
 
     Returns:
         TypedDict class or None.
@@ -175,6 +231,12 @@ def _find_typed_dict(t: object) -> type[dict[str, object]] | None:
             if found := _find_typed_dict(arg):
                 return found
 
+    # Recurse into the value type of dict[K, V] (e.g. dict[str, dict[str, TD]])
+    if origin is dict:
+        dict_args = get_args(t)
+        if dict_args[1:] and (found := _find_typed_dict(dict_args[1])):
+            return found
+
     # Expand Python 3.12 `type X = ...` aliases
     if v := getattr(t, "__value__", None):
         return _find_typed_dict(v)
@@ -182,7 +244,7 @@ def _find_typed_dict(t: object) -> type[dict[str, object]] | None:
 
 
 def _example_value_for_type(
-    annotation: type[object],
+    annotation: object,
     *,
     skip_not_required: bool = False,
 ) -> object:
@@ -192,9 +254,9 @@ def _example_value_for_type(
         Example value or None.
 
     """
-    if issubclass(annotation, IntEnum):
+    if isinstance(annotation, type) and issubclass(annotation, IntEnum):
         return next(iter(annotation)).name.lower()
-    if _is_typed_dict(annotation):
+    if _is_typed_dict(cast("object", annotation)):
         return _example_from_typed_dict(
             cast("type[dict[str, object]]", annotation),
             skip_not_required=skip_not_required,
@@ -202,8 +264,34 @@ def _example_value_for_type(
     return None
 
 
+def _example_collection(
+    origin: object,
+    args: tuple[object, ...],
+    *,
+    skip_not_required: bool = False,
+) -> object:
+    """Return example for list/dict collection types, or None if not a collection.
+
+    Returns:
+        A list, dict, or None.
+
+    """
+    if origin is list and args:
+        return [_example_value(args[0], skip_not_required=skip_not_required)]
+    if origin is dict and args[1:]:
+        if args[1] is object:
+            return {}
+        return {
+            _key_example_value(args[0]): _example_value(
+                args[1],
+                skip_not_required=skip_not_required,
+            ),
+        }
+    return None
+
+
 def _example_value(
-    annotation: type[object],
+    annotation: object,
     field_name: str = "",
     *,
     skip_not_required: bool = False,
@@ -239,12 +327,12 @@ def _example_value(
             skip_not_required=skip_not_required,
         )
 
-    if annotation in _PRIMITIVE_EXAMPLES:
-        v = _PRIMITIVE_EXAMPLES[annotation]
-        return v() if callable(v) else v
+    prim = _PRIMITIVE_EXAMPLES.get(cast("type[object]", annotation))
+    if prim is not None:
+        return prim() if callable(prim) else prim
 
-    if origin is list:
-        return [_example_value(args[0], skip_not_required=skip_not_required)]
+    if result := _example_collection(origin, args, skip_not_required=skip_not_required):
+        return result
 
     return _example_value_for_type(annotation, skip_not_required=skip_not_required)
 
@@ -280,18 +368,79 @@ def _example_from_typed_dict(
 
 _JSON_TYPE_NAMES: dict[type[object], str] = {
     NoneType: "null",
+    object: "object",
     bool: "boolean",
     str: "string",
     int: "number",
     float: "number",
-    Decimal: "number string",
+    Decimal: "number or number string",
     datetime.date: "ISO-8601 date string",
     datetime.datetime: "ISO-8601 date & time string",
 }
 
 
+def _key_schema_label(key_type: object) -> str:
+    """Return a schema placeholder like ``<url>`` for a NewType key, or ``<key>``.
+
+    Returns:
+        Placeholder string for use as a dict key in a schema.
+
+    """
+    name = getattr(key_type, "__name__", None)
+    if name and name not in {"str", "int", "object"}:
+        return f"<{name.lower()}>"
+    return "<key>"
+
+
+def _key_example_value(key_type: object) -> str:
+    """Return an example value for a dict key type.
+
+    Looks up ``_KEY_EXAMPLES`` for known NewType key names, falls back to a
+    ``<name>`` placeholder, or ``<example_key>`` for plain built-in types.
+
+    Returns:
+        Example string for use as a dict key.
+
+    """
+    name = getattr(key_type, "__name__", None)
+    if not name or name in {"str", "int", "object"}:
+        return "<example_key>"
+    return _KEY_EXAMPLES.get(name.lower(), f"<{name.lower()}>")
+
+
+def _schema_collection(
+    origin: object,
+    args: tuple[object, ...],
+    *,
+    skip_not_required: bool = False,
+) -> str | list[object] | dict[str, object] | None:
+    """Return schema for list/dict collection types, or None if not a collection.
+
+    Returns:
+        A string, list, dict, or None.
+
+    """
+    if origin is list:
+        item = (
+            _schema_type(args[0], skip_not_required=skip_not_required)
+            if args
+            else "unknown"
+        )
+        return [item]
+    if origin is dict and args[1:]:
+        if args[1] is object:
+            return "object"
+        return {
+            _key_schema_label(args[0]): _schema_type(
+                args[1],
+                skip_not_required=skip_not_required,
+            ),
+        }
+    return None
+
+
 def _schema_type(
-    annotation: type[object],
+    annotation: object,
     *,
     skip_not_required: bool = False,
 ) -> str | dict[str, object] | list[object]:
@@ -314,16 +463,11 @@ def _schema_type(
         base = " or ".join(str_parts) if str_parts else "null"
         return f"{base} or null" if has_none and base != "null" else base
 
-    if annotation in _JSON_TYPE_NAMES:
-        return _JSON_TYPE_NAMES[annotation]
+    if name := _JSON_TYPE_NAMES.get(cast("type[object]", annotation)):
+        return name
 
-    if origin is list:
-        item = (
-            _schema_type(args[0], skip_not_required=skip_not_required)
-            if args
-            else "unknown"
-        )
-        return [item]
+    if result := _schema_collection(origin, args, skip_not_required=skip_not_required):
+        return result
 
     if _is_typed_dict(annotation):
         return _schema_from_typed_dict(
@@ -331,7 +475,7 @@ def _schema_type(
             skip_not_required=skip_not_required,
         )
 
-    if issubclass(annotation, IntEnum):
+    if isinstance(annotation, type) and issubclass(annotation, IntEnum):
         return "string"
 
     return "unknown"
@@ -367,13 +511,54 @@ def _schema_from_typed_dict(
     return result
 
 
-def _extract_response_type(
-    view_func: Callable[..., object],
-) -> type[dict[str, object]] | None:
-    """Extract the TypedDict from a view function's return annotation.
+def _response_arms(t: object) -> dict[str, object]:
+    """Map HTTP status strings to type annotations for all response arms.
 
     Returns:
-        TypedDict class or None.
+        Dict mapping ``"200"``, ``"4xx"``, or a literal status string to the
+        type annotation for that response branch.
+
+    """
+    # Expand Python 3.12 `type X = ...` aliases
+    if v := getattr(t, "__value__", None):
+        return _response_arms(v)
+
+    origin = get_origin(t)
+    args = get_args(t)
+
+    if origin is UnionType or origin is typing.Union:
+        result: dict[str, object] = {}
+        for arm in args:
+            result.update(_response_arms(arm))
+        return result
+
+    if origin is tuple and args:
+        # Error arm: tuple[ErrorJSON, int] or tuple[ErrorJSON, Literal[422]]
+        td = _find_typed_dict(args[0])
+        if td is not None:
+            status_literals = get_args(args[1]) if args[1:] else ()
+            key = (
+                str(status_literals[0])
+                if status_literals and isinstance(status_literals[0], int)
+                else "4xx"
+            )
+            return {key: td}
+        return {}
+
+    # Success arm: return the full annotation so callers get dict[str,X] etc.
+    if _find_typed_dict(t) is not None:
+        return {"200": t}
+    return {}
+
+
+def _extract_response_annotations(
+    view_func: Callable[..., object],
+) -> dict[str, object]:
+    """Extract response type annotations keyed by HTTP status string.
+
+    Returns:
+        Dict mapping ``"200"``, ``"4xx"``, or specific status strings to type
+        annotations. Empty if the return type cannot be resolved.
 
     """
     try:
@@ -382,11 +567,11 @@ def _extract_response_type(
         # globals.  Supplying base explicitly fixes the NameError.
         hints = get_type_hints(view_func, localns={"base": base})
     except Exception:  # noqa: BLE001
-        return None
+        return {}
     ret = hints.get("return")
     if ret is None:
-        return None
-    return _find_typed_dict(ret)
+        return {}
+    return _response_arms(ret)
 
 
 def _extract_request_type(
@@ -490,14 +675,44 @@ def init_docs(app: flask.Flask) -> None:
     groups: list[_Group] = []
     for group, ops_unsorted in get_operations(app).items():
         ops = sorted(ops_unsorted, key=lambda op: (op.url.lower(), op.method))
-        groups.append(_Group(group, ops))
+        groups.append(_Group(group, [], ops))
 
     # globals shenanigans
     GROUPS.clear()
     GROUPS.extend(sorted(groups, key=lambda g: g.name.lower()))
 
 
+def json_api() -> dict[URL, dict[Method, _OperationJSON]]:
+    """GET machine-readable API documentation.
+
+    Returns:
+        JSON response structured as ``{url: {method: {info}}}`` where each
+        info object contains the description, schema, and examples keyed by
+        HTTP status code.
+
+    """
+    result: dict[URL, dict[Method, _OperationJSON]] = {}
+    for group in GROUPS:
+        for op in group.operations:
+            methods = result.setdefault(URL(op.url), {})
+            methods[Method(op.method.name)] = _OperationJSON(
+                description=op.description,
+                request_schema=op.request_schema,
+                request_example=op.request_example,
+                responses={
+                    Status(status): _ResponseInfoJSON(
+                        schema=resp.schema,
+                        example=resp.example,
+                    )
+                    for status, resp in op.responses.items()
+                },
+            )
+    return result
+
+
 ROUTES: base.Routes = {
     "/api": (page, ["GET"]),
-    # TODO (WattsUp): #0 Add json endpoint to get the same info
+    "/j/api": (cast("base.RouteCallable", json_api), ["GET"]),
 }
+# TODO (Bradley): #0 Parse controller for desc and title override
+# TODO (Bradley): #0 Describe URL args
