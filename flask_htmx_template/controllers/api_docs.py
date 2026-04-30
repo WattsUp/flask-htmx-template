@@ -11,7 +11,6 @@ import inspect
 import json
 import textwrap
 import typing
-from collections import defaultdict
 from decimal import Decimal
 from enum import IntEnum
 from types import NoneType, UnionType
@@ -34,6 +33,7 @@ from flask_htmx_template.controllers import base
 from flask_htmx_template.models.base import BaseEnum
 
 if TYPE_CHECKING:
+    import types
     from collections.abc import Callable
 
     import flask
@@ -613,7 +613,46 @@ def _extract_request_type(
     return None
 
 
-def get_operations(app: flask.Flask) -> dict[str, list[_Operation]]:
+def _parse_module_doc(
+    module: types.ModuleType,
+) -> tuple[str | None, list[str]]:
+    """Extract title override and description paragraphs from a module docstring.
+
+    Parses the module's docstring the same way view pydocs are parsed:
+    blank lines separate paragraphs, and standard section headers
+    (``Args:``, ``Returns:``, ``Raises:``) terminate parsing.
+
+    If a ``Title: <text>`` line appears, it is captured as the name override
+    and excluded from the description paragraphs.
+
+    Args:
+        module: Module whose ``__doc__`` string is parsed.
+
+    Returns:
+        Tuple of ``(title_or_None, description_paragraphs)``.
+
+    """
+    raw_doc = inspect.getdoc(module) or ""
+    title: str | None = None
+    paragraphs: list[str] = [""]
+    for raw in raw_doc.splitlines():
+        if raw.startswith(("Args:", "Returns:", "Raises:")):
+            break
+        if raw.startswith("Title:"):
+            title = raw[len("Title:") :].strip()
+            continue
+        line = raw.strip()
+        if not line:
+            paragraphs.append("")
+        else:
+            paragraphs[-1] += " " + line
+    desc = [p.strip() for p in paragraphs if p.strip()]
+    return title, desc
+
+
+def get_operations(
+    app: flask.Flask,
+) -> dict[str, tuple[types.ModuleType | None, list[_Operation]]]:
     """Scan /j/ routes and build operation documentation.
 
     Generates request/response examples by introspecting TypedDict annotations
@@ -623,14 +662,14 @@ def get_operations(app: flask.Flask) -> dict[str, list[_Operation]]:
         app: Flask application whose URL map is scanned.
 
     Returns:
-        List of all operations by groups, unordered and flat
+        Dict mapping group key to ``(module, operations)`` pairs, unordered.
 
     Raises:
         InvalidJSONRouteError: If multiple method on same view
             without a match statement
 
     """
-    groups: dict[str, list[_Operation]] = defaultdict(list)
+    groups: dict[str, tuple[types.ModuleType | None, list[_Operation]]] = {}
 
     for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
         path = str(rule.rule)
@@ -641,13 +680,17 @@ def get_operations(app: flask.Flask) -> dict[str, list[_Operation]]:
             continue
         group = str(rule.endpoint).split(".", 1)[0].capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
+
+        module = inspect.getmodule(view)
+        group_module, ops = groups.get(group, (module, []))
+        groups[group] = (group_module, ops)
+
         if len(methods) == 1:
             method = _Method(next(iter(methods)))
-            groups[group].append(_Operation.extract(path, method, view))
+            ops.append(_Operation.extract(path, method, view))
             continue
 
         view_name = view.__name__
-        module = inspect.getmodule(view)
         for s in methods:
             method = _Method(s)
             # Each method should have its own view
@@ -657,7 +700,7 @@ def get_operations(app: flask.Flask) -> dict[str, list[_Operation]]:
             except AttributeError as e:
                 msg = f"JSON routes require dedicated view: {method_view_name}"
                 raise exc.InvalidJSONRouteError(msg) from e
-            groups[group].append(_Operation.extract(path, method, method_view))
+            ops.append(_Operation.extract(path, method, method_view))
 
     return groups
 
@@ -673,9 +716,14 @@ def init_docs(app: flask.Flask) -> None:
 
     """
     groups: list[_Group] = []
-    for group, ops_unsorted in get_operations(app).items():
+    for group_key, (module, ops_unsorted) in get_operations(app).items():
         ops = sorted(ops_unsorted, key=lambda op: (op.url.lower(), op.method))
-        groups.append(_Group(group, [], ops))
+        if module is not None:
+            title, desc = _parse_module_doc(module)
+        else:
+            title, desc = None, []
+        name = title if title is not None else group_key
+        groups.append(_Group(name, desc, ops))
 
     # globals shenanigans
     GROUPS.clear()
@@ -714,5 +762,4 @@ ROUTES: base.Routes = {
     "/api": (page, ["GET"]),
     "/j/api": (cast("base.RouteCallable", json_api), ["GET"]),
 }
-# TODO (Bradley): #0 Parse controller for desc and title override
 # TODO (Bradley): #0 Describe URL args

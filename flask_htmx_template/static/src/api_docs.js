@@ -11,21 +11,21 @@ const apiDocs = {
    */
   loadSnippet(evt) {
     const btn = evt.currentTarget;
-    const controls = btn.parentElement;
-    const exampleSnippet = htmx.find(controls, ".snippet-example");
-    const schemaSnippet = htmx.find(controls, ".snippet-schema");
+    if (btn.classList.contains("btn-tonal")) return;
 
-    const showExample = btn.classList.contains("btn-example");
+    const details = htmx.closest(btn, "details");
+    const exampleSnippet = htmx.find(details, ".snippet-example");
+    const schemaSnippet = htmx.find(details, ".snippet-schema");
 
-    exampleSnippet.classList.toggle("hidden", !showExample);
-    schemaSnippet.classList.toggle("hidden", showExample);
+    htmx.toggleClass(exampleSnippet, "hidden");
+    htmx.toggleClass(schemaSnippet, "hidden");
 
-    const exampleBtn = htmx.find(controls, ".btn-example");
-    const schemaBtn = htmx.find(controls, ".btn-schema");
+    const exampleBtn = htmx.find(details, ".btn-example");
+    const schemaBtn = htmx.find(details, ".btn-schema");
 
-    exampleBtn.classList.toggle("btn-tonal", showExample);
-    exampleBtn.classList.toggle("btn-text", !showExample);
-    schemaBtn.classList.toggle("btn-tonal", !showExample);
-    schemaBtn.classList.toggle("btn-text", showExample);
+    htmx.toggleClass(exampleBtn, "btn-tonal");
+    htmx.toggleClass(exampleBtn, "btn-text");
+    htmx.toggleClass(schemaBtn, "btn-tonal");
+    htmx.toggleClass(schemaBtn, "btn-text");
   },
 };
