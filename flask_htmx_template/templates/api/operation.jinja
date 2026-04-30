@@ -1,32 +1,30 @@
 <details class="rounded-md bg-surface-container-low" name="operation" open>
   <summary
-    class="flex items-center gap-2 rounded-md bg-tertiary-container p-2 text-on-tertiary-container"
+    class="{{ op.method.container }} flex items-center gap-2 rounded-md p-2"
   >
-    {% for method in path.methods %}
-      <div
-        class="{{ method.style }} min-w-20 rounded p-2 text-center font-mono"
-      >
-        {{ method.name }}
-      </div>
-    {% endfor %}
-    <code class="grow">{{ path.name | e }}</code>
+    <div
+      class="{{ op.method.badge }} min-w-20 rounded p-2 text-center font-mono"
+    >
+      {{ op.method.name }}
+    </div>
+    <code class="grow">{{ op.url | e }}</code>
     <icon class="details-icon-open">keyboard_arrow_up</icon>
     <icon class="details-icon-closed">keyboard_arrow_down</icon>
   </summary>
   <div class="mx-auto prose px-2">
-    {% for p in path.description %}<p>{{ p }}</p>{% endfor %}
+    {% for p in op.description %}<p>{{ p }}</p>{% endfor %}
   </div>
 
   <div class="px-2">
     <h2 class="font-bold">Request</h2>
-    {% if path.request_example %}
+    {% if op.request_example %}
       <textarea
         class="api-request-body w-full resize-none bg-surface-container-highest font-mono"
-        rows="{{ path.request_example.count('\n') + 1 }}"
+        rows="{{ op.request_example.count('\n') + 1 }}"
         autocomplete="off"
         spellcheck="false"
       >
-{{- path.request_example -}}</textarea
+{{- op.request_example -}}</textarea
       >
     {% else %}
       <div class="italic">no body needed</div>
@@ -35,11 +33,11 @@
     <h2 class="font-bold">Response</h2>
     <textarea
       class="w-full resize-none bg-surface-container-highest font-mono"
-      rows="{{ path.response_example.count('\n') + 1 }}"
+      rows="{{ op.response_example.count('\n') + 1 }}"
       autocomplete="off"
       spellcheck="false"
     >
-{{- path.response_example -}}</textarea
+{{- op.response_example -}}</textarea
     >
   </div>
 </details>

@@ -236,8 +236,26 @@ def json_new() -> ItemContext | base.JSONResponse:
         return ctx_item(item)
 
 
-def json(uri: str) -> ItemContext | base.JSONResponse:
-    """Get and edit settings.
+def json_get(uri: str) -> ItemContext | base.JSONResponse:
+    """Get item by URI.
+
+    Args:
+        uri: Item URI
+
+    Returns:
+        JSON response
+
+    """
+    with web.db.begin_session():
+        try:
+            item = base.find(Item, uri)
+        except exc.http.HTTPException as e:
+            return {"errors": [str(e)]}, e.code or base.HTTP_CODE_INTERNAL_ERROR
+        return ctx_item(item)
+
+
+def json_put(uri: str) -> ItemContext | base.JSONResponse:
+    """Edit item by URI.
 
     Date will always be updated to today
 
@@ -253,26 +271,43 @@ def json(uri: str) -> ItemContext | base.JSONResponse:
             item = base.find(Item, uri)
         except exc.http.HTTPException as e:
             return {"errors": [str(e)]}, e.code or base.HTTP_CODE_INTERNAL_ERROR
+        today = datetime.datetime.now(datetime.UTC).date()
+        j: ItemContext = flask.request.json
+        j["uri"] = uri
+        j["date"] = today
+        j, e = utils.validate_json(j, ItemContext)
+        if e:
+            return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
 
-        if flask.request.method == "PUT":
-            today = datetime.datetime.now(datetime.UTC).date()
-            j: ItemContext = flask.request.json
-            j["uri"] = uri
-            j["date"] = today
-            j, e = utils.validate_json(j, ItemContext)
-            if e:
-                return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
-
-            try:
-                with s.begin_nested():
-                    item.name = j["name"]
-                    item.date_ord = today.toordinal()
-                    item.value = j["value"]
-                    item.note = j["note"]
-            except (exc.IntegrityError, exc.InvalidORMValueError) as e:
-                return {"errors": [str(e)]}, base.HTTP_CODE_BAD_REQUEST
+        try:
+            with s.begin_nested():
+                item.name = j["name"]
+                item.date_ord = today.toordinal()
+                item.value = j["value"]
+                item.note = j["note"]
+        except (exc.IntegrityError, exc.InvalidORMValueError) as e:
+            return {"errors": [str(e)]}, base.HTTP_CODE_BAD_REQUEST
 
         return ctx_item(item)
+
+
+def json(uri: str) -> ItemContext | base.JSONResponse:
+    """Get and edit settings.
+
+    Args:
+        uri: Item URI
+
+    Returns:
+        JSON response
+
+    """
+    match (flask.request.method):
+        case "GET":
+            return json_get(uri)
+        case "PUT":
+            return json_put(uri)
+        case _:
+            raise NotImplementedError
 
 
 def ctx_item(

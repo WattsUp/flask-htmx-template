@@ -17,6 +17,7 @@ from typing import (
     get_origin,
     get_type_hints,
     NamedTuple,
+    Self,
     TYPE_CHECKING,
 )
 
@@ -38,7 +39,7 @@ class _Method(BaseEnum):
     DELETE = 3
 
     @property
-    def style(self) -> str:
+    def badge(self) -> str:
         return {
             _Method.GET: "bg-primary text-on-primary",
             _Method.POST: "bg-secondary text-on-secondary",
@@ -46,18 +47,64 @@ class _Method(BaseEnum):
             _Method.DELETE: "bg-error text-on-error",
         }[self]
 
+    @property
+    def container(self) -> str:
+        return {
+            _Method.GET: "bg-primary-container text-on-primary-container",
+            _Method.POST: "bg-secondary-container text-on-secondary-container",
+            _Method.PUT: "bg-tertiary-container text-on-tertiary-container",
+            _Method.DELETE: "bg-error-container text-on-error-container",
+        }[self]
 
-class _Path(NamedTuple):
-    name: str
+
+class _Operation(NamedTuple):
+    url: str
+    method: _Method
     description: list[str]
-    methods: list[_Method]
     request_example: str | None
     response_example: str | None
+
+    @classmethod
+    def extract(cls, path: str, method: _Method, view: Callable[..., object]) -> Self:
+        paragraphs: list[str] = [""]
+        raw_doc = inspect.getdoc(view) or "The devs forgot pydocs, grr"
+        for raw in raw_doc.splitlines():
+            if raw.startswith(("Args:", "Returns:", "Raises:")):
+                break
+            line = raw.strip()
+            if not line:
+                paragraphs.append("")
+            else:
+                paragraphs[-1] += " " + line
+        desc = [p for p in paragraphs if p]
+
+        request_td = _extract_request_type(view)
+        response_td = _extract_response_type(view)
+
+        if response_td is None:
+            msg = f"{method.name} {path} is missing a response type"
+            raise exc.InvalidEndpointError(msg)
+
+        # TODO (WattsUp): #0 Format request_td as schema AND example
+
+        request_json = (
+            json.dumps(
+                utils.json_mutate(_example_from_typed_dict(request_td)),
+                indent=2,
+            )
+            if request_td
+            else None
+        )
+        response_json = json.dumps(
+            utils.json_mutate(_example_from_typed_dict(response_td)),
+            indent=2,
+        )
+        return cls(path, method, desc, request_json, response_json)
 
 
 class _Group(NamedTuple):
     name: str
-    paths: list[_Path]
+    operations: list[_Operation]
 
 
 GROUPS: list[_Group] = []
@@ -240,7 +287,7 @@ def _extract_request_type(view_func: Callable[..., object]) -> type[dict] | None
     return None
 
 
-def get_paths(app: flask.Flask) -> dict[str, list[_Path]]:
+def get_operations(app: flask.Flask) -> dict[str, list[_Operation]]:
     """Scan /j/ routes and build operation documentation.
 
     Generates request/response examples by introspecting TypedDict annotations
@@ -250,13 +297,14 @@ def get_paths(app: flask.Flask) -> dict[str, list[_Path]]:
         app: Flask application whose URL map is scanned.
 
     Returns:
-        List of all paths by groups, unordered and flat
+        List of all operations by groups, unordered and flat
 
     Raises:
-        InvalidEndpointError: If an endpoint is missing type annotations
+        InvalidJSONRouteError: If multiple method on same view
+            without a match statement
 
     """
-    groups: dict[str, list[_Path]] = defaultdict(list)
+    groups: dict[str, list[_Operation]] = defaultdict(list)
 
     for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
         path = str(rule.rule)
@@ -265,53 +313,25 @@ def get_paths(app: flask.Flask) -> dict[str, list[_Path]]:
         view = app.view_functions.get(rule.endpoint)
         if not view:
             continue
-
-        paragraphs: list[str] = [""]
-        raw_doc = inspect.getdoc(view) or "The devs forgot pydocs, grr"
-        for raw in raw_doc.splitlines():
-            if raw.startswith(("Args:", "Returns:", "Raises:")):
-                break
-            line = raw.strip()
-            if not line:
-                paragraphs.append("")
-            else:
-                paragraphs[-1] += " " + line
-        desc = [p for p in paragraphs if p]
-
         group = str(rule.endpoint).split(".", 1)[0].capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
+        if len(methods) == 1:
+            method = _Method(next(iter(methods)))
+            groups[group].append(_Operation.extract(path, method, view))
+            continue
 
-        request_td = _extract_request_type(view)
-        response_td = _extract_response_type(view)
-
-        if response_td is None:
-            msg = f"{rule.endpoint} is missing a response type"
-            raise exc.InvalidEndpointError(msg)
-
-        # TODO (WattsUp): #0 Format request_td as schema AND example
-        # TODO (WattsUp): #0 separate out each method. So get/put shows no body for get
-
-        request_json = (
-            json.dumps(
-                utils.json_mutate(_example_from_typed_dict(request_td)),
-                indent=2,
-            )
-            if request_td
-            else None
-        )
-        response_json = json.dumps(
-            utils.json_mutate(_example_from_typed_dict(response_td)),
-            indent=2,
-        )
-        groups[group].append(
-            _Path(
-                path,
-                desc,
-                sorted(_Method(m) for m in methods),
-                request_json,
-                response_json,
-            ),
-        )
+        view_name = view.__name__
+        module = inspect.getmodule(view)
+        for s in methods:
+            method = _Method(s)
+            # Each method should have its own view
+            method_view_name = f"{view_name}_{method.name.lower()}"
+            try:
+                method_view = getattr(module, method_view_name)
+            except AttributeError as e:
+                msg = f"JSON routes require dedicated view: {method_view_name}"
+                raise exc.InvalidJSONRouteError(msg) from e
+            groups[group].append(_Operation.extract(path, method, method_view))
 
     return groups
 
@@ -327,9 +347,9 @@ def init_docs(app: flask.Flask) -> None:
 
     """
     groups: list[_Group] = []
-    for group, paths_unsorted in get_paths(app).items():
-        paths = sorted(paths_unsorted, key=lambda path: path.name.lower())
-        groups.append(_Group(group, paths))
+    for group, ops_unsorted in get_operations(app).items():
+        ops = sorted(ops_unsorted, key=lambda op: (op.url.lower(), op.method))
+        groups.append(_Group(group, ops))
 
     # globals shenanigans
     GROUPS.clear()

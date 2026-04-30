@@ -11,8 +11,8 @@
   {% for group in groups %}
     <h2 class="mt-6 mb-3 font-serif text-xl text-primary">{{ group.name }}</h2>
     <div class="flex flex-col gap-2">
-      {% for path in group.paths %}
-        {% include "api/path.jinja" %}
+      {% for op in group.operations %}
+        {% include "api/operation.jinja" %}
       {% endfor %}
     </div>
   {% endfor %}

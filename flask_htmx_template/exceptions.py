@@ -18,6 +18,7 @@ __all__ = [
     "IntegrityError",
     "InvalidBackupTarError",
     "InvalidEndpointError",
+    "InvalidJSONRouteError",
     "InvalidKeyError",
     "InvalidORMValueError",
     "InvalidURIError",
@@ -115,3 +116,7 @@ class MigrationRequiredError(Exception):
 
 class NoKeywordArgumentsError(Exception):
     """Error when function is given kwargs when not expected."""
+
+
+class InvalidJSONRouteError(Exception):
+    """Error when a dedicated route function does not exist per method."""
