@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import datetime
 import inspect
 import json
 import textwrap
@@ -17,6 +18,7 @@ from typing import (
     get_origin,
     get_type_hints,
     NamedTuple,
+    NotRequired,
     Self,
     TYPE_CHECKING,
 )
@@ -89,7 +91,9 @@ class _Operation(NamedTuple):
 
         request_json = (
             json.dumps(
-                utils.json_mutate(_example_from_typed_dict(request_td)),
+                utils.json_mutate(
+                    _example_from_typed_dict(request_td, skip_not_required=True),
+                ),
                 indent=2,
             )
             if request_td
@@ -128,12 +132,14 @@ _FIELD_HINTS: dict[str, object] = {
     "uri": "1a32f309",
 }
 
-_PRIMITIVE_EXAMPLES: dict[type, object] = {
+_PRIMITIVE_EXAMPLES: dict[type, object | Callable[[], object]] = {
     bool: False,
     str: "",
     int: 0,
     float: 0.0,
     Decimal: Decimal(),
+    datetime.date: lambda: datetime.datetime.now(datetime.UTC).date(),
+    datetime.datetime: lambda: datetime.datetime.now(datetime.UTC),
 }
 
 
@@ -165,7 +171,11 @@ def _find_typed_dict(t: type[dict] | object) -> type[dict] | None:
     return None
 
 
-def _example_value_for_type(annotation: type) -> object:
+def _example_value_for_type(
+    annotation: type,
+    *,
+    skip_not_required: bool = False,
+) -> object:
     """Generate example value for a non-primitive concrete type.
 
     Returns:
@@ -175,11 +185,16 @@ def _example_value_for_type(annotation: type) -> object:
     if issubclass(annotation, IntEnum):
         return next(iter(annotation)).name.lower()
     if _is_typed_dict(annotation):
-        return _example_from_typed_dict(annotation)
+        return _example_from_typed_dict(annotation, skip_not_required=skip_not_required)
     return None
 
 
-def _example_value(annotation: type, field_name: str = "") -> object:
+def _example_value(
+    annotation: type,
+    field_name: str = "",
+    *,
+    skip_not_required: bool = False,
+) -> object:
     """Generate a sane example value from a type annotation.
 
     Uses *_FIELD_HINTS* for known field names, otherwise derives a sensible
@@ -188,6 +203,7 @@ def _example_value(annotation: type, field_name: str = "") -> object:
     Args:
         annotation: Resolved type annotation.
         field_name: Name of the field (for hint lookup).
+        skip_not_required: Passed through to nested TypedDict expansion.
 
     Returns:
         A JSON-serialisable example value.
@@ -204,29 +220,49 @@ def _example_value(annotation: type, field_name: str = "") -> object:
         non_none = [a for a in args if a is not NoneType]
         if not non_none or any(a is NoneType for a in args):
             return None
-        return _example_value(non_none[0], field_name)
+        return _example_value(
+            non_none[0],
+            field_name,
+            skip_not_required=skip_not_required,
+        )
 
     if annotation in _PRIMITIVE_EXAMPLES:
-        return _PRIMITIVE_EXAMPLES[cast("type", annotation)]
+        v = _PRIMITIVE_EXAMPLES[cast("type", annotation)]
+        return v() if callable(v) else v
 
     if origin is list:
-        return [_example_value(args[0])]
+        return [_example_value(args[0], skip_not_required=skip_not_required)]
 
-    return _example_value_for_type(annotation)
+    return _example_value_for_type(annotation, skip_not_required=skip_not_required)
 
 
-def _example_from_typed_dict(td: type) -> dict[str, object]:
+def _example_from_typed_dict(
+    td: type,
+    *,
+    skip_not_required: bool = False,
+) -> dict[str, object]:
     """Build an example dict from a TypedDict's field annotations.
+
+    Args:
+        td: TypedDict class.
+        skip_not_required: When True, omit fields annotated with NotRequired.
 
     Returns:
         Example dict.
 
     """
     try:
-        hints = get_type_hints(td)
+        hints = get_type_hints(td, include_extras=True)
     except Exception:  # noqa: BLE001
         return {}
-    return {k: _example_value(v, k) for k, v in hints.items()}
+    result: dict[str, object] = {}
+    for k, v in hints.items():
+        if skip_not_required and get_origin(v) is NotRequired:
+            continue
+        # Unwrap NotRequired[X] -> X before generating example value
+        annotation = get_args(v)[0] if get_origin(v) is NotRequired else v
+        result[k] = _example_value(annotation, k, skip_not_required=skip_not_required)
+    return result
 
 
 def _extract_response_type(view_func: Callable[..., object]) -> type[dict] | None:
@@ -277,7 +313,6 @@ def _extract_request_type(view_func: Callable[..., object]) -> type[dict] | None
         is_validate = (
             isinstance(func, ast.Attribute) and func.attr == "validate_json"
         ) or (isinstance(func, ast.Name) and func.id == "validate_json")
-        # TODO (WattsUp): #0 remove unused keys (uri, today)
         if is_validate and len(node.args) >= min_validate_args:
             type_arg = node.args[1]
             if isinstance(type_arg, ast.Name):

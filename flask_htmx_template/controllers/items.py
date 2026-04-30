@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, TypedDict
+from typing import NotRequired, TYPE_CHECKING, TypedDict
 
 import flask
 
@@ -21,10 +21,10 @@ if TYPE_CHECKING:
 class ItemContext(TypedDict):
     """Type definition for Item context."""
 
-    uri: str | None
+    uri: NotRequired[str | None]
     name: str
     value: Decimal
-    date: datetime.date
+    date: NotRequired[datetime.date]
     note: str | None
 
 
@@ -216,8 +216,6 @@ def json_new() -> ItemContext | base.JSONResponse:
     with web.db.begin_session() as s:
         today = datetime.datetime.now(datetime.UTC).date()
         j: ItemContext = flask.request.json
-        j["uri"] = ""
-        j["date"] = today
         j, e = utils.validate_json(j, ItemContext)
         if e:
             return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
@@ -273,8 +271,6 @@ def json_put(uri: str) -> ItemContext | base.JSONResponse:
             return {"errors": [str(e)]}, e.code or base.HTTP_CODE_INTERNAL_ERROR
         today = datetime.datetime.now(datetime.UTC).date()
         j: ItemContext = flask.request.json
-        j["uri"] = uri
-        j["date"] = today
         j, e = utils.validate_json(j, ItemContext)
         if e:
             return {"errors": e}, base.HTTP_CODE_BAD_REQUEST
