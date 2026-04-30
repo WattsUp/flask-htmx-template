@@ -143,13 +143,15 @@ _PRIMITIVE_EXAMPLES: dict[type, object | Callable[[], object]] = {
 }
 
 
-def _is_typed_dict(t: type[dict] | object) -> bool:
+def _is_typed_dict(t: object) -> bool:
     return (
-        isinstance(t, type) and issubclass(t, dict) and hasattr(t, "__required_keys__")
+        isinstance(t, type)
+        and issubclass(t, dict)
+        and hasattr(cast("type[dict[object, object]]", t), "__required_keys__")
     )
 
 
-def _find_typed_dict(t: type[dict] | object) -> type[dict] | None:
+def _find_typed_dict(t: object) -> type[dict[str, object]] | None:
     """Find the first TypedDict in a (possibly union) type annotation.
 
     Returns:
@@ -157,7 +159,7 @@ def _find_typed_dict(t: type[dict] | object) -> type[dict] | None:
 
     """
     if _is_typed_dict(t):
-        return cast("type[dict]", t)
+        return cast("type[dict[str, object]]", t)
 
     origin = get_origin(t)
     if origin is UnionType or origin is typing.Union:
@@ -172,7 +174,7 @@ def _find_typed_dict(t: type[dict] | object) -> type[dict] | None:
 
 
 def _example_value_for_type(
-    annotation: type,
+    annotation: type[object],
     *,
     skip_not_required: bool = False,
 ) -> object:
@@ -185,12 +187,15 @@ def _example_value_for_type(
     if issubclass(annotation, IntEnum):
         return next(iter(annotation)).name.lower()
     if _is_typed_dict(annotation):
-        return _example_from_typed_dict(annotation, skip_not_required=skip_not_required)
+        return _example_from_typed_dict(
+            cast("type[dict[str, object]]", annotation),
+            skip_not_required=skip_not_required,
+        )
     return None
 
 
 def _example_value(
-    annotation: type,
+    annotation: type[object],
     field_name: str = "",
     *,
     skip_not_required: bool = False,
@@ -227,7 +232,7 @@ def _example_value(
         )
 
     if annotation in _PRIMITIVE_EXAMPLES:
-        v = _PRIMITIVE_EXAMPLES[cast("type", annotation)]
+        v = _PRIMITIVE_EXAMPLES[annotation]
         return v() if callable(v) else v
 
     if origin is list:
@@ -237,7 +242,7 @@ def _example_value(
 
 
 def _example_from_typed_dict(
-    td: type,
+    td: type[dict[str, object]],
     *,
     skip_not_required: bool = False,
 ) -> dict[str, object]:
@@ -265,7 +270,9 @@ def _example_from_typed_dict(
     return result
 
 
-def _extract_response_type(view_func: Callable[..., object]) -> type[dict] | None:
+def _extract_response_type(
+    view_func: Callable[..., object],
+) -> type[dict[str, object]] | None:
     """Extract the TypedDict from a view function's return annotation.
 
     Returns:
@@ -285,7 +292,9 @@ def _extract_response_type(view_func: Callable[..., object]) -> type[dict] | Non
     return _find_typed_dict(ret)
 
 
-def _extract_request_type(view_func: Callable[..., object]) -> type[dict] | None:
+def _extract_request_type(
+    view_func: Callable[..., object],
+) -> type[dict[str, object]] | None:
     """Find the TypedDict passed to ``validate_json()`` in the function source.
 
     Scans the AST for ``validate_json(data, SomeTypedDict)`` and resolves
@@ -318,7 +327,7 @@ def _extract_request_type(view_func: Callable[..., object]) -> type[dict] | None
             if isinstance(type_arg, ast.Name):
                 type_obj = getattr(module, type_arg.id, None)
                 if type_obj and _is_typed_dict(type_obj):
-                    return cast("type[dict]", type_obj)
+                    return cast("type[dict[str, object]]", type_obj)
     return None
 
 
