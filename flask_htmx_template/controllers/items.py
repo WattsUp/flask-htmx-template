@@ -32,7 +32,7 @@ class AllItemsContext(TypedDict):
     """Context for page_all Items."""
 
     total: Decimal
-    items_: list[ItemContext]
+    items: list[ItemContext]
 
 
 def page_all() -> flask.Response:
@@ -345,7 +345,7 @@ def ctx_items() -> AllItemsContext:
 
     return {
         "total": total,
-        "items_": items,
+        "items": items,
     }
 
 

@@ -63,7 +63,9 @@ class _Operation(NamedTuple):
     url: str
     method: _Method
     description: list[str]
+    request_schema: str | None
     request_example: str | None
+    response_schema: str | None
     response_example: str | None
 
     @classmethod
@@ -87,23 +89,29 @@ class _Operation(NamedTuple):
             msg = f"{method.name} {path} is missing a response type"
             raise exc.InvalidEndpointError(msg)
 
-        # TODO (WattsUp): #0 Format request_td as schema AND example
-
-        request_json = (
-            json.dumps(
-                utils.json_mutate(
-                    _example_from_typed_dict(request_td, skip_not_required=True),
-                ),
-                indent=2,
+        if request_td:
+            req_schema = _schema_from_typed_dict(request_td, skip_not_required=True)
+            req_example = (
+                _example_from_typed_dict(request_td, skip_not_required=True),
             )
-            if request_td
-            else None
+        else:
+            req_schema = None
+            req_example = None
+        res_schema = _schema_from_typed_dict(response_td)
+        res_example = _example_from_typed_dict(response_td)
+        return cls(
+            path,
+            method,
+            desc,
+            json.dumps(req_schema, indent=2) if req_schema is not None else None,
+            (
+                json.dumps(utils.json_mutate(req_example), indent=2)
+                if req_example is not None
+                else None
+            ),
+            json.dumps(res_schema, indent=2),
+            json.dumps(utils.json_mutate(res_example), indent=2),
         )
-        response_json = json.dumps(
-            utils.json_mutate(_example_from_typed_dict(response_td)),
-            indent=2,
-        )
-        return cls(path, method, desc, request_json, response_json)
 
 
 class _Group(NamedTuple):
@@ -267,6 +275,95 @@ def _example_from_typed_dict(
         # Unwrap NotRequired[X] -> X before generating example value
         annotation = get_args(v)[0] if get_origin(v) is NotRequired else v
         result[k] = _example_value(annotation, k, skip_not_required=skip_not_required)
+    return result
+
+
+_JSON_TYPE_NAMES: dict[type[object], str] = {
+    NoneType: "null",
+    bool: "boolean",
+    str: "string",
+    int: "number",
+    float: "number",
+    Decimal: "number string",
+    datetime.date: "ISO-8601 date string",
+    datetime.datetime: "ISO-8601 date & time string",
+}
+
+
+def _schema_type(
+    annotation: type[object],
+    *,
+    skip_not_required: bool = False,
+) -> str | dict[str, object] | list[object]:
+    """Return a JSON-verbiage type description for a type annotation.
+
+    Returns:
+        String, nested dict (TypedDict), or single-element list (array type).
+
+    """
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+
+    if origin is UnionType or origin is typing.Union:
+        non_none = [a for a in args if a is not NoneType]
+        has_none = any(a is NoneType for a in args)
+        schemas = [
+            _schema_type(a, skip_not_required=skip_not_required) for a in non_none
+        ]
+        str_parts = [s for s in schemas if isinstance(s, str)]
+        base = " or ".join(str_parts) if str_parts else "null"
+        return f"{base} or null" if has_none and base != "null" else base
+
+    if annotation in _JSON_TYPE_NAMES:
+        return _JSON_TYPE_NAMES[annotation]
+
+    if origin is list:
+        item = (
+            _schema_type(args[0], skip_not_required=skip_not_required)
+            if args
+            else "unknown"
+        )
+        return [item]
+
+    if _is_typed_dict(annotation):
+        return _schema_from_typed_dict(
+            cast("type[dict[str, object]]", annotation),
+            skip_not_required=skip_not_required,
+        )
+
+    if issubclass(annotation, IntEnum):
+        return "string"
+
+    return "unknown"
+
+
+def _schema_from_typed_dict(
+    td: type[dict[str, object]],
+    *,
+    skip_not_required: bool = False,
+) -> dict[str, object]:
+    """Build a JSON-schema-style dict from a TypedDict's field annotations.
+
+    Args:
+        td: TypedDict class.
+        skip_not_required: When True, omit fields annotated with NotRequired.
+
+    Returns:
+        Dict mapping field names to type description strings or nested dicts.
+
+    """
+    try:
+        hints = get_type_hints(td, include_extras=True)
+    except Exception:  # noqa: BLE001
+        return {}
+    result: dict[str, object] = {}
+    for k, v in hints.items():
+        optional = get_origin(v) is NotRequired
+        if skip_not_required and optional:
+            continue
+        inner = get_args(v)[0] if optional else v
+        type_schema = _schema_type(inner, skip_not_required=skip_not_required)
+        result[k] = type_schema
     return result
 
 

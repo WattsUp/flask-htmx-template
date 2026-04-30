@@ -17,27 +17,37 @@
 
   <div class="px-2">
     <h2 class="font-bold">Request</h2>
-    {% if op.request_example %}
+    {% if op.request_schema %}
+      <h3 class="text-sm font-semibold text-on-surface-variant">Schema</h3>
+      <pre class="bg-surface-container-highest font-mono">
+{{- op.request_schema | e -}}</pre
+      >
+      <h3 class="text-sm font-semibold text-on-surface-variant">Example</h3>
       <textarea
         class="api-request-body w-full resize-none bg-surface-container-highest font-mono"
         rows="{{ op.request_example.count('\n') + 1 }}"
         autocomplete="off"
         spellcheck="false"
       >
-{{- op.request_example -}}</textarea
+{{- op.request_example | e -}}</textarea
       >
     {% else %}
       <div class="italic">no body needed</div>
     {% endif %}
 
     <h2 class="font-bold">Response</h2>
+    <h3 class="text-sm font-semibold text-on-surface-variant">Schema</h3>
+    <pre class="bg-surface-container-highest font-mono">
+{{- op.response_schema | e -}}</pre
+    >
+    <h3 class="text-sm font-semibold text-on-surface-variant">Example</h3>
     <textarea
       class="w-full resize-none bg-surface-container-highest font-mono"
       rows="{{ op.response_example.count('\n') + 1 }}"
       autocomplete="off"
       spellcheck="false"
     >
-{{- op.response_example -}}</textarea
+{{- op.response_example | e -}}</textarea
     >
   </div>
 </details>
