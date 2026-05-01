@@ -7,7 +7,6 @@ import calendar
 import contextlib
 import datetime
 import decimal
-import getpass
 import logging
 import operator as op
 import re
@@ -26,8 +25,6 @@ from typing import (
     overload,
     TYPE_CHECKING,
 )
-
-from colorama import Fore
 
 from flask_htmx_template import exceptions as exc
 
@@ -133,102 +130,6 @@ def camel_to_snake(s: str) -> str:
     """
     s = _REGEX_CC_SC_0.sub(r"\1_\2", s)  # _ at the start of Words
     return _REGEX_CC_SC_1.sub(r"\1_\2", s).lower()  # _ at then end of Words
-
-
-def get_input(
-    prompt: str = "",
-    *,
-    secure: bool = False,
-    print_key: bool | None = None,
-) -> str | None:
-    """Get input from the user, optionally secure.
-
-    Args:
-        prompt: string to print to user
-        secure: True will prompt for a password
-        print_key: True will print key symbol, False will not, None will check
-            stdout.encoding
-
-    Returns:
-        str String entered by user, None if canceled
-
-    """
-    try:
-        if secure:
-            secure_icon = "\u26bf"
-            if print_key is True or (
-                print_key is None
-                and sys.stdout.encoding
-                and sys.stdout.encoding.lower().startswith("utf-")
-            ):
-                input_ = getpass.getpass(f"{secure_icon}  {prompt}")
-            else:
-                input_ = getpass.getpass(prompt)
-        else:
-            input_ = input(prompt)
-    except (KeyboardInterrupt, EOFError):
-        return None
-    return input_
-
-
-def get_password() -> str | None:
-    """Get password from user input with confirmation.
-
-    Returns:
-        Password or None if canceled.
-
-    """
-    key: str | None = None
-    while key is None:
-        key = get_input("Please enter password: ", secure=True)
-        if key is None:
-            return None
-
-        if len(key) < MIN_PASS_LEN:
-            print(  # noqa: T201
-                f"{Fore.RED}Password must be at least {MIN_PASS_LEN} characters",
-            )
-            key = None
-            continue
-
-        repeat = get_input("Please confirm password: ", secure=True)
-        if repeat is None:
-            return None
-
-        if key != repeat:
-            print(f"{Fore.RED}Passwords must match")  # noqa: T201
-            key = None
-
-    return key
-
-
-def confirm(
-    prompt: str | None = None,
-    *,
-    default: bool | None = False,
-) -> bool | None:
-    """Prompt user for yes/no confirmation.
-
-    Args:
-        prompt: string to print to user
-        default: default response if only [Enter] is pressed
-
-    Returns:
-        bool True for yes, False for no
-
-    """
-    prompt = prompt or "Confirm"
-    prompt += " [Y/n]: " if default else " [y/N]: "
-
-    while True:
-        input_ = (input(prompt) or "").lower()
-        if not input_:
-            return default
-        if input_ == "y":
-            return True
-        if input_ == "n":
-            return False
-        print("\nPlease enter y or n.\n")  # noqa: T201
 
 
 def _eval_node(node: ast.expr) -> Decimal:

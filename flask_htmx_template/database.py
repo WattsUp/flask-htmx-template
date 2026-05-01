@@ -604,7 +604,7 @@ class SQLiteDatabase(Database):
 
         # Reload Database
         if isinstance(d, cls):
-            d._unlock()  # noqa: SLF001
+            d._unlock()
 
     @classmethod
     def _latest_backup_version(cls, path_db: Path) -> int:
@@ -736,7 +736,7 @@ class SQLiteDatabase(Database):
         shutil.copyfile(dst.path_salt, self.path_salt)
 
         # Test unlock
-        self._enc = dst._enc  # noqa: SLF001
+        self._enc = dst._enc
         self._engine = self.get_engine()
         self._session_maker = orm.sessionmaker(self._engine)
         self._unlock()

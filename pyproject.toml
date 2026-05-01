@@ -183,9 +183,15 @@ ignore = [
   "INP001", # Implicit namespace
   "S104",   # binding to 0.0.0.0
 ]
+"flask_htmx_template/database.py" = [
+  "SLF001", # Allow self for reloading
+]
 "flask_htmx_template/commands/*.py" = [
   "T201",    # Allow printing for commands
   "PLC0415", # Allow imports outside of top for faster time to main
+]
+"flask_htmx_template/controllers/api_docs.py" = [
+  "BLE001", # Allow blind except
 ]
 "flask_htmx_template/models/base_uri.py" = [
   "PLW0603", # Allow global CIPHER

@@ -403,7 +403,7 @@ def _example_from_typed_dict(
     """
     try:
         hints = get_type_hints(td, include_extras=True)
-    except Exception:  # noqa: BLE001  # pragma: no cover
+    except Exception:  # pragma: no cover
         return {}
     result: dict[str, object] = {}
     for k, v in hints.items():
@@ -547,7 +547,7 @@ def _schema_from_typed_dict(
     """
     try:
         hints = get_type_hints(td, include_extras=True)
-    except Exception:  # noqa: BLE001  # pragma: no cover
+    except Exception:  # pragma: no cover
         return {}
     result: dict[str, object] = {}
     for k, v in hints.items():
@@ -615,7 +615,7 @@ def _extract_response_annotations(
         # get_type_hints() can't resolve "base.JSONResponse" from module
         # globals.  Supplying base explicitly fixes the NameError.
         hints = get_type_hints(view_func, localns={"base": base})
-    except Exception:  # noqa: BLE001  # pragma: no cover
+    except Exception:  # pragma: no cover
         return {}
     ret = hints.get("return")
     if ret is None:
@@ -726,6 +726,7 @@ def get_operations(
             continue
         view = app.view_functions.get(rule.endpoint)
         if not view:  # pragma: no cover
+
             continue
         group = str(rule.endpoint).split(".", 1)[0].capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}

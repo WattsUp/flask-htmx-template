@@ -9,7 +9,7 @@ from typing import cast, override
 
 from colorama import Fore
 
-from flask_htmx_template.commands.base import Command
+from flask_htmx_template.commands.base import Command, confirm, get_password
 
 
 class ChangePassword(Command):
@@ -98,16 +98,16 @@ class ChangePassword(Command):
 
         new_db_key: str | None = None
         new_web_key: str | None = None
-        if utils.confirm("Change database password?"):
-            new_db_key = utils.get_password()
+        if confirm("Change database password?"):
+            new_db_key = get_password(utils.MIN_PASS_LEN)
             if new_db_key is None:
                 # Canceled
                 return None, None
 
-        if (self._d.is_encrypted or new_db_key is not None) and utils.confirm(
+        if (self._d.is_encrypted or new_db_key is not None) and confirm(
             "Change web password?",
         ):
-            new_web_key = utils.get_password()
+            new_web_key = get_password(utils.MIN_PASS_LEN)
             if new_web_key is None:
                 # Canceled
                 return None, None

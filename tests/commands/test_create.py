@@ -16,9 +16,6 @@ if TYPE_CHECKING:
 
 class MockDatabase(SQLiteDatabase):
 
-    def __new__(cls, *_args: object, **_kwargs: object) -> MockDatabase:  # noqa: PYI034
-        return object.__new__(cls)
-
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         pass
 
