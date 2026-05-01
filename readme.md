@@ -8,20 +8,20 @@ A production-ready Flask + HTMX template for building modern web applications wi
 
 ## What's Included
 
-| Feature               | Details                                                                        |
-| --------------------- | ------------------------------------------------------------------------------ |
-| **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator             |
+| Feature               | Details                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator                         |
 | **Database**          | SQLAlchemy 2 with active-record helpers, optional SQLCipher encryption, PostgreSQL support |
-| **Migrations**        | Versioned schema migrations with auto-detection on startup                     |
-| **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector       |
-| **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies          |
-| **HTMX patterns**     | Dialog system, snackbar notifications, partial page swaps, nav components      |
-| **JSON API**          | Type-validated JSON endpoints with full error reporting                        |
-| **CLI**               | `create`, `migrate`, `backup`, `restore`, `unlock`, `change-password`, `clean` |
-| **Metrics**           | Prometheus exporter on a separate port                                         |
-| **Asset pipeline**    | Tailwind CSS v4, JS minification, automatic rebuild on package install         |
-| **Testing**           | 100% coverage enforced, migration tests                                        |
-| **Docker**            | Multi-stage build, non-root user, configurable via environment variables       |
+| **Migrations**        | Versioned schema migrations with auto-detection on startup                                 |
+| **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector                   |
+| **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies                      |
+| **HTMX patterns**     | Dialog system, snackbar notifications, partial page swaps, nav components                  |
+| **JSON API**          | Type-validated JSON endpoints with full error reporting                                    |
+| **CLI**               | `create`, `migrate`, `backup`, `restore`, `unlock`, `change-password`, `clean`             |
+| **Metrics**           | Prometheus exporter on a separate port                                                     |
+| **Asset pipeline**    | Tailwind CSS v4, JS minification, automatic rebuild on package install                     |
+| **Testing**           | 100% coverage enforced, migration tests                                                    |
+| **Docker**            | Multi-stage build, non-root user, configurable via environment variables                   |
 
 ---
 
@@ -124,16 +124,16 @@ docker run \
 
 ### Configuration
 
-| Env                | Default             | Description                                                              |
-| ------------------ | ------------------- | ------------------------------------------------------------------------ |
-| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL                                 |
-| `DB_KEY_PATH`      | `/data/.key.secret` | File containing the encryption key (SQLite) or postgres password         |
-| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database                            |
-| `WEB_PORT`         | `8000`              | Port to bind server to                                                   |
-| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                                           |
-| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                                               |
-| `WEB_N_THREADS`    | `1`                 | Threads per worker                                                       |
-| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)                                          |
+| Env                | Default             | Description                                                      |
+| ------------------ | ------------------- | ---------------------------------------------------------------- |
+| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL                         |
+| `DB_KEY_PATH`      | `/data/.key.secret` | File containing the encryption key (SQLite) or postgres password |
+| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database                    |
+| `WEB_PORT`         | `8000`              | Port to bind server to                                           |
+| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                                   |
+| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                                       |
+| `WEB_N_THREADS`    | `1`                 | Threads per worker                                               |
+| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)                                  |
 
 > For PostgreSQL the `DB_KEY_PATH` file contains only the **password** when the username is already embedded in the URL (e.g. `postgresql://appuser@host/db`), or `user:password` when the URL has no username.
 
