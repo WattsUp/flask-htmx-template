@@ -6,8 +6,10 @@ from typing import override, TYPE_CHECKING
 
 import pytest
 
+from flask_htmx_template import utils
+from flask_htmx_template.commands import base
 from flask_htmx_template.commands.backup import Backup, Restore
-from flask_htmx_template.commands.base import Command
+from flask_htmx_template.commands.base import Command, confirm, get_input, get_password
 from flask_htmx_template.commands.change_password import ChangePassword
 from flask_htmx_template.commands.clean import Clean
 from flask_htmx_template.commands.create import Create
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from flask_htmx_template.database import SQLiteDatabase
-    from tests.conftest import PostgresDatabaseGenerator
+    from tests.conftest import PostgresDatabaseGenerator, RandomStringGenerator
 
 
 class MockCommand(Command):
@@ -261,3 +263,149 @@ def test_unlock_postgres_with_key(
     path_key.write_text(pg_key, "utf-8")
     c = MockCommand(pg_url_no_password, path_key)
     assert c._d.is_postgres
+
+
+def test_get_input_insecure(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str_generator: RandomStringGenerator,
+) -> None:
+    prompt = rand_str_generator()
+    prompt_input = rand_str_generator()
+
+    def mock_input(to_print: str) -> str | None:
+        print(to_print + prompt_input)
+        return prompt_input
+
+    monkeypatch.setattr("builtins.input", mock_input)
+    assert get_input(prompt=prompt, secure=False) == prompt_input
+    assert capsys.readouterr().out == prompt + prompt_input + "\n"
+
+
+def test_get_input_insecure_abort(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str_generator: RandomStringGenerator,
+) -> None:
+    prompt = rand_str_generator()
+    prompt_input = rand_str_generator()
+
+    def mock_input(to_print: str) -> str | None:
+        print(to_print + prompt_input)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("builtins.input", mock_input)
+    assert get_input(prompt=prompt, secure=False) is None
+    assert capsys.readouterr().out == prompt + prompt_input + "\n"
+
+
+def test_get_input_secure(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str_generator: RandomStringGenerator,
+) -> None:
+    prompt = rand_str_generator()
+    prompt_input = rand_str_generator()
+
+    def mock_get_pass(to_print: str) -> str | None:
+        print(to_print)
+        return prompt_input
+
+    monkeypatch.setattr("getpass.getpass", mock_get_pass)
+    assert get_input(prompt=prompt, secure=True, print_key=False) == prompt_input
+    assert capsys.readouterr().out == prompt + "\n"
+
+
+def test_get_input_secure_abort(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str: str,
+) -> None:
+    def mock_get_pass(to_print: str) -> str | None:
+        print(to_print)
+        raise EOFError
+
+    monkeypatch.setattr("getpass.getpass", mock_get_pass)
+    assert get_input(prompt=rand_str, secure=True, print_key=False) is None
+    assert capsys.readouterr().out == rand_str + "\n"
+
+
+def test_get_input_secure_with_icon(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str_generator: RandomStringGenerator,
+) -> None:
+    prompt = rand_str_generator()
+    prompt_input = rand_str_generator()
+
+    def mock_get_pass(to_print: str) -> str | None:
+        print(to_print)
+        return prompt_input
+
+    monkeypatch.setattr("getpass.getpass", mock_get_pass)
+    assert get_input(prompt=prompt, secure=True, print_key=True) == prompt_input
+    assert capsys.readouterr().out == "\u26bf  " + prompt + "\n"
+
+
+@pytest.mark.parametrize(
+    ("queue", "target"),
+    [
+        (["password", "password"], "password"),
+        (["short", "password", "typo", "password", "password"], "password"),
+        ([None], None),
+        (["password", None], None),
+    ],
+)
+def test_get_password(
+    monkeypatch: pytest.MonkeyPatch,
+    queue: list[str | None],
+    target: str,
+) -> None:
+
+    def mock_input(to_print: str, *, secure: bool) -> str | None:
+        assert secure
+        print(to_print)
+        return queue.pop(0)
+
+    monkeypatch.setattr(base, "get_input", mock_input)
+
+    assert get_password(utils.MIN_PASS_LEN) == target
+
+
+@pytest.mark.parametrize(
+    ("queue", "default", "target"),
+    [
+        ([None], False, False),
+        ([None], True, True),
+        (["Y"], False, True),
+        (["N"], False, False),
+        (["bad", "y"], False, True),
+    ],
+)
+def test_confirm(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    rand_str: str,
+    queue: list[str | None],
+    default: bool,
+    target: bool | None,
+) -> None:
+    retries = len(queue) > 1
+
+    def mock_input(to_print: str) -> str | None:
+        print(to_print)
+        if len(queue) == 1:
+            return queue[0]
+        return queue.pop(0)
+
+    monkeypatch.setattr("builtins.input", mock_input)
+    assert confirm(prompt=rand_str, default=default) == target
+
+    out = capsys.readouterr().out
+    assert rand_str in out
+    if default:
+        assert "[Y/n]" in out
+    else:
+        assert "[y/N]" in out
+
+    assert ("Please enter y or n" in out) == retries

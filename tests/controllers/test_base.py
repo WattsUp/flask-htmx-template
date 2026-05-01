@@ -265,13 +265,27 @@ def test_ctx_base_page(today: datetime.date) -> None:
     ctx = base.ctx_base_page(templates, today, is_encrypted=False, debug=True)
 
     assert isinstance(ctx["nav_items"], list)
+    known_acronyms = {"API", "JSON", "HTML", "URL", "HTTP"}
+
+    def _is_sentence_case(name: str) -> bool:
+        words = name.split()
+        for i, word in enumerate(words):
+            if word in known_acronyms:
+                continue
+            if i == 0:
+                if word != word.capitalize():
+                    return False
+            elif word != word.lower():
+                return False
+        return True
+
     for group in ctx["nav_items"]:
         assert isinstance(group, base.PageGroup)
         assert group.pages
         for name, d in group.pages.items():
             assert isinstance(d, base.Page)
             assert d
-            assert name == name.capitalize()
+            assert _is_sentence_case(name), f"Page name {name!r} must be sentence case"
 
     assert isinstance(ctx["icons"], str)
     assert ctx["icons"].count(",") > 10

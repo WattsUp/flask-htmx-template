@@ -9,7 +9,7 @@ from typing import override
 
 from colorama import Fore
 
-from flask_htmx_template.commands.base import Command
+from flask_htmx_template.commands.base import Command, get_password
 
 
 class Create(Command):
@@ -99,7 +99,7 @@ class Create(Command):
                 key = self._path_password.read_text("utf-8").strip()
 
             # Get key from user is password file empty
-            key = key or utils.get_password()
+            key = key or get_password(utils.MIN_PASS_LEN)
             if key is None:
                 # Canceled
                 return -1

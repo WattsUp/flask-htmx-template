@@ -57,14 +57,16 @@ def test_missing_each_lut(s: str, e: Derived) -> None:
 
 @pytest.mark.parametrize("other", [Derived.RED, "RED"])
 def test_comparators_eq(other: Derived | str) -> None:
-    assert Derived.RED == other  # noqa: SIM300
-    assert other == Derived.RED
+    target = Derived.RED
+    assert target == other
+    assert other == target
 
 
 @pytest.mark.parametrize("other", [Derived.BLUE, "BLUE"])
 def test_comparators_ne(other: Derived | str) -> None:
-    assert Derived.RED != other  # noqa: SIM300
-    assert other != Derived.RED
+    target = Derived.RED
+    assert target != other
+    assert other != target
 
 
 @pytest.mark.parametrize(

@@ -10,13 +10,13 @@ from pathlib import Path
 
 import argcomplete
 
-from flask_htmx_template import version
 from flask_htmx_template.commands.backup import Backup, Restore
 from flask_htmx_template.commands.change_password import ChangePassword
 from flask_htmx_template.commands.clean import Clean
 from flask_htmx_template.commands.create import Create
 from flask_htmx_template.commands.migrate import Migrate
 from flask_htmx_template.commands.unlock import Unlock
+from flask_htmx_template.version import __version__
 
 
 def main(command_line: list[str] | None = None) -> int:
@@ -34,7 +34,7 @@ def main(command_line: list[str] | None = None) -> int:
     home = Path("~").expanduser()
     default_path = str(home.joinpath(".flask-htmx-template", "database.db"))
     parser = argparse.ArgumentParser(prog="flask_htmx_template", description=desc)
-    parser.add_argument("--version", action="version", version=version.__version__)
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument(
         "--database",
         "-p",

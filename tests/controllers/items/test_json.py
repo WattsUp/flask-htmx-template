@@ -18,7 +18,7 @@ def test_get_all(web_client: WebClient, item: Item) -> None:
     result, _ = web_client.GET_J("items.json_all")
     target = {
         "total": 0,
-        "items_": [
+        "items": [
             {
                 "uri": item.uri,
                 "name": item.name,
@@ -161,5 +161,14 @@ def test_get_not_found(web_client: WebClient) -> None:
     result, _ = web_client.GET_J(
         ("items.json", {"uri": "bad-uri"}),
         rc=HTTP_CODE_BAD_REQUEST,
+    )
+    assert "errors" in result
+
+
+def test_put_not_found(web_client: WebClient) -> None:
+    result, _ = web_client.PUT_J(
+        ("items.json", {"uri": "bad-uri"}),
+        rc=HTTP_CODE_BAD_REQUEST,
+        json={"name": "x", "value": "1", "note": ""},
     )
     assert "errors" in result

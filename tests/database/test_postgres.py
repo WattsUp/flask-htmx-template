@@ -137,4 +137,4 @@ def test_str(postgres_database: PostgresDatabase, pg_url: str) -> None:
 
 def test_file_path_rejected(pg_url: str) -> None:
     with pytest.raises(exc.UnlockingError):
-        PostgresDatabase("/tmp/not_a_postgres_url.db", None)  # noqa: S108
+        PostgresDatabase("/path/to/not_a_postgres_url.db", None)

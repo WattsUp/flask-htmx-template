@@ -21,6 +21,7 @@ from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils, web_assets
 from flask_htmx_template.controllers import (
+    api_docs,
     auth,
     base,
     common,
@@ -66,6 +67,7 @@ class FlaskExtension:
         app.url_for = self.url_for
 
         self._add_routes(app)
+        api_docs.init_docs(app)
         web_assets.build_bundles(app)
         self._init_auth(app, self._db)
         self._init_jinja_env(app.jinja_env)
@@ -105,6 +107,7 @@ class FlaskExtension:
     @classmethod
     def _add_routes(cls, app: flask.Flask) -> None:
         modules = [
+            api_docs,
             auth,
             common,
             items,

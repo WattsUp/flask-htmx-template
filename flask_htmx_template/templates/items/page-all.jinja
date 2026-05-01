@@ -33,7 +33,7 @@
     <p>Items are things</p>
   </div>
 </details>
-{% for item in ctx.items_ %}
+{% for item in ctx["items"] %}
   {% include "items/item-row.jinja" %}
   {% if not loop.last %}<hr class="mx-4 my-1" />{% endif %}
 {% endfor %}

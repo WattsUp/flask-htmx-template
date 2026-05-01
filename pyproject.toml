@@ -102,6 +102,7 @@ exclude_lines = [
   # Don't complain if tests don't hit defensive assertion code:
   "raise AssertionError",
   "raise NotImplementedError",
+  "case _:",
 
   # Don't complain if non-runnable code isn't run:
   "if 0:",
@@ -182,9 +183,15 @@ ignore = [
   "INP001", # Implicit namespace
   "S104",   # binding to 0.0.0.0
 ]
+"flask_htmx_template/database.py" = [
+  "SLF001", # Allow self for reloading
+]
 "flask_htmx_template/commands/*.py" = [
   "T201",    # Allow printing for commands
   "PLC0415", # Allow imports outside of top for faster time to main
+]
+"flask_htmx_template/controllers/api_docs.py" = [
+  "BLE001", # Allow blind except
 ]
 "flask_htmx_template/models/base_uri.py" = [
   "PLW0603", # Allow global CIPHER
@@ -192,7 +199,7 @@ ignore = [
 "flask_htmx_template/migrations/v*.py" = [
   "N801", # Allow underscore in class name for version names
 ]
-"tests/*.py" = [
+"tests/**/*.py" = [
   "D100",    # Disable missing docstrings in tests
   "D101",
   "D102",
