@@ -138,6 +138,7 @@ class _Operation(NamedTuple):
     request_schema: dict[str, object] | None
     request_example: dict[str, object] | None
     responses: dict[str, _ResponseInfo]
+    enums: set[type[IntEnum]]
 
     @property
     def request_schema_json(self) -> str | None:
@@ -194,7 +195,23 @@ class _Operation(NamedTuple):
             )
             for status, ann in response_anns.items()
         }
-        return cls(path, method, desc, url_args, req_schema, req_example, responses)
+
+        enum_set: set[type[IntEnum]] = set()
+        if request_td:
+            _collect_enums_from_annotation(request_td, enum_set)
+        for ann in response_anns.values():
+            _collect_enums_from_annotation(ann, enum_set)
+
+        return cls(
+            path,
+            method,
+            desc,
+            url_args,
+            req_schema,
+            req_example,
+            responses,
+            enum_set,
+        )
 
 
 class _Group(NamedTuple):
@@ -216,7 +233,13 @@ class _OperationJSON(TypedDict):
     responses: dict[Status, _ResponseInfoJSON]
 
 
+class _APIDocsJSON(TypedDict):
+    urls: dict[URL, dict[Method, _OperationJSON]]
+    enums: dict[str, list[str]]
+
+
 GROUPS: list[_Group] = []
+ENUMS: dict[str, list[str]] = {}
 
 
 def page() -> flask.Response:
@@ -285,11 +308,53 @@ def _find_typed_dict(t: object) -> type[dict[str, object]] | None:
         dict_args = get_args(t)
         if dict_args[1:] and (found := _find_typed_dict(dict_args[1])):
             return found
+        # Treat dict[K, V] where V is not bare object as a documentable dict
+        if dict_args and dict_args[-1] is not object:
+            return cast("type[dict[str, object]]", t)
 
     # Expand Python 3.12 `type X = ...` aliases
     if v := getattr(t, "__value__", None):
         return _find_typed_dict(v)
     return None
+
+
+def _collect_enums_from_annotation(
+    ann: object,
+    result: set[type[IntEnum]],
+    _seen: set[int] | None = None,
+) -> None:
+    """Recursively collect IntEnum subclasses from a type annotation.
+
+    Args:
+        ann: Type annotation to scan.
+        result: Set to add found IntEnum subclasses to.
+        _seen: Set of already-visited annotation ids (cycle guard).
+
+    """
+    if _seen is None:
+        _seen = set()
+    key = id(ann)
+    if key in _seen:
+        return
+    _seen.add(key)
+
+    if isinstance(ann, type) and issubclass(ann, IntEnum):
+        result.add(ann)
+        return
+
+    for arg in get_args(ann):
+        _collect_enums_from_annotation(arg, result, _seen)
+
+    if _is_typed_dict(cast("object", ann)):
+        try:
+            hints = get_type_hints(
+                cast("type[dict[str, object]]", ann),
+                include_extras=True,
+            )
+        except Exception:  # pragma: no cover
+            return
+        for hint in hints.values():
+            _collect_enums_from_annotation(hint, result, _seen)
 
 
 def _example_value_for_type(
@@ -525,7 +590,8 @@ def _schema_type(
         )
 
     if isinstance(annotation, type) and issubclass(annotation, IntEnum):
-        return "string"
+        name = utils.camel_to_snake(annotation.__name__).replace("_", " ")
+        return f"{name} enum value"
 
     return "unknown"
 
@@ -779,20 +845,56 @@ def init_docs(app: flask.Flask) -> None:
     GROUPS.clear()
     GROUPS.extend(sorted(groups, key=lambda g: g.name.lower()))
 
+    all_enums: set[type[IntEnum]] = set()
+    for group in GROUPS:
+        for op in group.operations:
+            all_enums.update(op.enums)
+    ENUMS.clear()
+    ENUMS.update(
+        {
+            utils.camel_to_snake(e.__name__).replace("_", " "): [
+                m.name.lower() for m in e
+            ]
+            for e in sorted(all_enums, key=lambda e: e.__name__)
+        },
+    )
 
-def json_api() -> dict[URL, dict[Method, _OperationJSON]]:
+    # Patch the json_api_enums operation example to show actual enum values
+    # (ENUMS is populated above; the example was generated before it was filled)
+    for group in GROUPS:
+        for i, op in enumerate(group.operations):
+            if op.url == "/j/api/enums" and "200" in op.responses:
+                resp = op.responses["200"]
+                updated = dict(op.responses)
+                updated["200"] = _ResponseInfo(schema=resp.schema, example=dict(ENUMS))
+                group.operations[i] = op._replace(responses=updated)
+                break
+
+
+def json_api_enums() -> dict[str, list[str]]:
+    """GET known enum values for JSON API fields.
+
+    Returns:
+        JSON response structured as ``{EnumName: [value, ...]}`` mapping each
+        enum class name to its sorted list of lowercase member names.
+
+    """
+    return ENUMS
+
+
+def json_api() -> _APIDocsJSON:
     """GET machine-readable API documentation.
 
     Returns:
-        JSON response structured as ``{url: {method: {info}}}`` where each
-        info object contains the description, schema, and examples keyed by
-        HTTP status code.
+        JSON response structured as ``{"urls": {url: {method: {info}}},
+        "enums": {EnumName: [value, ...]}}`` where each info object contains
+        the description, schema, and examples keyed by HTTP status code.
 
     """
-    result: dict[URL, dict[Method, _OperationJSON]] = {}
+    urls: dict[URL, dict[Method, _OperationJSON]] = {}
     for group in GROUPS:
         for op in group.operations:
-            methods = result.setdefault(URL(op.url), {})
+            methods = urls.setdefault(URL(op.url), {})
             methods[Method(op.method.name)] = _OperationJSON(
                 description=op.description,
                 url_args=op.url_args,
@@ -806,10 +908,11 @@ def json_api() -> dict[URL, dict[Method, _OperationJSON]]:
                     for status, resp in op.responses.items()
                 },
             )
-    return result
+    return {"urls": urls, "enums": dict(ENUMS)}
 
 
 ROUTES: base.Routes = {
     "/api": (page, ["GET"]),
     "/j/api": (cast("base.RouteCallable", json_api), ["GET"]),
+    "/j/api/enums": (cast("base.RouteCallable", json_api_enums), ["GET"]),
 }

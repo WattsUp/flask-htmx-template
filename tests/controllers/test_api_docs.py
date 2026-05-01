@@ -10,6 +10,7 @@ import pytest
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
 from flask_htmx_template.controllers import api_docs
+from flask_htmx_template.controllers.items import ItemCategory
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -161,7 +162,10 @@ def test_get_operations_multi_method_no_dispatch() -> None:
 def test_json_api_structure(web_client: WebClient) -> None:
     result, _ = web_client.GET_J("api_docs.json_api")
     assert isinstance(result, dict)
-    for url, methods in result.items():
+    urls = result["urls"]
+    assert isinstance(urls, dict)
+    for url, methods in urls.items():
+        assert isinstance(url, str)
         assert url.startswith("/j/")
         assert isinstance(methods, dict)
         for method, info in methods.items():
@@ -175,7 +179,9 @@ def test_json_api_structure(web_client: WebClient) -> None:
 def test_json_api_url_args(web_client: WebClient) -> None:
     result, _ = web_client.GET_J("api_docs.json_api")
     assert isinstance(result, dict)
-    url_ops = result["/j/items/i/<path:uri>"]
+    urls = result["urls"]
+    assert isinstance(urls, dict)
+    url_ops = urls["/j/items/i/<path:uri>"]
     assert isinstance(url_ops, dict)
     item_get = url_ops["GET"]
     assert isinstance(item_get, dict)
@@ -196,6 +202,7 @@ def test_operation_request_example_json_none() -> None:
         request_schema=None,
         request_example=None,
         responses={},
+        enums=set(),
     )
     assert op.request_example_json is None
     assert op.request_schema_json is None
@@ -267,7 +274,7 @@ def test_example_value_for_type_unknown() -> None:
 
 
 def test_schema_type_intenum() -> None:
-    assert api_docs._schema_type(api_docs._Method) == "string"
+    assert api_docs._schema_type(ItemCategory) == "item category enum value"
 
 
 def test_schema_type_unknown() -> None:
@@ -300,4 +307,96 @@ def test_extract_request_type_attribute_type_arg() -> None:
     # _view_with_attr_validate uses api_docs._Method as type arg (ast.Attribute,
     # not ast.Name) → isinstance(type_arg, ast.Name) is False → 658->649 branch
     result = api_docs._extract_request_type(_view_with_attr_validate)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _collect_enums_from_annotation
+# ---------------------------------------------------------------------------
+
+
+def test_collect_enums_from_annotation_direct() -> None:
+    result: set[type] = set()
+    api_docs._collect_enums_from_annotation(api_docs._Method, result)
+    assert api_docs._Method in result
+
+
+def test_collect_enums_from_annotation_nested_in_typed_dict() -> None:
+    result: set[type] = set()
+    api_docs._collect_enums_from_annotation(_SimpleTypedDict, result)
+    assert not result  # _SimpleTypedDict has no enum fields
+
+
+def test_collect_enums_from_annotation_cycle_guard() -> None:
+    result: set[type] = set()
+    seen: set[int] = set()
+    api_docs._collect_enums_from_annotation(str, result, seen)
+    api_docs._collect_enums_from_annotation(str, result, seen)
+    assert not result
+
+
+# ---------------------------------------------------------------------------
+# /j/api/enums endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_json_api_enums_structure(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J("api_docs.json_api_enums")
+    assert isinstance(result, dict)
+    for enum_name, values in result.items():
+        assert isinstance(enum_name, str)
+        assert isinstance(values, list)
+        assert all(isinstance(v, str) for v in values)
+
+
+def test_json_api_enums_contains_item_category(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J("api_docs.json_api_enums")
+    assert "item category" in result
+    assert result["item category"] == ["general", "special"]
+
+
+def test_json_api_includes_enums(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J("api_docs.json_api")
+    assert "enums" in result
+    assert result["enums"] == web_client.GET_J("api_docs.json_api_enums")[0]
+
+
+def test_json_api_enums_example_matches_actual(web_client: WebClient) -> None:
+    enums_result, _ = web_client.GET_J("api_docs.json_api_enums")
+    api_result, _ = web_client.GET_J("api_docs.json_api")
+    assert isinstance(api_result, dict)
+    urls = api_result["urls"]
+    assert isinstance(urls, dict)
+    enums_op = urls["/j/api/enums"]
+    assert isinstance(enums_op, dict)
+    get_op = enums_op["GET"]
+    assert isinstance(get_op, dict)
+    responses = get_op["responses"]
+    assert isinstance(responses, dict)
+    response_200 = responses["200"]
+    assert isinstance(response_200, dict)
+    example = response_200["example"]
+    assert example == enums_result
+
+
+# ---------------------------------------------------------------------------
+# _find_typed_dict — non-object dict value branch
+# ---------------------------------------------------------------------------
+
+
+def test_find_typed_dict_dict_non_object_value() -> None:
+    # dict[str, list[str]] has a non-object value type → treated as documentable
+    result = api_docs._find_typed_dict(dict[str, list[str]])
+    assert result is not None
+
+
+def test_find_typed_dict_dict_typed_dict_value() -> None:
+    # dict[str, _SimpleTypedDict]: value is TypedDict → recurse finds it (line 310)
+    result = api_docs._find_typed_dict(dict[str, _SimpleTypedDict])
+    assert result is _SimpleTypedDict
+
+
+def test_find_typed_dict_dict_object_value() -> None:
+    # dict[str, object] has bare object as value → not treated as documentable
+    result = api_docs._find_typed_dict(dict[str, object])
     assert result is None

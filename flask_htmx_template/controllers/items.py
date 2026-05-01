@@ -14,7 +14,16 @@ import flask
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils, web
 from flask_htmx_template.controllers import base
+from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.models.item import Item
+
+
+class ItemCategory(BaseEnum):
+    """Category of an item."""
+
+    GENERAL = 0
+    SPECIAL = 1
+
 
 if TYPE_CHECKING:
 
@@ -29,6 +38,7 @@ class ItemContext(TypedDict):
     value: Decimal
     date: NotRequired[datetime.date]
     note: str | None
+    category: NotRequired[ItemCategory]
 
 
 class AllItemsContext(TypedDict):
