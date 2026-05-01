@@ -16,7 +16,16 @@ import sys
 from decimal import Decimal
 from enum import Enum
 from types import GenericAlias, NoneType, UnionType
-from typing import cast, get_type_hints, NamedTuple, overload, TYPE_CHECKING
+from typing import (
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+    NamedTuple,
+    NotRequired,
+    overload,
+    TYPE_CHECKING,
+)
 
 from colorama import Fore
 
@@ -1024,6 +1033,35 @@ def _validate_json_list[V: object](
     return obj, errors
 
 
+def _validate_typed_dict_hints[V: object](
+    obj: dict[str, V],
+    hints: dict[str, object],
+    key: str,
+) -> tuple[dict[str, V], list[str]]:
+    errors: list[str] = []
+    obj_upgrade: dict[str, V] = {}
+    obj_copy: dict[str, V] = obj.copy()
+    for k, sub_type in sorted(hints.items()):
+        is_not_required = get_origin(sub_type) is NotRequired
+        if k in obj_copy:
+            v = obj_copy.pop(k)
+            sub_obj, sub_errors = validate_json(
+                v,
+                (
+                    cast("type", get_args(sub_type)[0])
+                    if is_not_required
+                    else cast("type", sub_type)
+                ),
+                key=f"{key}.{k}",
+            )
+            obj_upgrade[k] = sub_obj
+            errors.extend(sub_errors)
+        elif not is_not_required:
+            errors.append(f"{key}.{k} is missing")
+    errors.extend(f"{key}.{k} is not recognized" for k in obj_copy)
+    return obj_upgrade, errors
+
+
 def _validate_json_dict[V: object](
     obj: dict[str, V],
     type_: type[dict[str, V]] | UnionType | GenericAlias,
@@ -1057,23 +1095,10 @@ def _validate_json_dict[V: object](
                     return obj_upgrade, errors
         errors.extend(union_errors)
         return obj, errors
-    hints = get_type_hints(type_)
+    hints = get_type_hints(type_, include_extras=True)
     if not hints:
         return obj, errors
-
-    obj_copy: dict[str, V] = obj.copy()
-    for k, sub_type in sorted(hints.items()):
-        if k in obj_copy:
-            v = obj_copy.pop(k)
-            sub_obj, sub_errors = validate_json(v, sub_type, key=f"{key}.{k}")
-            obj_upgrade[k] = sub_obj
-            errors.extend(sub_errors)
-        else:
-            errors.append(f"{key}.{k} is missing")
-
-    errors.extend(f"{key}.{k} is not recognized" for k in obj_copy)
-
-    return obj_upgrade, errors
+    return _validate_typed_dict_hints(obj, hints, key)
 
 
 def init_logger(*, debug: bool = False) -> None:

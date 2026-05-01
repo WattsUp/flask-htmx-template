@@ -26,7 +26,7 @@ def test_ctx_items(item: Item) -> None:
 
     target: items.AllItemsContext = {
         "total": item.value,
-        "items_": [
+        "items": [
             {
                 "date": item.date,
                 "name": item.name,

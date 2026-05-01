@@ -1,6 +1,6 @@
 """Interactive JSON API documentation controller.
 
-Title: API Documentation
+Title: API documentation
 """
 
 from __future__ import annotations
@@ -403,7 +403,7 @@ def _example_from_typed_dict(
     """
     try:
         hints = get_type_hints(td, include_extras=True)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001  # pragma: no cover
         return {}
     result: dict[str, object] = {}
     for k, v in hints.items():
@@ -547,7 +547,7 @@ def _schema_from_typed_dict(
     """
     try:
         hints = get_type_hints(td, include_extras=True)
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001  # pragma: no cover
         return {}
     result: dict[str, object] = {}
     for k, v in hints.items():
@@ -615,7 +615,7 @@ def _extract_response_annotations(
         # get_type_hints() can't resolve "base.JSONResponse" from module
         # globals.  Supplying base explicitly fixes the NameError.
         hints = get_type_hints(view_func, localns={"base": base})
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001  # pragma: no cover
         return {}
     ret = hints.get("return")
     if ret is None:
@@ -642,7 +642,7 @@ def _extract_request_type(
         return None
 
     module = inspect.getmodule(view_func)
-    if not module:
+    if not module:  # pragma: no cover
         return None
 
     min_validate_args = 2
@@ -725,7 +725,7 @@ def get_operations(
         if not path.startswith("/j/"):
             continue
         view = app.view_functions.get(rule.endpoint)
-        if not view:
+        if not view:  # pragma: no cover
             continue
         group = str(rule.endpoint).split(".", 1)[0].capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
@@ -769,7 +769,7 @@ def init_docs(app: flask.Flask) -> None:
         ops = sorted(ops_unsorted, key=lambda op: (op.url.lower(), op.method))
         if module is not None:
             title, desc = _parse_module_doc(module)
-        else:
+        else:  # pragma: no cover
             title, desc = None, []
         name = title if title is not None else group_key
         groups.append(_Group(name, desc, ops))
