@@ -390,6 +390,12 @@ def test_find_typed_dict_dict_non_object_value() -> None:
     assert result is not None
 
 
+def test_find_typed_dict_dict_typed_dict_value() -> None:
+    # dict[str, _SimpleTypedDict]: value is TypedDict → recurse finds it (line 310)
+    result = api_docs._find_typed_dict(dict[str, _SimpleTypedDict])
+    assert result is _SimpleTypedDict
+
+
 def test_find_typed_dict_dict_object_value() -> None:
     # dict[str, object] has bare object as value → not treated as documentable
     result = api_docs._find_typed_dict(dict[str, object])
