@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 import types
-from typing import Any, TYPE_CHECKING, TypedDict
+from typing import Any, Literal, TYPE_CHECKING, TypedDict
 
 import flask
 import pytest
@@ -251,6 +251,16 @@ def test_example_value_intenum() -> None:
     assert isinstance(result, str)
 
 
+def test_example_value_literal_string() -> None:
+    result = api_docs._example_value(Literal["a word"])
+    assert result == "a word"
+
+
+def test_example_value_literal_ints() -> None:
+    result = api_docs._example_value(Literal[1, 2, 3])
+    assert result == 1
+
+
 def test_example_collection_dict_object() -> None:
     result = api_docs._example_collection(dict, (str, object))
     assert result == {}
@@ -275,6 +285,14 @@ def test_example_value_for_type_unknown() -> None:
 
 def test_schema_type_intenum() -> None:
     assert api_docs._schema_type(ItemCategory) == "item category enum value"
+
+
+def test_schema_type_literal_strings() -> None:
+    assert api_docs._schema_type(Literal["a word"]) == "'a word'"
+
+
+def test_schema_type_literal_ints() -> None:
+    assert api_docs._schema_type(Literal[1, 2, 3]) == "1 or 2 or 3"
 
 
 def test_schema_type_unknown() -> None:

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import datetime
 from decimal import Decimal
-from typing import NotRequired, TYPE_CHECKING, TypedDict
+from typing import Literal, NotRequired, TYPE_CHECKING, TypedDict
 
 import flask
 
@@ -39,6 +39,8 @@ class ItemContext(TypedDict):
     date: NotRequired[datetime.date]
     note: str | None
     category: NotRequired[ItemCategory]
+    literal: NotRequired[Literal["a word"]]
+    many: NotRequired[Literal[1, 2, 3]]
 
 
 class AllItemsContext(TypedDict):
