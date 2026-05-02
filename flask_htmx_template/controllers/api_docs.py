@@ -19,6 +19,7 @@ from typing import (
     get_args,
     get_origin,
     get_type_hints,
+    Literal,
     NamedTuple,
     NewType,
     NotRequired,
@@ -404,6 +405,24 @@ def _example_collection(
     return None
 
 
+def _example_from_union(
+    args: tuple[object, ...],
+    field_name: str,
+    *,
+    skip_not_required: bool,
+) -> object:
+    """Return an example value for a union type annotation.
+
+    Returns:
+        None if any arm is NoneType, otherwise the example for the first non-None arm.
+
+    """
+    non_none = [a for a in args if a is not NoneType]
+    if not non_none or any(a is NoneType for a in args):
+        return None
+    return _example_value(non_none[0], field_name, skip_not_required=skip_not_required)
+
+
 def _example_value(
     annotation: object,
     field_name: str = "",
@@ -432,11 +451,8 @@ def _example_value(
 
     # Unwrap unions (str | None, etc.)
     if origin is UnionType or origin is typing.Union:
-        non_none = [a for a in args if a is not NoneType]
-        if not non_none or any(a is NoneType for a in args):
-            return None
-        return _example_value(
-            non_none[0],
+        return _example_from_union(
+            args,
             field_name,
             skip_not_required=skip_not_required,
         )
@@ -444,6 +460,9 @@ def _example_value(
     prim = _PRIMITIVE_EXAMPLES.get(cast("type[object]", annotation))
     if prim is not None:
         return prim() if callable(prim) else prim
+
+    if origin is Literal and args:
+        return args[0]
 
     if result := _example_collection(origin, args, skip_not_required=skip_not_required):
         return result
@@ -553,6 +572,22 @@ def _schema_collection(
     return None
 
 
+def _schema_scalar(annotation: object, origin: object, args: tuple[object, ...]) -> str:
+    """Return a schema string for Literal, IntEnum, or unknown annotations.
+
+    Returns:
+        A human-readable schema type string.
+
+    """
+    if origin is Literal:
+        parts = [f"'{a}'" if isinstance(a, str) else str(a) for a in args]
+        return " or ".join(parts)
+    if isinstance(annotation, type) and issubclass(annotation, IntEnum):
+        name = utils.camel_to_snake(annotation.__name__).replace("_", " ")
+        return f"{name} enum value"
+    return "unknown"
+
+
 def _schema_type(
     annotation: object,
     *,
@@ -589,11 +624,7 @@ def _schema_type(
             skip_not_required=skip_not_required,
         )
 
-    if isinstance(annotation, type) and issubclass(annotation, IntEnum):
-        name = utils.camel_to_snake(annotation.__name__).replace("_", " ")
-        return f"{name} enum value"
-
-    return "unknown"
+    return _schema_scalar(annotation, origin, args)
 
 
 def _schema_from_typed_dict(
