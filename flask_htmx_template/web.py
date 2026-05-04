@@ -16,6 +16,7 @@ import flask_login
 import prometheus_client
 import prometheus_flask_exporter
 import prometheus_flask_exporter.multiprocess
+from werkzeug.exceptions import HTTPException
 
 from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc
@@ -33,8 +34,30 @@ from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     import jinja2
+    import werkzeug
 
     from flask_htmx_template.database import Database
+
+
+class _Request(flask.Request):
+    """Flask Request that always raises descriptive JSON parse errors.
+
+    NOTE: Flask's on_json_loading_failed() swallows the original ValueError
+    and re-raises a bare BadRequest() when app.debug is False, losing the
+    decode message. We skip Flask's wrapper and use werkzeug's implementation
+    directly so the error text is always preserved.
+    """
+
+    @override
+    def on_json_loading_failed(self, e: ValueError | None) -> Any:
+        if e is not None:
+            msg = f"Failed to decode JSON object: {e}"
+            raise exc.http.BadRequest(msg)
+        msg = (
+            "Did not attempt to load JSON data because the request"
+            " Content-Type was not 'application/json'."
+        )
+        raise exc.http.UnsupportedMediaType(msg)
 
 
 class JSONEncoder(flask.json.provider.JSONProvider):
@@ -75,8 +98,11 @@ class FlaskExtension:
 
         app.context_processor(base.ctx_base)
 
+        app.request_class = _Request
         app.json_provider_class = JSONEncoder
         app.json = JSONEncoder(app)
+
+        app.register_error_handler(HTTPException, _handle_http_exception)
 
     @classmethod
     def _open_db(cls, config: dict[str, object]) -> Database:
@@ -232,6 +258,14 @@ class FlaskExtension:
     def db(self) -> Database:
         """Database flask is serving."""
         return self._db
+
+
+def _handle_http_exception(
+    e: HTTPException,
+) -> werkzeug.Response | tuple[base.ErrorJSON, int]:
+    if flask.request.path.startswith("/j/"):
+        return {"errors": [e.description or str(e)]}, e.code or 500
+    return e.get_response()
 
 
 ext = FlaskExtension()

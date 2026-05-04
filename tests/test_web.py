@@ -8,6 +8,7 @@ import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import web
+from flask_htmx_template.controllers import base
 from flask_htmx_template.database import SQLiteDatabase
 from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 from flask_htmx_template.models.base import BaseEnum
@@ -182,3 +183,51 @@ def test_open_db_postgres_url(
     postgres_database_generator()
     d = web.FlaskExtension._open_db({"PATH": postgres_database_generator.url})
     assert d.is_postgres
+
+
+def test_http_exception_json_path(flask_app: flask.Flask) -> None:
+    # 404 on a /j/ path must return ErrorJSON, not HTML
+    with flask_app.test_client() as client:
+        resp = client.get("/j/does-not-exist")
+    assert resp.status_code == base.HTTP_CODE_NOT_FOUND
+    assert resp.content_type == "application/json"
+    data = resp.get_json()
+    assert isinstance(data["errors"], list)
+    assert data["errors"]
+
+
+def test_http_exception_json_parse_error(flask_app: flask.Flask) -> None:
+    # Empty body must return the descriptive decode error, not a bare 400
+    with flask_app.test_client() as client:
+        resp = client.post(
+            "/j/items/new",
+            data=b"",
+            content_type="application/json",
+        )
+    assert resp.status_code == base.HTTP_CODE_BAD_REQUEST
+    data = resp.get_json()
+    assert data is not None
+    assert any("decode" in e.lower() or "json" in e.lower() for e in data["errors"])
+
+
+def test_http_exception_json_type_error(flask_app: flask.Flask) -> None:
+    # Empty body must return the descriptive decode error, not a bare 400
+    with flask_app.test_client() as client:
+        resp = client.post(
+            "/j/items/new",
+            data=b"",
+        )
+    assert resp.status_code == base.HTTP_CODE_UNSUPPORTED_MEDIA_TYPE
+    data = resp.get_json()
+    assert data is not None
+    assert any(
+        "did not attempt" in e.lower() or "json" in e.lower() for e in data["errors"]
+    )
+
+
+def test_http_exception_non_json_path(flask_app: flask.Flask) -> None:
+    # 404 on a non-/j/ path must return the default HTML response
+    with flask_app.test_client() as client:
+        resp = client.get("/h/does-not-exist")
+    assert resp.status_code == base.HTTP_CODE_NOT_FOUND
+    assert "text/html" in resp.content_type

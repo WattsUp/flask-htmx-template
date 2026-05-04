@@ -415,7 +415,65 @@ def test_metrics(web_client: WebClient, item: Item) -> None:
     assert 'endpoint="items.page_all"' in result_str
 
 
-def test_follow_links(web_client: WebClient) -> None:
+def _visit_all_links(
+    web_client: WebClient,
+    visited: set[str],
+    deletes: set[str],
+    url: str,
+    method: str,
+    *,
+    hx: bool = False,
+) -> None:
+    request = f"{method} {url}"
+    if request in visited or "validation" in url:
+        return
+    visited.add(request)
+    response: werkzeug.test.TestResponse | None = None
+    try:
+        print(f"Visiting: {request}")
+        response = web_client.raw_open(
+            url,
+            method=method,
+            buffered=False,
+            follow_redirects=False,
+            headers={"HX-Request": "true"} if hx else None,
+        )
+        page = response.text
+        if response.status_code == base.HTTP_CODE_BAD_REQUEST:
+            # Probably missing args/form
+            return
+        assert response.status_code == base.HTTP_CODE_OK
+        assert response.content_type == "text/html; charset=utf-8"
+
+    except exc.http.BadRequest:
+        # Better than a 404
+        # Probably missing args/form
+        return
+    finally:
+        if response is not None:
+            response.close()
+    hrefs = list(re.findall(r'href="([\w\d/\-]+)"', page))
+    hx_gets = list(re.findall(r'hx-get="([\w\d/\-]+)"', page))
+    hx_puts = list(re.findall(r'hx-put="([\w\d/\-]+)"', page))
+    hx_posts = list(re.findall(r'hx-post="([\w\d/\-]+)"', page))
+    hx_deletes = list(re.findall(r'hx-delete="([\w\d/\-]+)"', page))
+    page = ""  # Clear page so --locals isn't too noisy
+
+    for link in hrefs:
+        _visit_all_links(web_client, visited, deletes, link, "GET")
+    # With hx requests, add HX-Request header
+    for link in hx_gets:
+        _visit_all_links(web_client, visited, deletes, link, "GET", hx=True)
+    for link in hx_puts:
+        _visit_all_links(web_client, visited, deletes, link, "PUT", hx=True)
+    for link in hx_posts:
+        _visit_all_links(web_client, visited, deletes, link, "POST", hx=True)
+    deletes.update(hx_deletes)
+
+
+def test_follow_links(
+    web_client: WebClient,
+) -> None:
     # Recursively click on every link checking that it is a valid link and valid
     # method
     visited: set[str] = set()
@@ -423,53 +481,9 @@ def test_follow_links(web_client: WebClient) -> None:
     # Save hx-delete for the end in case it does successfully delete something
     deletes: set[str] = set()
 
-    def visit_all_links(url: str, method: str, *, hx: bool = False) -> None:
-        request = f"{method} {url}"
-        if request in visited or "validation" in url:
-            return
-        visited.add(request)
-        response: werkzeug.test.TestResponse | None = None
-        try:
-            print(f"Visiting: {request}")
-            response = web_client.raw_open(
-                url,
-                method=method,
-                buffered=False,
-                follow_redirects=False,
-                headers={"HX-Request": "true"} if hx else None,
-            )
-            page = response.text
-            assert response.status_code == base.HTTP_CODE_OK
-            assert response.content_type == "text/html; charset=utf-8"
-
-        except exc.http.BadRequest:
-            # Better than a 404
-            # Probably missing args/form
-            return
-        finally:
-            if response is not None:
-                response.close()
-        hrefs = list(re.findall(r'href="([\w\d/\-]+)"', page))
-        hx_gets = list(re.findall(r'hx-get="([\w\d/\-]+)"', page))
-        hx_puts = list(re.findall(r'hx-put="([\w\d/\-]+)"', page))
-        hx_posts = list(re.findall(r'hx-post="([\w\d/\-]+)"', page))
-        hx_deletes = list(re.findall(r'hx-delete="([\w\d/\-]+)"', page))
-        page = ""  # Clear page so --locals isn't too noisy
-
-        for link in hrefs:
-            visit_all_links(link, "GET")
-        # With hx requests, add HX-Request header
-        for link in hx_gets:
-            visit_all_links(link, "GET", hx=True)
-        for link in hx_puts:
-            visit_all_links(link, "PUT", hx=True)
-        for link in hx_posts:
-            visit_all_links(link, "POST", hx=True)
-        deletes.update(hx_deletes)
-
-    visit_all_links("/", "GET")
+    _visit_all_links(web_client, visited, deletes, "/", "GET")
     for link in deletes:
-        visit_all_links(link, "DELETE", hx=True)
+        _visit_all_links(web_client, visited, deletes, link, "DELETE", hx=True)
 
 
 def test_change_redirect_no_changes() -> None:
