@@ -12,6 +12,7 @@ class CbcMode:
     iv: Buffer
     IV: Buffer
     def __init__(self, block_cipher: SmartPointer, iv: Buffer) -> None: ...
+
     @overload
     def encrypt(self, plaintext: Buffer) -> bytes: ...
     @overload
@@ -20,6 +21,7 @@ class CbcMode:
         plaintext: Buffer,
         output: bytearray | memoryview,
     ) -> None: ...
+
     @overload
     def decrypt(self, plaintext: Buffer) -> bytes: ...
     @overload

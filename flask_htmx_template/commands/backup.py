@@ -118,30 +118,32 @@ class Restore(Command):
             )
             return -1
 
-        try:
-            if self._list_ver:
-                backups = database.SQLiteDatabase.backups(self._path_db)
-                if len(backups) == 0:
-                    print(
-                        f"{Fore.RED}No backups found, run 'flask_htmx_template backup'",
-                        file=sys.stderr,
-                    )
-                    return 0
-                now = datetime.datetime.now(datetime.UTC)
-                for ver, ts in backups:
-                    ago_s = (now - ts).total_seconds()
-                    ago = utils.format_seconds(ago_s)
-
-                    # Convert ts utc to local timezone
-                    ts_local = ts.astimezone().isoformat(timespec="seconds")
-                    print(
-                        f"{Fore.CYAN}Backup #{ver:2} created at {ts_local} ({ago} ago)",
-                    )
+        if self._list_ver:
+            backups = database.SQLiteDatabase.backups(self._path_db)
+            if len(backups) == 0:
+                print(
+                    f"{Fore.RED}No backups found, run 'flask_htmx_template backup'",
+                    file=sys.stderr,
+                )
                 return 0
+            now = datetime.datetime.now(datetime.UTC)
+            for ver, ts in backups:
+                ago_s = (now - ts).total_seconds()
+                ago = utils.format_seconds(ago_s)
+
+                # Convert ts utc to local timezone
+                ts_local = ts.astimezone().isoformat(timespec="seconds")
+                print(
+                    f"{Fore.CYAN}Backup #{ver:2} created at {ts_local} ({ago} ago)",
+                )
+            return 0
+
+        try:
             database.SQLiteDatabase.restore(self._path_db, tar_ver=self._tar_ver)
-            print(f"{Fore.CYAN}Extracted backup tar")
         except FileNotFoundError as e:
             print(f"{Fore.RED}{e}", file=sys.stderr)
             return -1
+        else:
+            print(f"{Fore.CYAN}Extracted backup tar")
         print(f"{Fore.GREEN}Database restored for {self._path_db}")
         return 0

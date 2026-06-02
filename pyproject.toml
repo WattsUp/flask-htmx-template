@@ -62,9 +62,9 @@ test = [
 ]
 dev = [
   "flask-htmx-template[deploy,test]",
-  "ruff>=0.15.8",
+  "ruff>=0.15.15",
   "codespell>=2.4.1",
-  "black>=25.9",
+  "black>=26.5",
   "isort",
   "prek",
   "djlint>=1.36.4",

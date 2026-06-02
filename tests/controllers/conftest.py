@@ -434,14 +434,14 @@ class WebClient:
 
         kwargs["method"] = method
         kwargs["headers"] = kwargs.get("headers", {"HX-Request": "true"})
-        response: werkzeug.test.TestResponse | None = None
-        try:
-            response = self._client.open(
-                url,
-                buffered=False,
-                follow_redirects=False,
-                **kwargs,
-            )
+        response = self._client.open(
+            url,
+            buffered=False,
+            follow_redirects=False,
+            **kwargs,
+        )
+        with response:
+            response: werkzeug.test.TestResponse
             assert response.status_code == rc, response.data
             assert response.content_type == content_type
 
@@ -454,9 +454,6 @@ class WebClient:
             d = response.data
             assert isinstance(d, bytes)
             return d, response.headers
-        finally:
-            if response is not None:
-                response.close()
 
     @overload
     def GET(

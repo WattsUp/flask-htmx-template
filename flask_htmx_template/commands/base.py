@@ -269,19 +269,25 @@ def get_input(
     # defer for faster time to main
     import getpass
 
-    try:
-        if secure:
-            secure_icon = "\u26bf"
-            if print_key is True or (
+    if secure:
+        secure_icon = "\u26bf"
+        to_print = (
+            f"{secure_icon}  {prompt}"
+            if print_key is True
+            or (
                 print_key is None
                 and sys.stdout.encoding
                 and sys.stdout.encoding.lower().startswith("utf-")
-            ):
-                input_ = getpass.getpass(f"{secure_icon}  {prompt}")
-            else:
-                input_ = getpass.getpass(prompt)
-        else:
-            input_ = input(prompt)
+            )
+            else prompt
+        )
+
+        try:
+            return getpass.getpass(to_print)
+        except (KeyboardInterrupt, EOFError):
+            return None
+
+    try:
+        return input(prompt)
     except (KeyboardInterrupt, EOFError):
         return None
-    return input_
