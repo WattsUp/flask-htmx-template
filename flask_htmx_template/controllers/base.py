@@ -336,33 +336,48 @@ def page(content_template: str, title: str, **context: object) -> flask.Response
 
     # Create response and add Vary: HX-Request
     # Since the cache needs to cache both
-    response = flask.make_response(html)
-    response.headers["Vary"] = "HX-Request"
-    return response
+    res = flask.make_response(html)
+    res.headers["Vary"] = "HX-Request"
+    return res
 
 
-def change_redirect_to_htmx(response: flask.Response) -> flask.Response:
+def append_json_newline(res: flask.Response) -> flask.Response:
+    """Append a trailing newline to JSON responses for CLI friendliness.
+
+    Args:
+        res: HTTP response
+
+    Returns:
+        Modified HTTP response
+
+    """
+    if res.content_type.startswith("application/json") and not res.data.endswith(b"\n"):
+        res.data += b"\n"
+    return res
+
+
+def change_redirect_to_htmx(res: flask.Response) -> flask.Response:
     """Change redirect responses to HX-Redirect.
 
     Args:
-        response: HTTP response
+        res: HTTP response
 
     Returns:
         Modified HTTP response
 
     """
     if (
-        response.status_code == HTTP_CODE_REDIRECT
+        res.status_code == HTTP_CODE_REDIRECT
         and flask.request.headers.get("HX-Request", "false") == "true"
     ):
         # If a redirect is issued to a HX-Request, send OK and HX-Redirect
-        response.headers["HX-Redirect"] = response.headers.pop("Location")
-        response.status_code = HTTP_CODE_OK
+        res.headers["HX-Redirect"] = res.headers.pop("Location")
+        res.status_code = HTTP_CODE_OK
         # werkzeug redirect doesn't have close tags
         # clear body
-        response.data = ""
+        res.data = ""
 
-    return response
+    return res
 
 
 def find[T: Base](cls: type[T], uri: str) -> T:

@@ -272,6 +272,15 @@ def test_example_value_union_non_none() -> None:
     assert result == "a string of words"
 
 
+def test_example_from_union_all_none() -> None:
+    result = api_docs._example_from_union(
+        (types.NoneType,),
+        "",
+        skip_not_required=False,
+    )
+    assert result is None
+
+
 def test_example_value_for_type_unknown() -> None:
     # datetime.date is not an IntEnum or TypedDict → returns None
     result = api_docs._example_value_for_type(datetime.date)

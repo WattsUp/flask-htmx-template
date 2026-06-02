@@ -37,11 +37,7 @@ if TYPE_CHECKING:
 
 
 class Database(ABC):
-    """Database base class.
-
-    Use as a factory: Database(path, key) returns SQLiteDatabase or
-    PostgresDatabase depending on the path.
-    """
+    """Database base class."""
 
     _ENCRYPTION_TEST_VALUE = "flask_htmx_template encryption test string"
 
@@ -189,9 +185,6 @@ class Database(ABC):
 
         """
         raise NotImplementedError
-        if self._postgres_url is not None:
-            return sql.get_engine_postgres(self._postgres_url)
-        return sql.get_engine(self._path_db, self._enc)
 
     def dispose(self) -> None:
         """Dispose of the connection pool.

@@ -20,8 +20,6 @@ from tests import conftest
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import werkzeug.test
-
     from tests.conftest import RandomStringGenerator
     from tests.controllers.conftest import HTMLValidator, WebClient
 
@@ -428,9 +426,8 @@ def _visit_all_links(
     if request in visited or "validation" in url:
         return
     visited.add(request)
-    response: werkzeug.test.TestResponse | None = None
+    print(f"Visiting: {request}")
     try:
-        print(f"Visiting: {request}")
         response = web_client.raw_open(
             url,
             method=method,
@@ -438,20 +435,17 @@ def _visit_all_links(
             follow_redirects=False,
             headers={"HX-Request": "true"} if hx else None,
         )
+    except exc.http.BadRequest:
+        # Better than a 404
+        # Probably missing args/form
+        return
+    with response:
         page = response.text
         if response.status_code == base.HTTP_CODE_BAD_REQUEST:
             # Probably missing args/form
             return
         assert response.status_code == base.HTTP_CODE_OK
         assert response.content_type == "text/html; charset=utf-8"
-
-    except exc.http.BadRequest:
-        # Better than a 404
-        # Probably missing args/form
-        return
-    finally:
-        if response is not None:
-            response.close()
     hrefs = list(re.findall(r'href="([\w\d/\-]+)"', page))
     hx_gets = list(re.findall(r'hx-get="([\w\d/\-]+)"', page))
     hx_puts = list(re.findall(r'hx-put="([\w\d/\-]+)"', page))

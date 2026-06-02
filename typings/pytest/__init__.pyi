@@ -85,6 +85,7 @@ def approx[T](
     abs: T | None = None,
     nan_ok: bool = False,
 ) -> ApproxScalar: ...
+
 def approx[T](
     expected: T,
     rel: T | None = None,

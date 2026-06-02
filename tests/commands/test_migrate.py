@@ -50,6 +50,23 @@ def test_v0_1_migration(
     assert not captured.err
 
 
+def test_no_schema_updates(
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    data_path: Path,
+) -> None:
+    path = tmp_path / "database.db"
+    shutil.copyfile(data_path / "old_versions" / "v0.2.0.db", path)
+
+    c = Migrate(path, None)
+    assert c.run() == 0
+
+    captured = capsys.readouterr()
+    target = "Database is unlocked\nDatabase migrated to v0.3.0\n"
+    assert captured.out == target
+    assert not captured.err
+
+
 def test_migrate_postgres(
     capsys: pytest.CaptureFixture[str],
     postgres_database_generator: PostgresDatabaseGenerator,

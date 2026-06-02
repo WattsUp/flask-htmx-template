@@ -242,7 +242,6 @@
 
   #main {
     @apply min-h-full overflow-hidden px-2 pt-2 pb-20 md:px-4;
-    @apply mx-auto max-w-7xl;
 
     & > div:first-of-type {
       @apply flex items-center justify-between pb-1;
