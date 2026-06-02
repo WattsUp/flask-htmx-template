@@ -414,11 +414,11 @@ def _example_from_union(
     """Return an example value for a union type annotation.
 
     Returns:
-        None if any arm is NoneType, otherwise the example for the first non-None arm.
+        The example for the first non-None arm.
 
     """
     non_none = [a for a in args if a is not NoneType]
-    if not non_none or any(a is NoneType for a in args):
+    if not non_none:
         return None
     return _example_value(non_none[0], field_name, skip_not_required=skip_not_required)
 
@@ -825,7 +825,7 @@ def get_operations(
         if not view:  # pragma: no cover
 
             continue
-        group = str(rule.endpoint).split(".", 1)[0].capitalize()
+        group = str(rule.endpoint).split(".", 1)[0].replace("_", " ").capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
 
         module = inspect.getmodule(view)

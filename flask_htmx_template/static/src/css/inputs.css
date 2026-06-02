@@ -373,7 +373,7 @@
   }
 
   & > div {
-    @apply flex grow flex-col justify-center;
+    @apply flex grow flex-col justify-center pr-2;
 
     & > span {
       @variant not-first {
@@ -383,7 +383,7 @@
   }
 
   & > switch {
-    @apply relative h-8 w-13;
+    @apply relative h-8 w-13 shrink-0;
     @apply border-2 transition-colors;
 
     background-color: var(--toggle-track-color);

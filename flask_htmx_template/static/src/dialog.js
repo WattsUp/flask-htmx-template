@@ -39,6 +39,7 @@ const dialog = {
     let allFilled = true;
     htmx.findAll("#dialog [required]").forEach((e) => {
       if (!allFilled) return;
+      if (e.disabled) return;
       if (!e.value) {
         allFilled = false;
         return;

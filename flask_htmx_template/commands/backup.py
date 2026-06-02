@@ -109,11 +109,9 @@ class Restore(Command):
     @override
     def run(self) -> int:
         # Defer for faster time to main
-        from flask_htmx_template import database
-        from flask_htmx_template import sql as sql_mod
-        from flask_htmx_template import utils
+        from flask_htmx_template import database, sql, utils
 
-        if sql_mod.is_postgres_url(str(self._path_db)):
+        if sql.is_postgres_url(str(self._path_db)):
             print(
                 f"{Fore.RED}restore is not supported for postgres databases",
                 file=sys.stderr,

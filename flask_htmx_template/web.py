@@ -166,6 +166,7 @@ class FlaskExtension:
         config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
         config["REMEMBER_COOKIE_DURATION"] = datetime.timedelta(days=28)
         app.after_request(base.change_redirect_to_htmx)
+        app.after_request(base.append_json_newline)
 
         login_manager = flask_login.LoginManager()
         login_manager.init_app(app)
