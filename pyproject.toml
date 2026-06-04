@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 name = "flask-htmx-template"
 dynamic = ["version"]
 dependencies = [
-  "sqlalchemy>=2",
+  "sqlalchemy>=2,!=2.0.50",    # 2.0.50 has an accidental debug print in pysqlcipher dialect; remove when 2.0.51 ships (sqlalchemy/sqlalchemy#13349)
   "colorama",
   "flask>=3",
   "flask-assets",
