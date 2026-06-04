@@ -3,20 +3,14 @@ from __future__ import annotations
 import shutil
 from typing import TYPE_CHECKING
 
-from packaging.version import Version
-
 from flask_htmx_template import sql
 from flask_htmx_template.database import SQLiteDatabase
-from flask_htmx_template.migrations.v0_1 import MigratorV0_1
+from flask_htmx_template.migrations.create_item_table import CreateItemTable
 from flask_htmx_template.models.config import Config
 from flask_htmx_template.models.item import Item
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-def test_version() -> None:
-    assert MigratorV0_1().min_version() == Version("0.1.0")
 
 
 def test_migrate(tmp_path: Path, data_path: Path) -> None:
@@ -25,7 +19,7 @@ def test_migrate(tmp_path: Path, data_path: Path) -> None:
     shutil.copyfile(path_original, path_db)
 
     d = SQLiteDatabase(path_db, None, check_migration=False)
-    m = MigratorV0_1()
+    m = CreateItemTable()
     result = m.migrate(d)
     target = [
         "Created Item table",

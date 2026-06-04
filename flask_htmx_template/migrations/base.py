@@ -5,10 +5,9 @@ from __future__ import annotations
 import re
 import textwrap
 from abc import ABC, abstractmethod
-from typing import override, TYPE_CHECKING
+from typing import ClassVar, override, TYPE_CHECKING
 
 import sqlalchemy
-from packaging.version import Version
 from sqlalchemy.schema import CreateTable
 
 from flask_htmx_template import sql
@@ -22,7 +21,25 @@ if TYPE_CHECKING:
 class Migrator(ABC):
     """Base Migrator."""
 
-    _VERSION: str
+    _names: ClassVar[set[str]] = set()
+
+    @override
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Check class name is unique among all Migrator subclasses.
+
+        Args:
+            **kwargs: Passed to super
+
+        Raises:
+            TypeError: If the class name is already used by another Migrator
+
+        """
+        super().__init_subclass__(**kwargs)
+        name = cls.__name__
+        if name in Migrator._names:
+            msg = f"Migrator subclass name '{name}' is already in use"
+            raise TypeError(msg)
+        Migrator._names.add(name)
 
     def __init__(self) -> None:
         """Initialize Migrator."""
@@ -40,16 +57,6 @@ class Migrator(ABC):
             List of comments to display to user
 
         """
-
-    @classmethod
-    def min_version(cls) -> Version:
-        """Minimum version that satisfies migrator.
-
-        Returns:
-            Version
-
-        """
-        return Version(cls._VERSION)
 
     def add_column(
         self,
@@ -241,6 +248,7 @@ class SchemaMigrator(Migrator):
 
     @override
     def migrate(self, d: Database) -> list[str]:
+        comments: list[str] = []
         for model in self.pending_schema_updates:
             with d.begin_session() as s:
                 engine = s.get_bind().engine
@@ -254,4 +262,5 @@ class SchemaMigrator(Migrator):
                     # Postgres: sync schema via create_all with checkfirst
                     table = model.sql_table()
                     table.create(bind=engine, checkfirst=True)
-        return []
+            comments.append(f"Migrated {model.__tablename__}")
+        return comments

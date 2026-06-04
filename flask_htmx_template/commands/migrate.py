@@ -7,7 +7,6 @@ from typing import cast, override, TYPE_CHECKING
 from colorama import Fore
 
 from flask_htmx_template.commands.base import Command
-from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     import argparse
@@ -46,11 +45,15 @@ class Migrate(Command):
     @override
     def run(self) -> int:
         # Defer for faster time to main
-        from packaging.version import Version
+        import datetime
+
+        import sqlalchemy
 
         from flask_htmx_template import database
         from flask_htmx_template.migrations.base import SchemaMigrator
-        from flask_htmx_template.migrations.top import MIGRATORS
+        from flask_htmx_template.migrations.top import collect
+        from flask_htmx_template.models.applied_migration import AppliedMigration
+        from flask_htmx_template.models.base import Base
         from flask_htmx_template.models.config import Config, ConfigKey
 
         d = self._d
@@ -60,17 +63,27 @@ class Migrate(Command):
         if not d.is_postgres:
             _, tar_ver = cast("database.SQLiteDatabase", d).backup()
 
-        with d.begin_session():
-            v_db = Config.db_version()
+        # Ensure applied_migration table exists (old databases won't have it)
+        with d.begin_session() as s:
+            engine = s.get_bind().engine
+            inspector = sqlalchemy.inspect(engine)
+            table_exists = inspector.has_table("applied_migration")
 
-        any_migrated = False
+        if not table_exists:
+            with d.begin_session() as s:
+                Base.metadata.create_all(
+                    s.get_bind().engine,
+                    [AppliedMigration.sql_table()],
+                )
+
+        pending = collect(d)
+        if not pending:
+            print(f"{Fore.GREEN}Database does not need migration")
+            return 0
+
         pending_schema_updates: set[type[Base]] = set()
-        for m_class in MIGRATORS:
-            v_m = m_class.min_version()
-            if v_db >= v_m:
-                continue
+        for m_class in pending:
             m = m_class()
-            any_migrated = True
             try:
                 comments = m.migrate(d)
             except Exception:  # pragma: no cover
@@ -83,24 +96,23 @@ class Migrate(Command):
             for line in comments:
                 print(f"{Fore.CYAN}{line}")
 
-            print(f"{Fore.GREEN}Database migrated to v{v_m}")
+            print(f"{Fore.GREEN}Database migrated: {m_class.__name__}")
             pending_schema_updates.update(m.pending_schema_updates)
 
-        if not any_migrated:
-            print(f"{Fore.GREEN}Database does not need migration")
-            return 0
+            with d.begin_session():
+                AppliedMigration.create(
+                    name=m_class.__name__,
+                    applied_at_utc=datetime.datetime.now(datetime.UTC),
+                )
 
         if pending_schema_updates:
             m = SchemaMigrator(pending_schema_updates)
-            m.migrate(d)  # no comments
+            comments = m.migrate(d)
+            for line in comments:
+                print(f"{Fore.CYAN}{line}")
             print(f"{Fore.GREEN}Database model schemas updated")
 
         with d.begin_session():
-            v = max(
-                Version(__version__),
-                *[m.min_version() for m in MIGRATORS],
-            )
-
-            Config.set_(ConfigKey.VERSION, str(v))
+            Config.set_(ConfigKey.VERSION, "1.0")
 
         return 0

@@ -3,19 +3,13 @@ from __future__ import annotations
 import shutil
 from typing import TYPE_CHECKING
 
-from packaging.version import Version
-
 from flask_htmx_template import web_theme
 from flask_htmx_template.database import SQLiteDatabase
-from flask_htmx_template.migrations.v0_3 import MigratorV0_3
+from flask_htmx_template.migrations.add_web_theme_config import AddWebThemeConfig
 from flask_htmx_template.models.config import Config, ConfigKey
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-
-def test_version() -> None:
-    assert MigratorV0_3().min_version() == Version("0.3.0")
 
 
 def test_migrate(tmp_path: Path, data_path: Path) -> None:
@@ -24,7 +18,7 @@ def test_migrate(tmp_path: Path, data_path: Path) -> None:
     shutil.copyfile(path_original, path_db)
 
     d = SQLiteDatabase(path_db, None, check_migration=False)
-    m = MigratorV0_3()
+    m = AddWebThemeConfig()
     result = m.migrate(d)
     assert result == []
 

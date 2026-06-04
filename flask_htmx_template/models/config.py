@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Literal, overload
 
-from packaging.version import Version
 from sqlalchemy import orm
 
 from flask_htmx_template import exceptions as exc
@@ -120,16 +119,6 @@ class Config(Base):
                 return None
             msg = f"Config.{key} not found"
             raise exc.ProtectedObjectNotFoundError(msg) from e
-
-    @classmethod
-    def db_version(cls) -> Version:
-        """Query the database version.
-
-        Returns:
-            Version of database
-
-        """
-        return Version(Config.fetch(ConfigKey.VERSION))
 
     @classmethod
     def web_theme_mood(cls) -> web_theme.Mood:

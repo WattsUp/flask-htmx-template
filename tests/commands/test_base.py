@@ -16,7 +16,6 @@ from flask_htmx_template.commands.create import Create
 from flask_htmx_template.commands.migrate import Migrate
 from flask_htmx_template.commands.unlock import Unlock
 from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
-from flask_htmx_template.migrations.top import MIGRATORS
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -72,10 +71,8 @@ def test_migration_required(
 
     captured = capsys.readouterr()
     assert not captured.out
-    v = MIGRATORS[-1].min_version()
     target = (
-        f"Database requires migration to v{v}\n"
-        "Run 'flask_htmx_template migrate' to resolve\n"
+        "Database requires migration\nRun 'flask_htmx_template migrate' to resolve\n"
     )
     assert captured.err == target
 

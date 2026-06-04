@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import datetime
 import enum
 from decimal import Decimal
 from typing import ClassVar, NamedTuple, overload, override, Self, TYPE_CHECKING
@@ -22,6 +23,10 @@ if TYPE_CHECKING:
 
 ORMBool = orm.Mapped[bool]
 ORMBoolOpt = orm.Mapped[bool | None]
+ORMDate = orm.Mapped[datetime.date]
+ORMDateOpt = orm.Mapped[datetime.date | None]
+ORMDateTime = orm.Mapped[datetime.datetime]
+ORMDateTimeOpt = orm.Mapped[datetime.datetime | None]
 ORMInt = orm.Mapped[int]
 ORMIntOpt = orm.Mapped[int | None]
 ORMStr = orm.Mapped[str]
