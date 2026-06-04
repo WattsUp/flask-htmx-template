@@ -7,6 +7,7 @@ import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template.models import base_uri
+from flask_htmx_template.models.applied_migration import AppliedMigration
 from flask_htmx_template.models.base import Base
 from flask_htmx_template.models.base_uri import Cipher
 from flask_htmx_template.models.config import Config
@@ -17,6 +18,7 @@ MODELS_URI: list[type[Base]] = [
 ]
 # Models without a URI not made for front end access
 MODELS_NONE: list[type[Base]] = [
+    AppliedMigration,
     Config,
 ]
 

@@ -18,17 +18,16 @@ from typing import override, Self, TYPE_CHECKING
 
 import sqlalchemy
 import tqdm
-from packaging.version import Version
 from sqlalchemy import func, orm
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils, web_theme
 from flask_htmx_template.encryption.top import Encryption, ENCRYPTION_AVAILABLE
-from flask_htmx_template.migrations.top import MIGRATORS
+from flask_htmx_template.migrations.top import _MIGRATORS, collect
+from flask_htmx_template.models.applied_migration import AppliedMigration
 from flask_htmx_template.models.base import Base
 from flask_htmx_template.models.base_uri import Cipher, load_cipher
 from flask_htmx_template.models.config import Config, ConfigKey
-from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -68,11 +67,10 @@ class Database(ABC):
 
         self._engine = self.get_engine()
         self._session_maker = orm.sessionmaker(self._engine)
-        configs = self._unlock()
+        self._unlock()
 
-        version_str = configs.get(ConfigKey.VERSION)
-        if check_migration and (v := self.migration_required(version_str)):
-            msg = f"Database requires migration to v{v}"
+        if check_migration and self.migration_required():
+            msg = "Database requires migration"
             raise exc.MigrationRequiredError(msg)
 
     @classmethod
@@ -173,6 +171,10 @@ class Database(ABC):
             msg = "Config.CIPHER not found"
             raise exc.ProtectedObjectNotFoundError(msg)
         load_cipher(base64.b64decode(cipher_b64))
+        # Verify VERSION is present
+        if configs.get(ConfigKey.VERSION) is None:
+            msg = "Config.VERSION not found"
+            raise exc.ProtectedObjectNotFoundError(msg)
         # All good :)
         return configs
 
@@ -253,26 +255,14 @@ class Database(ABC):
         """
         return self.decrypt(enc_secret).decode()
 
-    def migration_required(self, version_str: str | None) -> Version | None:
+    def migration_required(self) -> bool:
         """Check if migration is required.
 
-        Args:
-            version_str: Config VERSION value, will skip extra query
-
         Returns:
-            Version to migrate to or None if migration not required
+            True if migration is required
 
         """
-        if version_str is None:
-            with self.begin_session():
-                v_db = Config.db_version()
-        else:
-            v_db = Version(version_str)
-        for m in MIGRATORS[::-1]:
-            v_m = m.min_version()
-            if v_db < v_m:
-                return v_m
-        return None
+        return bool(collect(self))
 
     def change_web_key(self, key: str) -> None:
         """Change password used to access web.
@@ -361,15 +351,8 @@ class SQLiteDatabase(Database):
                 Base.metadata_create_all()
 
             with s.begin():
-                # If developing a migration, current version will be less
-                # Set new database to max of __version__ and Migrator.all()
-                versions = [
-                    Version(__version__),
-                    *[m.min_version() for m in MIGRATORS],
-                ]
-                v = versions[0] if len(versions) == 1 else max(versions)
-
-                Config.set_(ConfigKey.VERSION, str(v))
+                # NOTE: Keep DB version at 1.0 unless a BIG change happens
+                Config.set_(ConfigKey.VERSION, "1.0")
                 Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
                 Config.set_(ConfigKey.CIPHER, cipher_b64)
                 Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
@@ -379,6 +362,11 @@ class SQLiteDatabase(Database):
 
                 if enc is not None and key is not None:
                     Config.set_(ConfigKey.WEB_KEY, enc.encrypt(key))
+
+                # New databases have all migrations pre-applied
+                now = datetime.datetime.now(datetime.UTC)
+                for m_class in _MIGRATORS:
+                    AppliedMigration.create(name=m_class.__name__, applied_at_utc=now)
         path_db.chmod(0o600)  # Only owner can read/write
 
         return cls(path_db, key)
@@ -784,19 +772,18 @@ class PostgresDatabase(Database):
                     msg = "Postgres database is already initialized"
                     raise FileExistsError(msg)
 
-                versions = [
-                    Version(__version__),
-                    *[m.min_version() for m in MIGRATORS],
-                ]
-                v = versions[0] if len(versions) == 1 else max(versions)
-
-                Config.set_(ConfigKey.VERSION, str(v))
+                # NOTE: Keep DB version at 1.0 unless a BIG change happens
+                Config.set_(ConfigKey.VERSION, "1.0")
                 Config.set_(ConfigKey.ENCRYPTION_TEST, test_value)
                 Config.set_(ConfigKey.CIPHER, cipher_b64)
                 Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
 
                 Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
                 Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
+
+                now = datetime.datetime.now(datetime.UTC)
+                for m_class in _MIGRATORS:
+                    AppliedMigration.create(name=m_class.__name__, applied_at_utc=now)
 
         return cls(url, None)
 

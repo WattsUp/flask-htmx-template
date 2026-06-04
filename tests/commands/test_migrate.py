@@ -4,13 +4,14 @@ import shutil
 from typing import TYPE_CHECKING
 
 from flask_htmx_template.commands.migrate import Migrate
+from flask_htmx_template.database import SQLiteDatabase
+from flask_htmx_template.models.applied_migration import AppliedMigration
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     import pytest
 
-    from flask_htmx_template.database import SQLiteDatabase
     from tests.conftest import PostgresDatabaseGenerator
 
 
@@ -42,8 +43,9 @@ def test_v0_1_migration(
     target = (
         "Database is unlocked\n"
         "Created Item table\n"
-        "Database migrated to v0.1.0\n"
-        "Database migrated to v0.3.0\n"
+        "Database migrated: CreateItemTable\n"
+        "Database migrated: AddWebThemeConfig\n"
+        "Migrated config\n"
         "Database model schemas updated\n"
     )
     assert captured.out == target
@@ -53,16 +55,20 @@ def test_v0_1_migration(
 def test_no_schema_updates(
     capsys: pytest.CaptureFixture[str],
     tmp_path: Path,
-    data_path: Path,
 ) -> None:
+
     path = tmp_path / "database.db"
-    shutil.copyfile(data_path / "old_versions" / "v0.2.0.db", path)
+    d = SQLiteDatabase.create(path, None)
+
+    # Remove AddWebThemeConfig so it re-runs; it has no pending_schema_updates
+    with d.begin_session():
+        AppliedMigration.query().filter_by(name="AddWebThemeConfig").delete()
 
     c = Migrate(path, None)
     assert c.run() == 0
 
     captured = capsys.readouterr()
-    target = "Database is unlocked\nDatabase migrated to v0.3.0\n"
+    target = "Database is unlocked\nDatabase migrated: AddWebThemeConfig\n"
     assert captured.out == target
     assert not captured.err
 

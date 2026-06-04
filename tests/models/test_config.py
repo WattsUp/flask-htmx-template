@@ -3,13 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from packaging.version import Version
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, web_theme
-from flask_htmx_template.migrations.top import MIGRATORS
 from flask_htmx_template.models.config import Config, ConfigKey
-from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     from tests.conftest import RandomStringGenerator
@@ -70,12 +67,7 @@ def test_fetch_missing_ok() -> None:
 
 
 def test_db_version() -> None:
-    versions = [
-        Version(__version__),
-        *[m.min_version() for m in MIGRATORS],
-    ]
-    target = versions[0] if len(versions) == 1 else max(versions)
-    assert Config.db_version() == target
+    assert Config.fetch(ConfigKey.VERSION) == "1.0"
 
 
 def test_web_theme_mood() -> None:

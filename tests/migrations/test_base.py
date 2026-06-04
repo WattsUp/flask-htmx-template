@@ -4,7 +4,6 @@ from typing import override, TYPE_CHECKING
 
 import pytest
 import sqlalchemy
-from packaging.version import Version
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql
@@ -20,8 +19,6 @@ if TYPE_CHECKING:
 
 class MockMigrator(Migrator):
 
-    _VERSION = "999.0.0"
-
     @override
     def migrate(self, d: Database) -> list[str]:
         return ["Comments"]
@@ -30,6 +27,25 @@ class MockMigrator(Migrator):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# __init_subclass__ uniqueness check
+# ---------------------------------------------------------------------------
+
+
+def test_duplicate_subclass_name() -> None:
+    name = "_DupMigrator"
+
+    def _migrate(self: Migrator, d: Database) -> list[str]:
+        return []
+
+    try:
+        type(name, (Migrator,), {"migrate": _migrate})
+        with pytest.raises(TypeError, match="already in use"):
+            type(name, (Migrator,), {"migrate": _migrate})
+    finally:
+        Migrator._names.discard(name)
 
 
 def _column_names(d: Database) -> list[str]:
@@ -42,16 +58,6 @@ def _column_names(d: Database) -> list[str]:
     with d.begin_session() as s:
         inspector = sqlalchemy.inspect(s.get_bind().engine)
         return [c["name"] for c in inspector.get_columns("item")]
-
-
-# ---------------------------------------------------------------------------
-# Non-parameterized: version
-# ---------------------------------------------------------------------------
-
-
-def test_version() -> None:
-    m = MockMigrator()
-    assert m.min_version() == Version("999.0.0")
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +233,7 @@ def test_migrate_schemas_value_set(
     with empty_database.begin_session():
         m.add_column(Item, Item.date_ord, today_ord)
 
-    assert m.migrate(empty_database) == []
+    assert m.migrate(empty_database) == ["Migrated item"]
 
 
 def test_recreate_table_not_sqlite(postgres_database: Database) -> None:
@@ -238,4 +244,4 @@ def test_recreate_table_not_sqlite(postgres_database: Database) -> None:
 
 def test_migrate_schemas_postgres(postgres_database: Database) -> None:
     m = SchemaMigrator({Item})
-    assert m.migrate(postgres_database) == []
+    assert m.migrate(postgres_database) == ["Migrated item"]

@@ -385,7 +385,9 @@ def test_count(parent: Parent) -> None:
 
 
 re_check_no_session_add = re.compile(r"^ *(s|session)\.add\(\w+\)")
-re_check_no_model_new = re.compile(rf"({'|'.join(m.__name__ for m in Base._MODELS)})\(")
+re_check_no_model_new = re.compile(
+    "|".join(rf"\b{m.__name__}\(" for m in Base._MODELS),
+)
 re_check_no_session_query = re.compile(r"[( ](s|session)\.query\(")
 re_check_no_scalar_query = re.compile(r"(\w*)\.scalar\(")
 re_check_no_query_one = re.compile(r"(\w*)\.one\(")

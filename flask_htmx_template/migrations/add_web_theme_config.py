@@ -1,4 +1,4 @@
-"""Migrator to v0.3.0."""
+"""Add web theme config."""
 
 from __future__ import annotations
 
@@ -12,14 +12,20 @@ if TYPE_CHECKING:
     from flask_htmx_template.database import Database
 
 
-class MigratorV0_3(Migrator):
-    """Migrator to v0.3.0."""
-
-    _VERSION = "0.3.0"
+class AddWebThemeConfig(Migrator):
+    """Add web theme swatch and mood config entries."""
 
     @override
     def migrate(self, d: Database) -> list[str]:
+        """Run migration.
 
+        Args:
+            d: Database to migrate
+
+        Returns:
+            List of comments to display to user
+
+        """
         comments: list[str] = []
 
         with d.begin_session():
