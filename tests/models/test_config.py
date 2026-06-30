@@ -12,6 +12,11 @@ if TYPE_CHECKING:
     from tests.conftest import RandomStringGenerator
 
 
+@pytest.fixture(autouse=True)
+def delete_web_key() -> None:
+    Config.query().where(Config.key == ConfigKey.WEB_KEY).delete()
+
+
 def test_init_properties(rand_str: str) -> None:
     d = {
         "key": ConfigKey.WEB_KEY,

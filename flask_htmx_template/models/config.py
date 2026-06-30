@@ -21,13 +21,12 @@ class ConfigKey(BaseEnum):
     """Configuration keys."""
 
     VERSION = 1
-    ENCRYPTION_TEST = 2
-    CIPHER = 3
-    SECRET_KEY = 4
-    WEB_KEY = 5
+    CIPHER = 2
+    SECRET_KEY = 3
+    WEB_KEY = 4
 
-    WEB_THEME_SWATCH = 6
-    WEB_THEME_MOOD = 7
+    WEB_THEME_SWATCH = 5
+    WEB_THEME_MOOD = 6
 
 
 class Config(Base):

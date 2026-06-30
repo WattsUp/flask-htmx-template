@@ -17,7 +17,7 @@ def test_migrate(tmp_path: Path, data_path: Path) -> None:
     path_db = tmp_path / "portfolio.new.db"
     shutil.copyfile(path_original, path_db)
 
-    d = SQLiteDatabase(path_db, None, check_migration=False)
+    d = SQLiteDatabase(path_db, check_migration=False)
     m = AddWebThemeConfig()
     result = m.migrate(d)
     assert result == []

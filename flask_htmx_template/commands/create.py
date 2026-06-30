@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
 import sys
 from pathlib import Path
-from typing import override
+from typing import override, TYPE_CHECKING
 
 from colorama import Fore
 
-from flask_htmx_template.commands.base import Command, get_password
+from flask_htmx_template.commands.base import Command
+
+if TYPE_CHECKING:
+    import argparse
 
 
 class Create(Command):
@@ -22,23 +24,18 @@ class Create(Command):
     def __init__(
         self,
         path_db: Path | str,
-        path_password: Path | None,
         *,
         force: bool,
-        no_encrypt: bool,
     ) -> None:
         """Initialize create command.
 
         Args:
             path_db: Path to Database DB or postgres connection URL
-            path_password: Path to password file, None will prompt when necessary
             force: True will overwrite existing if necessary
-            no_encrypt: True will not encrypt the Database
 
         """
-        super().__init__(path_db, path_password, do_unlock=False)
+        super().__init__(path_db, do_unlock=False)
         self._force = force
-        self._no_encrypt = no_encrypt
 
     @override
     @classmethod
@@ -49,25 +46,15 @@ class Create(Command):
             action="store_true",
             help="Force create a new database, will overwrite existing",
         )
-        parser.add_argument(
-            "--no-encrypt",
-            default=False,
-            action="store_true",
-            # No encrypt is for testing only
-            help=argparse.SUPPRESS,
-        )
 
     @override
     def run(self) -> int:
         # Defer for faster time to main
-        from flask_htmx_template import database, sql, utils
+        from flask_htmx_template import database, sql
 
         if sql.is_postgres_url(str(self._path_db)):
-            pg_key: str | None = None
-            if self._path_password is not None and self._path_password.exists():
-                pg_key = self._path_password.read_text("utf-8").strip()
             try:
-                database.PostgresDatabase.create(self._path_db, pg_key)
+                database.PostgresDatabase.create(self._path_db)
             except FileExistsError as e:
                 if self._force:
                     print(
@@ -93,18 +80,7 @@ class Create(Command):
                 )
                 return -1
 
-        key: str | None = None
-        if not self._no_encrypt:
-            if self._path_password is not None and self._path_password.exists():
-                key = self._path_password.read_text("utf-8").strip()
-
-            # Get key from user is password file empty
-            key = key or get_password(utils.MIN_PASS_LEN)
-            if key is None:
-                # Canceled
-                return -1
-
-        database.SQLiteDatabase.create(path_db, key)
+        database.SQLiteDatabase.create(path_db)
         print(f"{Fore.GREEN}Database created at {path_db}")
 
         return 0

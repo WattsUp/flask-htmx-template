@@ -1,27 +1,22 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from typing import override, TYPE_CHECKING
 
 import pytest
 
 from flask_htmx_template import utils
 from flask_htmx_template.commands import base
-from flask_htmx_template.commands.backup import Backup, Restore
 from flask_htmx_template.commands.base import Command, confirm, get_input, get_password
-from flask_htmx_template.commands.change_password import ChangePassword
-from flask_htmx_template.commands.clean import Clean
 from flask_htmx_template.commands.create import Create
 from flask_htmx_template.commands.migrate import Migrate
 from flask_htmx_template.commands.unlock import Unlock
-from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from flask_htmx_template.database import SQLiteDatabase
-    from tests.conftest import PostgresDatabaseGenerator, RandomStringGenerator
+    from tests.conftest import RandomStringGenerator
 
 
 class MockCommand(Command):
@@ -36,13 +31,13 @@ class MockCommand(Command):
 
 
 def test_no_unlock(tmp_path: Path) -> None:
-    MockCommand(tmp_path / "fake.db", None, do_unlock=False)
+    MockCommand(tmp_path / "fake.db", do_unlock=False)
 
 
 def test_no_file(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     path = tmp_path / "fake.db"
     with pytest.raises(SystemExit):
-        MockCommand(path, None)
+        MockCommand(path)
 
     captured = capsys.readouterr()
     assert not captured.out
@@ -54,7 +49,7 @@ def test_unlock(
     capsys: pytest.CaptureFixture[str],
     empty_database: SQLiteDatabase,
 ) -> None:
-    MockCommand(empty_database.path, None)
+    MockCommand(empty_database.path)
 
     captured = capsys.readouterr()
     target = "Database is unlocked\n"
@@ -67,135 +62,12 @@ def test_migration_required(
     data_path: Path,
 ) -> None:
     with pytest.raises(SystemExit):
-        MockCommand(data_path / "old_versions" / "v0.0.0.db", None)
+        MockCommand(data_path / "old_versions" / "v0.0.0.db")
 
     captured = capsys.readouterr()
     assert not captured.out
     target = (
         "Database requires migration\nRun 'flask_htmx_template migrate' to resolve\n"
-    )
-    assert captured.err == target
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="Encryption is not installed")
-@pytest.mark.encryption
-def test_unlock_encrypted_path(
-    capsys: pytest.CaptureFixture[str],
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-    tmp_path: Path,
-) -> None:
-    d, key = empty_database_encrypted
-    path_password = tmp_path / "password.secret"
-    path_password.write_text(key, "utf-8")
-
-    MockCommand(d.path, path_password)
-
-    captured = capsys.readouterr()
-    target = "Database is unlocked\n"
-    assert captured.out == target
-    assert not captured.err
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="Encryption is not installed")
-@pytest.mark.encryption
-def test_unlock_encrypted_path_bad_key(
-    capsys: pytest.CaptureFixture[str],
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-    tmp_path: Path,
-) -> None:
-    d, _ = empty_database_encrypted
-    path_password = tmp_path / "password.secret"
-    path_password.write_text("not key", "utf-8")
-
-    with pytest.raises(SystemExit):
-        MockCommand(d.path, path_password)
-
-    captured = capsys.readouterr()
-    assert not captured.out
-    target = "Could not decrypt with password file\n"
-    assert captured.err == target
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="Encryption is not installed")
-@pytest.mark.encryption
-def test_unlock_encrypted(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-) -> None:
-    d, key = empty_database_encrypted
-    queue = ["not key", key]
-
-    def mock_get_pass(to_print: str) -> str | None:
-        print(to_print, file=sys.stderr)
-        return queue.pop(0)
-
-    monkeypatch.setattr("getpass.getpass", mock_get_pass)
-
-    MockCommand(d.path, None)
-
-    captured = capsys.readouterr()
-    assert captured.out == "Database is unlocked\n"
-    target = (
-        "\u26bf  Please enter password: \n"
-        "Incorrect password\n"
-        "\u26bf  Please enter password: \n"
-    )
-    assert captured.err == target
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="Encryption is not installed")
-@pytest.mark.encryption
-def test_unlock_encrypted_cancel(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-) -> None:
-    d, _ = empty_database_encrypted
-
-    def mock_get_pass(to_print: str) -> str | None:
-        print(to_print, file=sys.stderr)
-        return None
-
-    monkeypatch.setattr("getpass.getpass", mock_get_pass)
-
-    with pytest.raises(SystemExit):
-        MockCommand(d.path, None)
-
-    captured = capsys.readouterr()
-    assert not captured.out
-    target = "\u26bf  Please enter password: \n"
-    assert captured.err == target
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="Encryption is not installed")
-@pytest.mark.encryption
-def test_unlock_encrypted_failed(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-) -> None:
-    d, _ = empty_database_encrypted
-
-    def mock_get_pass(to_print: str) -> str | None:
-        print(to_print, file=sys.stderr)
-        return "not key"
-
-    monkeypatch.setattr("getpass.getpass", mock_get_pass)
-
-    with pytest.raises(SystemExit):
-        MockCommand(d.path, None)
-
-    captured = capsys.readouterr()
-    assert not captured.out
-    target = (
-        "\u26bf  Please enter password: \n"
-        "Incorrect password\n"
-        "\u26bf  Please enter password: \n"
-        "Incorrect password\n"
-        "\u26bf  Please enter password: \n"
-        "Incorrect password\n"
-        "Too many incorrect attempts\n"
     )
     assert captured.err == target
 
@@ -206,10 +78,6 @@ def test_unlock_encrypted_failed(
         (Create, []),
         (Unlock, []),
         (Migrate, []),
-        (Backup, []),
-        (Restore, []),
-        (Clean, []),
-        (ChangePassword, []),
     ],
 )
 def test_args(
@@ -235,7 +103,6 @@ def test_args(
     args = parser.parse_args(args=command_line)
     args_d = vars(args)
     args_d["path_db"] = empty_database.path
-    args_d["path_password"] = None
     cmd: str = args_d.pop("cmd")
     assert cmd == cmd_class.NAME
 
@@ -244,22 +111,9 @@ def test_args(
 
 
 def test_postgres_url_normalized_in_command(pg_url: str) -> None:
-    c = MockCommand(pg_url, None, do_unlock=False)
+    c = MockCommand(pg_url, do_unlock=False)
     assert isinstance(c._path_db, str)
     assert c._path_db.startswith("postgresql+psycopg://")
-
-
-def test_unlock_postgres_with_key(
-    postgres_database_generator: PostgresDatabaseGenerator,
-    pg_url_no_password: str,
-    pg_key: str,
-    tmp_path: Path,
-) -> None:
-    postgres_database_generator()
-    path_key = tmp_path / "key.secret"
-    path_key.write_text(pg_key, "utf-8")
-    c = MockCommand(pg_url_no_password, path_key)
-    assert c._d.is_postgres
 
 
 def test_get_input_insecure(

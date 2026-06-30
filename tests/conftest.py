@@ -121,24 +121,16 @@ class EmptyDatabaseGenerator:
         self,
         tmp_path_factory: pytest.TempPathFactory,
         rand_str_generator: RandomStringGenerator,
-        key: str | None,
     ) -> None:
         # Create the database once, then copy the file each time called
         self._path = tmp_path_factory.mktemp("data") / "database.db"
         self._rand_str_generator = rand_str_generator
-        self._key = key
-        SQLiteDatabase.create(self._path, key)
+        SQLiteDatabase.create(self._path)
 
-    def __call__(self) -> tuple[SQLiteDatabase, str | None]:
+    def __call__(self) -> SQLiteDatabase:
         tmp_path = self._path.with_name(f"{self._rand_str_generator()}.db")
         shutil.copyfile(self._path, tmp_path)
-        if self._key is not None:
-            # copy salt too
-            shutil.copyfile(
-                self._path.with_suffix(".nacl"),
-                tmp_path.with_suffix(".nacl"),
-            )
-        return SQLiteDatabase(tmp_path, self._key), self._key
+        return SQLiteDatabase(tmp_path)
 
 
 @pytest.fixture(scope="session")
@@ -152,25 +144,7 @@ def empty_database_generator(
         EmptyDatabase generator
 
     """
-    return EmptyDatabaseGenerator(tmp_path_factory, rand_str_generator, None)
-
-
-@pytest.fixture(scope="session")
-def empty_database_encrypted_generator(
-    tmp_path_factory: pytest.TempPathFactory,
-    rand_str_generator: RandomStringGenerator,
-) -> EmptyDatabaseGenerator:
-    """Return an empty database generator.
-
-    Returns:
-        EmptyDatabase generator
-
-    """
-    return EmptyDatabaseGenerator(
-        tmp_path_factory,
-        rand_str_generator,
-        rand_str_generator(),
-    )
+    return EmptyDatabaseGenerator(tmp_path_factory, rand_str_generator)
 
 
 @pytest.fixture
@@ -183,22 +157,7 @@ def empty_database(
         Database
 
     """
-    return empty_database_generator()[0]
-
-
-@pytest.fixture
-def empty_database_encrypted(
-    empty_database_encrypted_generator: EmptyDatabaseGenerator,
-) -> tuple[SQLiteDatabase, str]:
-    """Return an empty encrypted database.
-
-    Returns:
-        tuple(Database, key)
-
-    """
-    d, key = empty_database_encrypted_generator()
-    assert key is not None
-    return d, key
+    return empty_database_generator()
 
 
 @pytest.fixture(autouse=True)
@@ -209,7 +168,7 @@ def session(empty_database: SQLiteDatabase) -> Generator[orm.Session]:
         Session
 
     """
-    s = orm.Session(sql.get_engine(empty_database.path, None))
+    s = orm.Session(sql.get_engine(empty_database.path))
     with Base.set_session(s):
         yield s
 
@@ -333,13 +292,14 @@ class FlaskAppGenerator:
             @override
             @classmethod
             def _open_db(cls, config: dict[str, object]) -> Database:
-                return generator()[0]
+                return generator()
 
         self._ext = MockExtension()
 
         path_root = Path(web.__file__).parent.resolve()
         self._flask_app = flask.Flask(__name__, root_path=str(path_root))
         self._flask_app.debug = True
+        self._flask_app.testing = True
         self._ext.init_app(self._flask_app)
 
         # Needed by test_change_redirect
@@ -370,19 +330,6 @@ def flask_app_generator(
     return FlaskAppGenerator(empty_database_generator)
 
 
-@pytest.fixture(scope="session")
-def flask_app_encrypted_generator(
-    empty_database_encrypted_generator: EmptyDatabaseGenerator,
-) -> FlaskAppGenerator:
-    """Return an flask app generator.
-
-    Returns:
-        FlaskAppGenerator
-
-    """
-    return FlaskAppGenerator(empty_database_encrypted_generator)
-
-
 @pytest.fixture
 def flask_app(
     flask_app_generator: FlaskAppGenerator,
@@ -395,20 +342,6 @@ def flask_app(
 
     """
     return flask_app_generator(empty_database)
-
-
-@pytest.fixture
-def flask_app_encrypted(
-    flask_app_encrypted_generator: FlaskAppGenerator,
-    empty_database_encrypted: tuple[Database, str],
-) -> flask.Flask:
-    """Create flask app for EmptyDatabase.
-
-    Returns:
-        Flask
-
-    """
-    return flask_app_encrypted_generator(empty_database_encrypted[0])
 
 
 @pytest.fixture
@@ -447,7 +380,7 @@ class PostgresDatabaseGenerator:
 
     @property
     def url(self) -> str:
-        """Return the postgres URL for this database.
+        """Postgres URL for this database.
 
         Returns:
             postgres URL string
@@ -545,30 +478,6 @@ def pg_url(pg_credentials: tuple[str, int, str, str, str]) -> str:
     """
     host, port, dbname, user, password = pg_credentials
     return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
-
-
-@pytest.fixture(scope="session")
-def pg_url_no_password(pg_credentials: tuple[str, int, str, str, str]) -> str:
-    """Return a postgres URL with username but no password for the test database.
-
-    Returns:
-        postgresql://user@host:port/dbname
-
-    """
-    host, port, dbname, user, _password = pg_credentials
-    return f"postgresql://{user}@{host}:{port}/{dbname}"
-
-
-@pytest.fixture(scope="session")
-def pg_key(pg_credentials: tuple[str, int, str, str, str]) -> str:
-    """Return the password for the test postgres database.
-
-    Returns:
-        password string
-
-    """
-    _host, _port, _dbname, _user, password = pg_credentials
-    return password
 
 
 @pytest.fixture(scope="session")

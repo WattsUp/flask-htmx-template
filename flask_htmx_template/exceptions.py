@@ -16,7 +16,6 @@ __all__ = [
     "DuplicateURLError",
     "EvaluationError",
     "IntegrityError",
-    "InvalidBackupTarError",
     "InvalidEndpointError",
     "InvalidJSONRouteError",
     "InvalidKeyError",
@@ -27,27 +26,12 @@ __all__ = [
     "NoKeywordArgumentsError",
     "NoResultFound",
     "NoURIError",
-    "NotEncryptedError",
     "ProtectedObjectNotFoundError",
     "UnboundExecutionError",
-    "UnknownEncryptionVersionError",
     "UnlockingError",
     "WrongURITypeError",
     "http",
 ]
-
-
-class NotEncryptedError(Exception):
-    """Error when encryption operation is called on a unencrypted database."""
-
-    def __init__(self) -> None:
-        """Initialize NotEncryptedError."""
-        msg = "Database is not encrypted"
-        super().__init__(msg)
-
-
-class InvalidBackupTarError(Exception):
-    """Error when a backup tar does not have expected contents."""
 
 
 class InvalidKeyError(Exception):
@@ -70,15 +54,6 @@ class DuplicateURLError(Exception):
 
         """
         msg = f"Already have a route on {url}, cannot add {endpoint}"
-        super().__init__(msg)
-
-
-class UnknownEncryptionVersionError(Exception):
-    """Error when encryption config has an unknown version."""
-
-    def __init__(self) -> None:
-        """Initialize UnknownEncryptionVersionError."""
-        msg = "Encryption config has an unrecognized version"
         super().__init__(msg)
 
 

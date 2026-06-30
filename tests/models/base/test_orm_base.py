@@ -118,7 +118,7 @@ def session(tmp_path: Path) -> Generator[orm.Session]:
 
     """
     path = tmp_path / "sql.db"
-    s = orm.Session(sql.get_engine(path, None))
+    s = orm.Session(sql.get_engine(path))
     with s.begin_nested():
         Base.metadata.create_all(
             s.get_bind(),

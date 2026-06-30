@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import sys
 from collections.abc import Sequence
 from typing import cast, overload, TYPE_CHECKING
@@ -16,13 +15,6 @@ if TYPE_CHECKING:
     import sqlite3
     from collections.abc import Generator, Iterable
     from pathlib import Path
-
-    from flask_htmx_template.encryption.base import EncryptionInterface
-
-try:
-    import sqlcipher3
-except ImportError:
-    sqlcipher3 = None
 
 
 _ENGINE_ARGS: dict[str, object] = {}
@@ -89,75 +81,29 @@ def set_sqlite_pragma(db_connection: sqlite3.Connection, *_) -> None:
 
     """
     module = type(db_connection).__module__
-    if "sqlite" not in module and "sqlcipher" not in module:
+    if "sqlite" not in module:
         return
     cursor = db_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
-    # Suppress logging from sqlcipher
-    cursor.execute("PRAGMA cipher_log_source=NONE")
     cursor.close()
 
 
-def get_engine(
-    path: Path,
-    enc: EncryptionInterface | None = None,
-) -> sqlalchemy.engine.Engine:
+def get_engine(path: Path) -> sqlalchemy.engine.Engine:
     """Get sqlalchemy Engine to the database.
 
     Args:
         path: Path to database file
-        enc: Encryption object storing the key
 
     Returns:
         sqlalchemy.Engine
 
     """
-    # Cannot support in-memory DB cause every transaction closes it
-    if enc is not None:
-        db_key = base64.urlsafe_b64encode(enc.hashed_key).decode()
-        sep = "//" if path.is_absolute() else "/"
-        db_path = f"sqlite+pysqlcipher://:{db_key}@{sep}{path}"
-        engine = sqlalchemy.create_engine(db_path, module=sqlcipher3, **_ENGINE_ARGS)
-    else:
-        db_path = (
-            f"sqlite:///{path}"
-            if sys.platform == "win32" or not path.is_absolute()
-            else f"sqlite:////{path}"
-        )
-        engine = sqlalchemy.create_engine(db_path, **_ENGINE_ARGS)
-    return engine
-
-
-def postgres_url_has_password(url: str) -> bool:
-    """Check if a postgres URL already contains a password.
-
-    Args:
-        url: postgres connection URL
-
-    Returns:
-        True if the URL contains a password
-
-    """
-    u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
-    return u.password is not None
-
-
-def inject_postgres_password(url: str, password: str) -> str:
-    """Inject a password into a postgres URL.
-
-    The username must already be present in the URL.
-
-    Args:
-        url: postgres connection URL (username must be embedded)
-        password: Password to inject
-
-    Returns:
-        URL with password injected
-
-    """
-    u = sqlalchemy.engine.make_url(normalize_postgres_url(url))
-    u = u.set(password=password)
-    return u.render_as_string(hide_password=False)
+    db_path = (
+        f"sqlite:///{path}"
+        if sys.platform == "win32" or not path.is_absolute()
+        else f"sqlite:////{path}"
+    )
+    return sqlalchemy.create_engine(db_path, **_ENGINE_ARGS)
 
 
 def get_engine_postgres(url: str) -> sqlalchemy.engine.Engine:
