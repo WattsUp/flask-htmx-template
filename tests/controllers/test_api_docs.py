@@ -28,12 +28,12 @@ class _NotATypedDict:
 
 
 def _view_with_non_td_validate() -> api_docs._ResponseInfo:
-    utils.validate_json({}, _NotATypedDict)
+    utils.validate_json(dict[str, Any](), _NotATypedDict)
     return api_docs._ResponseInfo({}, {})
 
 
 def _view_with_attr_validate() -> api_docs._ResponseInfo:
-    utils.validate_json({}, api_docs._Method)
+    utils.validate_json(dict[str, Any](), api_docs._Method)
     return api_docs._ResponseInfo({}, {})
 
 

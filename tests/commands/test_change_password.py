@@ -46,7 +46,10 @@ def test_aborted_when_get_password_returns_none(
     monkeypatch: pytest.MonkeyPatch,
     empty_database: SQLiteDatabase,
 ) -> None:
-    monkeypatch.setattr(change_password_module, "get_password", lambda _: None)
+    def no_password(_: int) -> str | None:
+        return None
+
+    monkeypatch.setattr(change_password_module, "get_password", no_password)
 
     c = ChangePassword(empty_database.path, None)
     assert c.run() == -1
