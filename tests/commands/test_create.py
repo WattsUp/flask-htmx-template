@@ -22,8 +22,8 @@ class MockDatabase(SQLiteDatabase):
     # Creating takes a long time so mock actual function
     @override
     @classmethod
-    def create(cls, path: str | Path, key: str | None = None) -> MockDatabase:
-        print(f"Creating {path} with {key}", file=sys.stderr)
+    def create(cls, path: str | Path) -> MockDatabase:
+        print(f"Creating {path}", file=sys.stderr)
         return MockDatabase()
 
 
@@ -34,7 +34,7 @@ def test_create_existing(
     path = tmp_path / "new.db"
     path.touch()
 
-    c = Create(path, None, force=False, no_encrypt=True)
+    c = Create(path, force=False)
     assert c.run() != 0
 
     captured = capsys.readouterr()
@@ -43,7 +43,7 @@ def test_create_existing(
     assert captured.err == target
 
 
-def test_create_unencrypted_forced(
+def test_create_forced(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -52,17 +52,17 @@ def test_create_unencrypted_forced(
     path.touch()
     monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
-    c = Create(path, None, force=True, no_encrypt=True)
+    c = Create(path, force=True)
     assert c.run() == 0
 
     captured = capsys.readouterr()
     target = f"Database created at {path}\n"
     assert captured.out == target
-    target = f"Creating {path} with None\n"
+    target = f"Creating {path}\n"
     assert captured.err == target
 
 
-def test_create_unencrypted(
+def test_create(
     capsys: pytest.CaptureFixture[str],
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -70,87 +70,14 @@ def test_create_unencrypted(
     path = tmp_path / "new.db"
     monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
 
-    c = Create(path, None, force=False, no_encrypt=True)
+    c = Create(path, force=False)
     assert c.run() == 0
 
     captured = capsys.readouterr()
     target = f"Database created at {path}\n"
     assert captured.out == target
-    target = f"Creating {path} with None\n"
+    target = f"Creating {path}\n"
     assert captured.err == target
-
-
-def test_create_encrypted(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    rand_str: str,
-) -> None:
-    path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
-
-    queue = [rand_str, rand_str]
-
-    def mock_get_pass(_: str) -> str | None:
-        return queue.pop(0)
-
-    monkeypatch.setattr("builtins.input", mock_get_pass)
-    monkeypatch.setattr("getpass.getpass", mock_get_pass)
-
-    c = Create(path, None, force=False, no_encrypt=False)
-    assert c.run() == 0
-
-    captured = capsys.readouterr()
-    target = f"Database created at {path}\n"
-    assert captured.out == target
-    target = f"Creating {path} with {rand_str}\n"
-    assert captured.err == target
-
-
-def test_create_encrypted_pass_file(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    rand_str: str,
-) -> None:
-    path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
-
-    path_password = tmp_path / "password.secret"
-    path_password.write_text(rand_str, "utf-8")
-
-    c = Create(path, path_password, force=False, no_encrypt=False)
-    assert c.run() == 0
-
-    captured = capsys.readouterr()
-    target = f"Database created at {path}\n"
-    assert captured.out == target
-    target = f"Creating {path} with {rand_str}\n"
-    assert captured.err == target
-
-
-def test_create_encrypted_cancelled(
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    path = tmp_path / "new.db"
-    monkeypatch.setattr("flask_htmx_template.database.SQLiteDatabase", MockDatabase)
-
-    queue = [None]
-
-    def mock_get_pass(_: str) -> str | None:
-        return queue.pop(0)
-
-    monkeypatch.setattr("builtins.input", mock_get_pass)
-    monkeypatch.setattr("getpass.getpass", mock_get_pass)
-
-    c = Create(path, None, force=False, no_encrypt=False)
-    assert c.run() != 0
-
-    captured = capsys.readouterr()
-    assert not captured.out
-    assert not captured.err
 
 
 def test_create_postgres(
@@ -158,26 +85,8 @@ def test_create_postgres(
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
     postgres_database_generator.drop()
-    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    c = Create(postgres_database_generator.url, force=False)
     assert c.run() == 0
-
-
-def test_create_postgres_with_key(
-    capsys: pytest.CaptureFixture[str],
-    postgres_database_generator: PostgresDatabaseGenerator,
-    pg_url_no_password: str,
-    pg_key: str,
-    tmp_path: Path,
-) -> None:
-    postgres_database_generator.drop()
-    path_key = tmp_path / "key.secret"
-    path_key.write_text(pg_key, "utf-8")
-    c = Create(pg_url_no_password, path_key, force=False, no_encrypt=False)
-    assert c.run() == 0
-
-    captured = capsys.readouterr()
-    assert f"Postgres database initialized at {c._path_db}" in captured.out
-    assert not captured.err
 
 
 def test_create_postgres_already_exists(
@@ -185,7 +94,7 @@ def test_create_postgres_already_exists(
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
     postgres_database_generator()
-    c = Create(postgres_database_generator.url, None, force=False, no_encrypt=False)
+    c = Create(postgres_database_generator.url, force=False)
     assert c.run() == -1
 
     captured = capsys.readouterr()
@@ -198,7 +107,7 @@ def test_create_postgres_force(
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
     postgres_database_generator()
-    c = Create(postgres_database_generator.url, None, force=True, no_encrypt=False)
+    c = Create(postgres_database_generator.url, force=True)
     assert c.run() == -1
 
     captured = capsys.readouterr()

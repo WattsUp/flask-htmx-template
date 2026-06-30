@@ -260,7 +260,7 @@ def test_ctx_base_page(today: datetime.date) -> None:
     base.TEMPLATES.clear()
     templates = Path(flask_htmx_template.__file__).with_name("templates")
 
-    ctx = base.ctx_base_page(templates, today, is_encrypted=False, debug=True)
+    ctx = base.ctx_base_page(templates, today, debug=True)
 
     assert isinstance(ctx["nav_items"], list)
     known_acronyms = {"API", "JSON", "HTML", "URL", "HTTP"}

@@ -19,7 +19,7 @@ def test_not_required(
     capsys: pytest.CaptureFixture[str],
     empty_database: SQLiteDatabase,
 ) -> None:
-    c = Migrate(empty_database.path, None)
+    c = Migrate(empty_database.path)
     assert c.run() == 0
 
     captured = capsys.readouterr()
@@ -36,7 +36,7 @@ def test_v0_1_migration(
     path = tmp_path / "database.db"
     shutil.copyfile(data_path / "old_versions" / "v0.0.0.db", path)
 
-    c = Migrate(path, None)
+    c = Migrate(path)
     assert c.run() == 0
 
     captured = capsys.readouterr()
@@ -58,13 +58,13 @@ def test_no_schema_updates(
 ) -> None:
 
     path = tmp_path / "database.db"
-    d = SQLiteDatabase.create(path, None)
+    d = SQLiteDatabase.create(path)
 
     # Remove AddWebThemeConfig so it re-runs; it has no pending_schema_updates
     with d.begin_session():
         AppliedMigration.query().filter_by(name="AddWebThemeConfig").delete()
 
-    c = Migrate(path, None)
+    c = Migrate(path)
     assert c.run() == 0
 
     captured = capsys.readouterr()
@@ -78,7 +78,7 @@ def test_migrate_postgres(
     postgres_database_generator: PostgresDatabaseGenerator,
 ) -> None:
     postgres_database_generator()
-    c = Migrate(postgres_database_generator.url, None)
+    c = Migrate(postgres_database_generator.url)
     assert c.run() == 0
 
     captured = capsys.readouterr()

@@ -16,7 +16,7 @@ def test_empty(
     empty_database: SQLiteDatabase,
 ) -> None:
 
-    c = Unlock(empty_database.path, None)
+    c = Unlock(empty_database.path)
     assert c.run() == 0
 
     captured = capsys.readouterr()

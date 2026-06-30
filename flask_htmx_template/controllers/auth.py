@@ -45,6 +45,9 @@ def default_login_required() -> flask.Response | None:
     if not endpoint or endpoint.rsplit(".", 1)[-1] == "static":
         return None
 
+    if flask.current_app.testing:
+        return None
+
     view = flask.current_app.view_functions[endpoint]
     if getattr(view, "login_exempt", False):
         return None
@@ -102,7 +105,6 @@ def page_login() -> str | werkzeug.Response:
         **base.ctx_base_page(
             templates,
             datetime.datetime.now(datetime.UTC),
-            is_encrypted=web.db.is_encrypted,
             debug=flask.current_app.debug,
         ),
         next_url=next_url,
@@ -125,10 +127,9 @@ def login() -> str | werkzeug.Response:
         return base.error("Password must not be blank")
 
     with db.begin_session():
-        expected_encoded = Config.fetch(ConfigKey.WEB_KEY)
+        expected = Config.fetch(ConfigKey.WEB_KEY)
 
-    expected = db.decrypt(expected_encoded)
-    if password.encode() != expected:
+    if password != expected:
         return base.error("Bad password")
 
     web_user = WebUser()

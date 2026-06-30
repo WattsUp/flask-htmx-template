@@ -57,7 +57,7 @@ USER python
 
 COPY --chown=python:python --from=app-build /app/dist/* .
 RUN whl=$(echo flask_htmx_template*.whl) \
-  && pip3 install --no-warn-script-location --no-cache-dir "$whl[deploy,encrypt]"
+  && pip3 install --no-warn-script-location --no-cache-dir "$whl[deploy]"
 
 ENV PYTHONUNBUFFERED="true" \
   PYTHONPATH="." \

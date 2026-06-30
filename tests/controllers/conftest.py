@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import NamedTuple, overload, TYPE_CHECKING
 
 import flask
-import flask.sessions
 import pytest
 
 import flask_htmx_template
@@ -15,13 +14,11 @@ from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.base import HTTP_CODE_OK, HTTP_CODE_REDIRECT
 
 if TYPE_CHECKING:
-    import contextlib
     import datetime
     from collections.abc import Generator
 
     import werkzeug.datastructures
 
-    from flask_htmx_template.database import Database
 
 JSONValue = str | float | int | bool | list["JSONValue"] | dict[str, "JSONValue"] | None
 JSON = dict[str, JSONValue]
@@ -347,7 +344,7 @@ class HTMLValidator:
         """Check all icons seen are in ctx_base."""
         templates = Path(flask_htmx_template.__file__).with_name("templates")
 
-        ctx = base.ctx_base_page(templates, today, is_encrypted=False, debug=True)
+        ctx = base.ctx_base_page(templates, today, debug=True)
         icons = set(ctx["icons"].split(","))
         # All icons seen should be in ctx_base
         # Might not have seen all so extra is okay
@@ -394,14 +391,9 @@ class WebClient:
                 **url_args,
             )
 
-    def session(self) -> contextlib.AbstractContextManager[flask.sessions.SessionMixin]:
-        """Get the client session.
-
-        Returns:
-            Client session
-
-        """
-        return self._client.session_transaction()
+    def login(self, password: str) -> None:
+        """Login user."""
+        self.POST("auth.login", data={"password": password})
 
     def open_(
         self,
@@ -743,36 +735,3 @@ def web_client(flask_app: flask.Flask, valid_html: HTMLValidator) -> WebClient:
 
     """
     return WebClient(flask_app, valid_html)
-
-
-class WebClientEncrypted(WebClient):
-
-    def __init__(
-        self,
-        app: flask.Flask,
-        valid_html: HTMLValidator,
-        web_key: str,
-    ) -> None:
-        super().__init__(app, valid_html)
-        self._web_key = web_key
-
-    def login(self) -> None:
-        """Login user."""
-        self.POST("auth.login", data={"password": self._web_key})
-
-
-@pytest.fixture
-def web_client_encrypted(
-    flask_app_encrypted: flask.Flask,
-    valid_html: HTMLValidator,
-    empty_database_encrypted: tuple[Database, str],
-) -> WebClientEncrypted:
-    """Return a WebClient.
-
-    Returns:
-        WebClient
-
-    """
-    _, key = empty_database_encrypted
-    # web key and database key are the same
-    return WebClientEncrypted(flask_app_encrypted, valid_html, key)

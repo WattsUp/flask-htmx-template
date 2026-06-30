@@ -15,7 +15,7 @@ import flask
 from flask.typing import RouteCallable
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, utils, web
+from flask_htmx_template import sql, utils
 from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.version import __version__
 
@@ -142,7 +142,6 @@ def ctx_base_page(
     templates: Path,
     today: datetime.date,
     *,
-    is_encrypted: bool,
     debug: bool,
 ) -> BasePageContext:
     """Get the context to build the base page.
@@ -150,7 +149,6 @@ def ctx_base_page(
     Args:
         templates: Path to templates
         today: Today's date
-        is_encrypted: Database encrypted status
         debug: Flask app debug status
 
     Returns:
@@ -170,11 +168,7 @@ def ctx_base_page(
             (
                 "Utilities",
                 {
-                    "Logout": (
-                        Page("logout", "auth.logout", LinkType.HX_POST)
-                        if is_encrypted
-                        else None
-                    ),
+                    "Logout": Page("logout", "auth.logout", LinkType.HX_POST),
                     "Style test": (
                         Page("style", "common.page_style_test") if debug else None
                     ),
@@ -328,7 +322,6 @@ def page(content_template: str, title: str, **context: object) -> flask.Response
             **ctx_base_page(
                 templates,
                 datetime.datetime.now(datetime.UTC),
-                is_encrypted=web.db.is_encrypted,
                 debug=flask.current_app.debug,
             ),
             **context,

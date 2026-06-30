@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast, override, TYPE_CHECKING
+from typing import override, TYPE_CHECKING
 
 from colorama import Fore
 
@@ -25,16 +25,14 @@ class Migrate(Command):
     def __init__(
         self,
         path_db: Path | str,
-        path_password: Path | None,
     ) -> None:
         """Initialize migrate command.
 
         Args:
             path_db: Path to Database DB or postgres connection URL
-            path_password: Path to password file, None will prompt when necessary
 
         """
-        super().__init__(path_db, path_password, check_migration=False)
+        super().__init__(path_db, check_migration=False)
 
     @override
     @classmethod
@@ -49,7 +47,6 @@ class Migrate(Command):
 
         import sqlalchemy
 
-        from flask_htmx_template import database
         from flask_htmx_template.migrations.base import SchemaMigrator
         from flask_htmx_template.migrations.top import collect
         from flask_htmx_template.models.applied_migration import AppliedMigration
@@ -57,11 +54,6 @@ class Migrate(Command):
         from flask_htmx_template.models.config import Config, ConfigKey
 
         d = self._d
-
-        # Back up Database (SQLite only)
-        tar_ver: int | None = None
-        if not d.is_postgres:
-            _, tar_ver = cast("database.SQLiteDatabase", d).backup()
 
         # Ensure applied_migration table exists (old databases won't have it)
         with d.begin_session() as s:
@@ -84,14 +76,7 @@ class Migrate(Command):
         pending_schema_updates: set[type[Base]] = set()
         for m_class in pending:
             m = m_class()
-            try:
-                comments = m.migrate(d)
-            except Exception:  # pragma: no cover
-                # No immediate exception thrown, can't easily test
-                if tar_ver is not None:
-                    database.SQLiteDatabase.restore(d, tar_ver=tar_ver)
-                    print(f"{Fore.RED}Abandoned migrate, restored from backup")
-                raise
+            comments = m.migrate(d)
 
             for line in comments:
                 print(f"{Fore.CYAN}{line}")

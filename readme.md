@@ -11,7 +11,7 @@ A production-ready Flask + HTMX template for building modern web applications wi
 | Feature               | Details                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------ |
 | **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator                         |
-| **Database**          | SQLAlchemy 2 with active-record helpers, optional SQLCipher encryption, PostgreSQL support |
+| **Database**          | SQLAlchemy 2 with active-record helpers,  PostgreSQL support |
 | **Migrations**        | Versioned schema migrations with auto-detection on startup                                 |
 | **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector                   |
 | **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies                      |
@@ -33,7 +33,6 @@ flask_htmx_template/
 ├── commands/           # CLI subcommands
 ├── models/             # SQLAlchemy ORM models
 ├── migrations/         # Versioned schema migrations
-├── encryption/         # Optional AES database encryption
 ├── templates/          # Jinja2 HTML (shared components + per-controller)
 ├── static/src/         # Tailwind CSS + JavaScript source
 ├── static/dist/        # Compiled assets (generated, not committed)
@@ -63,12 +62,6 @@ flask_htmx_template/
 - Node 18+ (for Prettier formatters only — not needed at runtime)
 - Python packages: `sqlalchemy`, `colorama`, `flask`, `flask-assets`, `flask-login`, `argcomplete`, `prometheus-flask-exporter`, `packaging`, `materialyoucolor`
 
-### Optional — Encryption
-
-Encrypts the SQLite database file using SQLCipher.
-
-- `sqlcipher3-binary`, `Cipher`, `pycryptodome`
-
 ---
 
 ## Installation / Build / Deployment
@@ -79,12 +72,6 @@ Install module
 python -m pip install .
 # For autocomplete
 activate-global-python-argcomplete
-```
-
-Install with encryption support
-
-```bash
-uv pip install .[encrypt]
 ```
 
 For development (editable install + pre-commit hooks)
@@ -127,15 +114,12 @@ docker run \
 | Env                | Default             | Description                                                      |
 | ------------------ | ------------------- | ---------------------------------------------------------------- |
 | `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL                         |
-| `DB_KEY_PATH`      | `/data/.key.secret` | File containing the encryption key (SQLite) or postgres password |
 | `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database                    |
 | `WEB_PORT`         | `8000`              | Port to bind server to                                           |
 | `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                                   |
 | `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                                       |
 | `WEB_N_THREADS`    | `1`                 | Threads per worker                                               |
 | `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)                                  |
-
-> For PostgreSQL the `DB_KEY_PATH` file contains only the **password** when the username is already embedded in the URL (e.g. `postgresql://appuser@host/db`), or `user:password` when the URL has no username.
 
 ---
 
@@ -194,8 +178,7 @@ services:
     depends_on:
       - postgres
     environment:
-      DB_PATH: postgresql://appuser@postgres:5432/appdb
-      DB_KEY_PATH: /run/secrets/db_password
+      DB_PATH: postgresql://appuser:password@postgres:5432/appdb
       DB_WEB_KEY: web-admin
     secrets:
       - db_password

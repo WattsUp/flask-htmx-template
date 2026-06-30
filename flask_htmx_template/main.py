@@ -10,9 +10,7 @@ from pathlib import Path
 
 import argcomplete
 
-from flask_htmx_template.commands.backup import Backup, Restore
 from flask_htmx_template.commands.change_password import ChangePassword
-from flask_htmx_template.commands.clean import Clean
 from flask_htmx_template.commands.create import Create
 from flask_htmx_template.commands.migrate import Migrate
 from flask_htmx_template.commands.unlock import Unlock
@@ -43,24 +41,13 @@ def main(command_line: list[str] | None = None) -> int:
         default=default_path,
         help="specify database.db location or postgres URL (postgres://user:password@server:port/db)",
     )
-    parser.add_argument(
-        "--pass-file",
-        dest="path_password",
-        metavar="PATH",
-        type=Path,
-        help="specify password file location, omit will prompt when necessary",
-    )
-
     subparsers = parser.add_subparsers(dest="cmd", metavar="<command>", required=True)
 
     cmds = [
         Create,
-        Unlock,
-        Backup,
-        Restore,
-        Migrate,
         ChangePassword,
-        Clean,
+        Unlock,
+        Migrate,
     ]
     for cmd_class in cmds:
         sub = subparsers.add_parser(

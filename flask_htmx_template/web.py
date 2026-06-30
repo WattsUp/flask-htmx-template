@@ -110,25 +110,12 @@ class FlaskExtension:
         if not isinstance(s, str):
             raise TypeError
 
-        key = config.get("KEY")
-        if key is None:
-            path_key = config.get("KEY_PATH")
-            path_key = (
-                Path(path_key).expanduser().absolute()
-                if isinstance(path_key, str)
-                else None
-            )
-            if path_key and path_key.exists():
-                key = path_key.read_text("utf-8").strip()
-        elif not isinstance(key, str):
-            raise TypeError
-
         if sql.is_postgres_url(s):
-            return PostgresDatabase(s, key)
+            return PostgresDatabase(s)
 
         path = Path(s).expanduser().absolute()
 
-        return SQLiteDatabase(path, key)
+        return SQLiteDatabase(path)
 
     @classmethod
     def _add_routes(cls, app: flask.Flask) -> None:
@@ -173,9 +160,7 @@ class FlaskExtension:
         login_manager.user_loader(auth.get_user)
         login_manager.login_view = "auth.page_login"
 
-        if d.is_encrypted:
-            # Only can have authentiation with encrypted database
-            app.before_request(auth.default_login_required)
+        app.before_request(auth.default_login_required)
 
     @classmethod
     def _init_jinja_env(cls, env: jinja2.Environment) -> None:

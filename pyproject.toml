@@ -46,7 +46,6 @@ Repository = "https://github.com/WattsUp/flask_htmx_template.git"
 Issues = "https://github.com/WattsUp/flask_htmx_template/issues"
 
 [project.optional-dependencies]
-encrypt = ["sqlcipher3-binary", "Cipher", "pycryptodomex"]
 postgres = ["psycopg[binary]"]
 deploy = ["gunicorn"]
 test = [
@@ -62,7 +61,7 @@ test = [
 ]
 dev = [
   "flask-htmx-template[deploy,test]",
-  "ruff>=0.15.15",
+  "ruff>=0.15.20",
   "codespell>=2.4.1",
   "black>=26.5",
   "isort",
@@ -72,7 +71,7 @@ dev = [
   "taplo",
 ]
 build = ["build"]
-build-docker = ["flask-htmx-template[build,encrypt]", "setuptools-scm>=8"]
+build-docker = ["flask-htmx-template[build]", "setuptools-scm>=8"]
 
 [tool.black]
 target-version = ["py312", "py313"]
@@ -156,7 +155,6 @@ reportUnnecessaryTypeIgnoreComment = "warning"
 reportPrivateUsage = "none"
 
 [tool.pytest.ini_options]
-markers = ["encryption: tests that require encryption"]
 addopts = ["--durations=10", "--import-mode=importlib"]
 
 [tool.ruff]

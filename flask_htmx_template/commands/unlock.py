@@ -21,16 +21,14 @@ class Unlock(Command):
     def __init__(
         self,
         path_db: Path | str,
-        path_password: Path | None,
     ) -> None:
         """Initialize unlock command.
 
         Args:
             path_db: Path to Database DB or postgres connection URL
-            path_password: Path to password file, None will prompt when necessary
 
         """
-        super().__init__(path_db, path_password)
+        super().__init__(path_db)
 
     @override
     @classmethod

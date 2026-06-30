@@ -26,7 +26,6 @@ class Command(ABC):
     def __init__(
         self,
         path_db: Path | str,
-        path_password: Path | None,
         *,
         do_unlock: bool = True,
         check_migration: bool = True,
@@ -35,7 +34,6 @@ class Command(ABC):
 
         Args:
             path_db: Path to DB or postgres connection URL
-            path_password: Path to password file, None will prompt when necessary
             do_unlock: True will unlock database, False will not
             check_migration: True will check if migration is required
 
@@ -52,11 +50,6 @@ class Command(ABC):
         else:
             self._path_db = Path(path_db).expanduser().absolute()
 
-        if path_password:
-            path_password = path_password.expanduser().absolute()
-
-        self._path_password = path_password
-
         if not do_unlock:
             return
 
@@ -67,14 +60,9 @@ class Command(ABC):
                 file=sys.stderr,
             )
             sys.exit(1)
-        key: str | None = None
-        if path_password is not None and path_password.exists():
-            key = path_password.read_text("utf-8").strip()
-
         try:
             self._d = self._unlock(
                 self._path_db,
-                key,
                 check_migration=check_migration,
             )
         except exc.MigrationRequiredError as e:
@@ -113,7 +101,6 @@ class Command(ABC):
     def _unlock(
         cls,
         path_db: Path | str,
-        key: str | None,
         *,
         check_migration: bool = True,
     ) -> Database:
@@ -121,7 +108,6 @@ class Command(ABC):
 
         Args:
             path_db: Path to Database DB to unlock, or postgres connection URL
-            key: Database key, None will prompt when necessary
             check_migration: True will check if migration is required
 
         Returns:
@@ -129,60 +115,18 @@ class Command(ABC):
 
         """
         # defer for faster time to main
-        from flask_htmx_template import database
-        from flask_htmx_template import exceptions as exc
-        from flask_htmx_template import sql
+        from flask_htmx_template import database, sql
 
         if sql.is_postgres_url(str(path_db)):
             return database.PostgresDatabase(
                 path_db,
-                key,
                 check_migration=check_migration,
             )
 
-        if not database.Database.is_encrypted_path(path_db):
-            return database.SQLiteDatabase(
-                path_db,
-                None,
-                check_migration=check_migration,
-            )
-
-        if key is not None:
-            # Try once with password file
-            try:
-                d = database.SQLiteDatabase(
-                    path_db,
-                    key,
-                    check_migration=check_migration,
-                )
-            except exc.UnlockingError:
-                print(
-                    f"{Fore.RED}Could not decrypt with password file",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            else:
-                return d
-
-        # 3 attempts
-        for _ in range(3):
-            key = get_input("Please enter password: ", secure=True)
-            if key is None:
-                sys.exit(1)
-            try:
-                d = database.SQLiteDatabase(
-                    path_db,
-                    key,
-                    check_migration=check_migration,
-                )
-            except exc.UnlockingError:
-                print(f"{Fore.RED}Incorrect password", file=sys.stderr)
-                # Try again
-            else:
-                return d
-
-        print(f"{Fore.RED}Too many incorrect attempts", file=sys.stderr)
-        sys.exit(1)
+        return database.SQLiteDatabase(
+            path_db,
+            check_migration=check_migration,
+        )
 
 
 def get_password(min_len: int) -> str | None:

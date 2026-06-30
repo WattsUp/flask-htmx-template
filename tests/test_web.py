@@ -10,14 +10,12 @@ from flask_htmx_template import exceptions as exc
 from flask_htmx_template import web
 from flask_htmx_template.controllers import base
 from flask_htmx_template.database import SQLiteDatabase
-from flask_htmx_template.encryption.top import ENCRYPTION_AVAILABLE
 from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.models.config import Config, ConfigKey
 from tests import conftest
 
 if TYPE_CHECKING:
     import datetime
-    from pathlib import Path
 
     from tests.conftest import PostgresDatabaseGenerator
 
@@ -32,10 +30,20 @@ def test_create_app(empty_database: SQLiteDatabase, flask_app: flask.Flask) -> N
     with empty_database.begin_session():
         secret_key = Config.fetch(ConfigKey.SECRET_KEY)
     assert flask_app.secret_key == secret_key
-    assert len(flask_app.before_request_funcs[None]) == 1
+    assert len(flask_app.before_request_funcs[None]) == 2
 
     assert isinstance(web.db, SQLiteDatabase)
     assert web.db.path == empty_database.path
+
+
+def test_create_app_env(
+    monkeypatch: pytest.MonkeyPatch,
+    empty_database: SQLiteDatabase,
+) -> None:
+    monkeypatch.setenv("DB_PATH", str(empty_database.path))
+
+    app = web.create_app()
+    assert len(app.before_request_funcs[None]) == 2
 
 
 def test_no_secret_key(
@@ -48,37 +56,6 @@ def test_no_secret_key(
 
     with pytest.raises(exc.ProtectedObjectNotFoundError):
         web.create_app()
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")
-@pytest.mark.encryption
-def test_create_app_encrypted(
-    monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-) -> None:
-    d, key = empty_database_encrypted
-    monkeypatch.setenv("DB_PATH", str(d.path))
-    monkeypatch.setenv("DB_KEY", key)
-
-    app = web.create_app()
-    assert len(app.before_request_funcs[None]) == 2
-
-
-@pytest.mark.skipif(not ENCRYPTION_AVAILABLE, reason="No encryption available")
-@pytest.mark.encryption
-def test_create_app_encrypted_key_file(
-    monkeypatch: pytest.MonkeyPatch,
-    empty_database_encrypted: tuple[SQLiteDatabase, str],
-    tmp_path: Path,
-) -> None:
-    d, key = empty_database_encrypted
-    path_key = tmp_path / "key"
-    path_key.write_text(key, "utf-8")
-    monkeypatch.setenv("DB_PATH", str(d.path))
-    monkeypatch.setenv("DB_KEY_PATH", str(path_key))
-
-    app = web.create_app()
-    assert len(app.before_request_funcs[None]) == 2
 
 
 def test_getattr() -> None:
