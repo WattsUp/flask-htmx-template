@@ -8,7 +8,7 @@ import string
 from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path
-from typing import cast, override, TYPE_CHECKING
+from typing import cast, NamedTuple, override, TYPE_CHECKING
 
 import flask
 import psycopg
@@ -431,8 +431,18 @@ def pg_proc(_pg_proc: PostgreSQLExecutor) -> PostgreSQLExecutor:
     return _pg_proc
 
 
+class PGCredentials(NamedTuple):
+    """Postgres database credentials."""
+
+    host: str
+    port: int
+    dbname: str
+    user: str
+    password: str
+
+
 @pytest.fixture(scope="session")
-def pg_credentials(pg_proc: PostgreSQLExecutor) -> tuple[str, int, str, str, str]:
+def pg_credentials(pg_proc: PostgreSQLExecutor) -> PGCredentials:
     """Create a dedicated test user/database.
 
     Returns:
@@ -465,11 +475,11 @@ def pg_credentials(pg_proc: PostgreSQLExecutor) -> tuple[str, int, str, str, str
         if cur.fetchone() is None:
             cur.execute(f"CREATE DATABASE {dbname} OWNER {user}")
 
-    return host, port, dbname, user, password
+    return PGCredentials(host, port, dbname, user, password)
 
 
 @pytest.fixture(scope="session")
-def pg_url(pg_credentials: tuple[str, int, str, str, str]) -> str:
+def pg_url(pg_credentials: PGCredentials) -> str:
     """Return a postgres URL with credentials for the test database.
 
     Returns:

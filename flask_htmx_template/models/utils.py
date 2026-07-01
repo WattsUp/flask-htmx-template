@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import cast, TYPE_CHECKING
+from typing import cast, NamedTuple, TYPE_CHECKING
 
 import sqlalchemy
 from sqlalchemy import (
@@ -23,11 +23,19 @@ if TYPE_CHECKING:
     from flask_htmx_template.models.base import Base
 
 
+class Page[T](NamedTuple):
+    """Paginatation page."""
+
+    results: list[T]
+    count_: int
+    next_offset: int | None
+
+
 def paginate[T: Base](
     query: orm.Query[T],
     limit: int,
     offset: int,
-) -> tuple[list[T], int, int | None]:
+) -> Page[T]:
     """Paginate query response for smaller results.
 
     Args:
@@ -55,7 +63,7 @@ def paginate[T: Base](
     remaining = count - n_current - offset
     next_offset = offset + n_current if remaining > 0 else None
 
-    return results, count, next_offset
+    return Page(results, count, next_offset)
 
 
 def dump_table_configs(model: type[Base]) -> list[str]:
