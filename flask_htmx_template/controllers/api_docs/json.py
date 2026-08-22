@@ -1,4 +1,7 @@
-"""API documentation JSON endpoints."""
+"""API documentation JSON endpoints.
+
+Title: API docs
+"""
 
 from __future__ import annotations
 
