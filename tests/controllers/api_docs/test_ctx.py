@@ -171,6 +171,41 @@ def test_extract_url_args_none() -> None:
 
 
 # ---------------------------------------------------------------------------
+# _extract_query_args
+# ---------------------------------------------------------------------------
+
+
+def test_extract_query_args_multiple() -> None:
+    def view() -> None:
+        """Get resources.
+
+        Query args:
+            before: ISO-8601 date upper bound, optional
+            category: category name, optional
+
+        Returns:
+            Resources before the upper bound.
+
+        """
+
+    result = api_docs._extract_query_args(view)
+
+    assert result == {
+        "before": "ISO-8601 date upper bound, optional",
+        "category": "category name, optional",
+    }
+
+
+def test_extract_query_args_none() -> None:
+    def view() -> None:
+        """Get resources without filters."""
+
+    result = api_docs._extract_query_args(view)
+
+    assert result == {}
+
+
+# ---------------------------------------------------------------------------
 # get_operations — error cases
 # ---------------------------------------------------------------------------
 
@@ -218,6 +253,7 @@ def test_json_api_structure(web_client: WebClient) -> None:
             assert isinstance(info, dict)
             assert "description" in info
             assert "url_args" in info
+            assert "query_args" in info
             assert "responses" in info
 
 
@@ -233,6 +269,21 @@ def test_json_api_url_args(web_client: WebClient) -> None:
     assert item_get["url_args"] == {"uri": "Item URI"}
 
 
+def test_json_api_query_args(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J("api_docs.json_api")
+
+    assert isinstance(result, dict)
+    urls = result["urls"]
+    assert isinstance(urls, dict)
+    url_ops = urls["/j/items"]
+    assert isinstance(url_ops, dict)
+    item_get = url_ops["GET"]
+    assert isinstance(item_get, dict)
+    assert item_get["query_args"] == {
+        "before": "filter items that appear before this date, optional",
+    }
+
+
 # ---------------------------------------------------------------------------
 # _Operation properties
 # ---------------------------------------------------------------------------
@@ -244,6 +295,7 @@ def test_operation_request_example_json_none() -> None:
         method=api_docs._Method.GET,
         description=["Test"],
         url_args={},
+        query_args={},
         request_schema=None,
         request_example=None,
         responses={},
@@ -511,6 +563,7 @@ def test_operation_serializes_request_schema_and_example() -> None:
         method=api_docs._Method.GET,
         description=["Test"],
         url_args={},
+        query_args={},
         request_schema={"key": "string"},
         request_example={"key": "value"},
         responses={},

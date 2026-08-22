@@ -9,3 +9,11 @@ if TYPE_CHECKING:
 def test_page(web_client: WebClient) -> None:
     result, _ = web_client.GET("api_docs.page")
     assert "API" in result
+
+
+def test_page_includes_query_parameters(web_client: WebClient) -> None:
+    result, _ = web_client.GET("api_docs.page")
+
+    assert "Query parameters" in result
+    assert "before" in result
+    assert "filter items that appear before this date, optional" in result

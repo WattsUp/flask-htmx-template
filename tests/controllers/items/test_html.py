@@ -21,6 +21,38 @@ def test_page_all(web_client: WebClient, item: Item) -> None:
     assert item.name in result
 
 
+def test_page_all_before_filters_items(
+    web_client: WebClient,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    with session.begin_nested():
+        older = Item.create(name="Apples", date_ord=today_ord - 1)
+        newer = Item.create(name="Cherries", date_ord=today_ord + 1)
+
+    result, _ = web_client.GET(
+        "items.page_all",
+        query_string={"before": item.date.isoformat()},
+    )
+
+    assert older.name in result
+    assert item.name not in result
+    assert newer.name not in result
+    assert f'value="{item.date.isoformat()}"' in result
+    assert "hx-include=\"[name='before']\"" in result
+
+
+def test_page_all_before_rejects_invalid_date(web_client: WebClient) -> None:
+    result, _ = web_client.GET(
+        "items.page_all",
+        query_string={"before": "not-a-date"},
+        rc=base.HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert "before must be an ISO 8601 date string" in result
+
+
 def test_page(web_client: WebClient, item: Item) -> None:
     result, _ = web_client.GET(("items.page", {"uri": item.uri}))
     assert item.name in result
@@ -168,3 +200,22 @@ def test_validation(
         ),
     )
     assert result == target
+
+
+def test_validation_new_item_name_without_uri(
+    web_client: WebClient,
+    item: Item,
+) -> None:
+    result, _ = web_client.GET(
+        ("items.validation", {"name": item.name}),
+    )
+
+    assert result == "Must be unique"
+
+
+def test_validation_new_item_name_with_empty_uri(web_client: WebClient) -> None:
+    result, _ = web_client.GET(
+        ("items.validation", {"name": "New Name", "uri": ""}),
+    )
+
+    assert not result

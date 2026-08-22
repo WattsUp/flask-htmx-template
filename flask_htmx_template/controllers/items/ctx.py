@@ -55,8 +55,11 @@ def item(item: Item) -> ItemContext:
     }
 
 
-def items() -> AllItemsContext:
+def items(*, before: datetime.date | None = None) -> AllItemsContext:
     """Build the all-items context.
+
+    Args:
+        before: Exclude items on or after this date
 
     Returns:
         Context for all items and their total.
@@ -64,7 +67,11 @@ def items() -> AllItemsContext:
     """
     total = Decimal()
     result: list[ItemContext] = []
-    for item_ in sql.yield_(Item.query().order_by(Item.date_ord)):
+    query = Item.query().order_by(Item.date_ord)
+    if before is not None:
+        # NOTE: "before" is an exclusive cutoff, matching its plain-language meaning.
+        query = query.where(Item.date_ord < before.toordinal())
+    for item_ in sql.yield_(query):
         result.append(item(item_))
         total += item_.value
     return {"total": total, "items": result}
