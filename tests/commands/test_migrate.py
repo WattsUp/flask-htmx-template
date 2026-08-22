@@ -45,6 +45,7 @@ def test_v0_1_migration(
         "Created Item table\n"
         "Database migrated: CreateItemTable\n"
         "Database migrated: AddWebThemeConfig\n"
+        "Database migrated: AddAPIBearerToken\n"
         "Migrated config\n"
         "Database model schemas updated\n"
     )

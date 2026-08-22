@@ -25,7 +25,9 @@ from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.api_docs import ctx as api_docs_ctx
 from flask_htmx_template.controllers.api_docs import html as api_docs_html
 from flask_htmx_template.controllers.api_docs import json as api_docs_json
+from flask_htmx_template.controllers.auth import bearer as auth_bearer
 from flask_htmx_template.controllers.auth import ctx as auth_ctx
+from flask_htmx_template.controllers.auth import debug as auth_debug
 from flask_htmx_template.controllers.auth import html as auth_html
 from flask_htmx_template.controllers.common import html as common_html
 from flask_htmx_template.controllers.items import html as items_html
@@ -125,6 +127,7 @@ class FlaskExtension:
             api_docs_html,
             api_docs_json,
             auth_html,
+            auth_debug,
             common_html,
             items_html,
             items_json,
@@ -163,6 +166,7 @@ class FlaskExtension:
         login_manager = flask_login.LoginManager()
         login_manager.init_app(app)
         login_manager.user_loader(auth_ctx.get_user)
+        login_manager.request_loader(auth_bearer.load_user)
         login_manager.login_view = "auth.page_login"
 
         app.before_request(auth_ctx.default_login_required)

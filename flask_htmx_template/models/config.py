@@ -24,9 +24,10 @@ class ConfigKey(BaseEnum):
     CIPHER = 2
     SECRET_KEY = 3
     WEB_KEY = 4
-
     WEB_THEME_SWATCH = 5
     WEB_THEME_MOOD = 6
+
+    API_BEARER_TOKEN = 7
 
 
 class Config(Base):

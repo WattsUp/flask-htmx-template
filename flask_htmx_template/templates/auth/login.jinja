@@ -50,6 +50,23 @@
             <icon>login</icon>
           </button>
         </form>
+        {% if debug %}
+          <form
+            class="mx-2 flex w-full max-w-96 justify-center"
+            hx-post="{{ url_for('auth.debug_login') }}"
+            hx-disabled-elt="find button"
+            hx-target="#login-error"
+            hx-include="this"
+          >
+            {% if next_url %}
+              <input name="next" type="hidden" value="{{ next_url }}" />
+            {% endif %}
+            <button class="btn-tonal">
+              Debug login
+              <icon>bug_report</icon>
+            </button>
+          </form>
+        {% endif %}
       </main>
     </div>
     <div id="snackbar" onclick="snackbar.hide()"></div>

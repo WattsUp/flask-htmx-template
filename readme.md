@@ -10,7 +10,7 @@ A production-ready Flask + HTMX template for building modern web applications wi
 
 | Feature               | Details                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------ |
-| **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator                         |
+| **Authentication**    | Password/session authentication, debug login, and database-backed bearer tokens            |
 | **Database**          | SQLAlchemy 2 with active-record helpers,  PostgreSQL support |
 | **Migrations**        | Versioned schema migrations with auto-detection on startup                                 |
 | **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector                   |
@@ -94,6 +94,12 @@ flask_htmx_template create
 # Start the development server
 flask --app flask_htmx_template.web run
 ```
+
+### API bearer token
+
+New databases receive an opaque API token in `ConfigKey.API_BEARER_TOKEN`. Send it
+as `Authorization: Bearer <token>` to authenticate API requests. The token is stored
+only in the database and is not issued or validated by an external identity provider.
 
 ---
 

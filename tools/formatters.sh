@@ -2,5 +2,5 @@
 # Run every formatter
 isort .
 black .
-prettier --write .
+npx prettier --write .
 taplo fmt .
