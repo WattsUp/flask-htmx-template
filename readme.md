@@ -17,6 +17,7 @@ A production-ready Flask + HTMX template for building modern web applications wi
 | **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies           |
 | **HTMX patterns**     | Dialog system, snackbar notifications, partial page swaps, nav components       |
 | **JSON API**          | Type-validated JSON endpoints with full error reporting                         |
+| **MCP server**        | Authenticated Streamable HTTP endpoint with typed tool registration              |
 | **CLI**               | `create`, `migrate`, `backup`, `restore`, `unlock`, `change-password`, `clean`  |
 | **Metrics**           | Prometheus exporter on a separate port                                          |
 | **Asset pipeline**    | Tailwind CSS v4, JS minification, automatic rebuild on package install          |
@@ -37,6 +38,8 @@ flask_htmx_template/
 ├── static/src/         # Tailwind CSS + JavaScript source
 ├── static/dist/        # Compiled assets (generated, not committed)
 ├── web.py              # Flask app factory + extension
+├── asgi.py             # Combined Flask + MCP ASGI app factory
+├── mcp.py              # MCP server, tool registration, and metrics
 ├── web_theme.py        # Material Design 3 color generation
 └── main.py             # CLI entry point
 ```
@@ -60,7 +63,7 @@ flask_htmx_template/
 
 - Python 3.12+
 - Node 18+ (for Prettier formatters only — not needed at runtime)
-- Python packages: `sqlalchemy`, `colorama`, `flask`, `flask-assets`, `flask-login`, `argcomplete`, `prometheus-flask-exporter`, `packaging`, `materialyoucolor`
+- Python packages: `sqlalchemy`, `colorama`, `flask`, `flask-assets`, `flask-login`, `argcomplete`, `prometheus-flask-exporter`, `packaging`, `materialyoucolor`, `mcp`, `asgiref`
 
 ---
 
@@ -93,6 +96,9 @@ flask_htmx_template create
 
 # Start the development server
 flask --app flask_htmx_template.web run
+
+# Start the combined web and MCP service
+uvicorn --factory flask_htmx_template.asgi:create_app --host 127.0.0.1 --port 5000
 ```
 
 ### API bearer token
@@ -100,6 +106,32 @@ flask --app flask_htmx_template.web run
 New databases receive an opaque API token in `ConfigKey.API_BEARER_TOKEN`. Send it
 as `Authorization: Bearer <token>` to authenticate API requests. The token is stored
 only in the database and is not issued or validated by an external identity provider.
+
+### Model Context Protocol
+
+The combined ASGI service exposes a stateless Streamable HTTP MCP endpoint at
+`http://127.0.0.1:5000/mcp`. It includes a read-only `get_items` example tool and
+records per-tool call count and duration metrics in the web application's Prometheus
+registry.
+
+MCP requests must send the same database-backed API token as the JSON API:
+
+```text
+Authorization: Bearer <ConfigKey.API_BEARER_TOKEN>
+```
+
+Add tools in a controller's `mcp.py`, decorate each one with `base.mcp_tool`, and
+register the module's `TOOLS` collection in `flask_htmx_template/mcp.py`. The plain
+Flask development command does not expose MCP; use the ASGI command above.
+
+Use the project-local client to inspect a running server without putting the bearer
+token in shell history or the process list:
+
+```bash
+export MCP_BEARER_TOKEN="<ConfigKey.API_BEARER_TOKEN>"
+python tools/mcp_connect.py list-tools
+python tools/mcp_connect.py call get_items
+```
 
 ---
 

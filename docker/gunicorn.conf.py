@@ -20,6 +20,7 @@ workers = int(os.getenv("WEB_CONCURRENCY") or multiprocessing.cpu_count() * 2 + 
 threads = int(os.getenv("WEB_N_THREADS") or 1)
 timeout = int(os.getenv("WEB_TIMEOUT") or 30)
 preload_app = True
+worker_class = "uvicorn.workers.UvicornWorker"
 
 
 def when_ready(_) -> None:

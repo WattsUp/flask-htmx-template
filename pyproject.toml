@@ -21,6 +21,9 @@ dependencies = [
   "argcomplete",
   "prometheus-flask-exporter",
   "packaging",
+  "mcp>=2,<3",
+  "httpx2",
+  "asgiref>=3.8",
   "tqdm",
   "materialyoucolor>=3.0.2",
 ]
@@ -167,63 +170,49 @@ preview = true
 future-annotations = true
 
 ignore = [
-  "line-contains-todo",                # Permit TODOs
-  "unsorted-imports",                  # mismatch between ruff and isort
-  "missing-copyright-notice",          # No copyright
-  "undocumented-public-package",       # Missing docstring in public package
-  "incorrect-blank-line-before-class", # No blank line before pydocs
-  "multi-line-summary-second-line",    # Summary on not on second line
+  "line-contains-todo",
+  "unsorted-imports",
+  "missing-copyright-notice",
+  "undocumented-public-package",
+  "incorrect-blank-line-before-class",
+  "multi-line-summary-second-line",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "docker/*.py" = [
-  "undocumented-public-module",    # Disable missing docstrings in tests
-  "implicit-namespace-package",    # Implicit namespace
-  "hardcoded-bind-all-interfaces", # binding to 0.0.0.0
+  "undocumented-public-module",
+  "implicit-namespace-package",
+  "hardcoded-bind-all-interfaces",
 ]
-"flask_htmx_template/database.py" = [
-  "private-member-access", # Allow self for reloading
-]
-"flask_htmx_template/commands/*.py" = [
-  "print",                    # Allow printing for commands
-  "import-outside-top-level", # Allow imports outside of top for faster time to main
-]
-"flask_htmx_template/controllers/api_docs/ctx.py" = [
-  "blind-except", # Allow blind except
-]
-"flask_htmx_template/models/base_uri.py" = [
-  "global-statement", # Allow global CIPHER
-]
-"flask_htmx_template/migrations/v*.py" = [
-  "invalid-class-name", # Allow underscore in class name for version names
-]
+"flask_htmx_template/database.py" = ["private-member-access"]
+"flask_htmx_template/commands/*.py" = ["print", "import-outside-top-level"]
+"flask_htmx_template/controllers/api_docs/ctx.py" = ["blind-except"]
+"flask_htmx_template/models/base_uri.py" = ["global-statement"]
+"flask_htmx_template/migrations/v*.py" = ["invalid-class-name"]
+"tools/**/*.py" = ["print"]
 "tests/**/*.py" = [
-  "undocumented-public-module",                # Disable missing docstrings in tests
+  "undocumented-public-module",
   "undocumented-public-class",
   "undocumented-public-method",
   "undocumented-public-function",
   "undocumented-magic-method",
   "undocumented-public-nested-class",
   "undocumented-public-init",
-  "hardcoded-sql-expression",                  # Disable possible SQL injection
-  "import-private-name",                       # Private import
-  "suspicious-subprocess-import",              # subprocess import
-  "assert",                                    # Uses asserts in pytest
-  "suspicious-non-cryptographic-random-usage", # Uses random in pytest
-  "magic-value-comparison",                    # Uses magic numbers in pytest
-  "boolean-type-hint-positional-argument",     # Boolean positional arguments
-  "print",                                     # Allow printing for extra context
-  "private-member-access",                     # Allow access to privates
-  "unused-function-argument",                  # Allow unused arguments for fixtures
-  "too-many-arguments",                        # Allow many arguments
-  "too-many-positional-arguments",             # Allow many arguments
+  "hardcoded-sql-expression",
+  "import-private-name",
+  "suspicious-subprocess-import",
+  "assert",
+  "suspicious-non-cryptographic-random-usage",
+  "magic-value-comparison",
+  "boolean-type-hint-positional-argument",
+  "print",
+  "private-member-access",
+  "unused-function-argument",
+  "too-many-arguments",
+  "too-many-positional-arguments",
 ]
-"tests/controllers/*.py" = [
-  "invalid-function-name", # Allow CAPS methods
-]
-"tests/mock*.py" = [
-  "raise-vanilla-class", # Allow base Exception
-]
+"tests/controllers/*.py" = ["invalid-function-name"]
+"tests/mock*.py" = ["raise-vanilla-class"]
 
 [tool.ruff.lint.flake8-annotations]
 suppress-dummy-args = true

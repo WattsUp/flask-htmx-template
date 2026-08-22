@@ -27,4 +27,4 @@ fi
 # Start server
 export PROMETHEUS_MULTIPROC_DIR=$prom_dir
 export DB_PATH="$database"
-/home/python/.local/bin/gunicorn -c gunicorn.conf.py "flask_htmx_template.web:create_app()"
+/home/python/.local/bin/gunicorn -c gunicorn.conf.py "flask_htmx_template.asgi:create_app()"

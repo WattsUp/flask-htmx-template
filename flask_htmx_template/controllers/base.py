@@ -9,10 +9,11 @@ import re
 import textwrap
 from decimal import Decimal
 from pathlib import Path
-from typing import NamedTuple, TYPE_CHECKING, TypedDict
+from typing import cast, NamedTuple, Protocol, TYPE_CHECKING, TypedDict
 
 import flask
 from flask.typing import RouteCallable
+from mcp_types import ToolAnnotations
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils
@@ -20,6 +21,9 @@ from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from flask_htmx_template.database import Database
     from flask_htmx_template.models.base import (
         Base,
     )
@@ -92,6 +96,63 @@ class BasePageContext(TypedDict):
     icons: str
     version: str
     current_year: int
+
+
+class MCPTool(Protocol):
+    """A database MCP tool with its registration metadata."""
+
+    __name__: str
+    mcp_annotations: ToolAnnotations
+    mcp_description: str
+
+    def __call__(self, database: Database) -> str:
+        """Run the tool for a database."""
+        raise NotImplementedError
+
+
+def mcp_tool(
+    description: str,
+    *,
+    read_only_hint: bool | None = None,
+    destructive_hint: bool | None = None,
+    idempotent_hint: bool | None = None,
+    open_world_hint: bool | None = None,
+) -> Callable[[Callable[[Database], str]], MCPTool]:
+    """Decorate a database function with MCP registration metadata.
+
+    Args:
+        description: Human-readable MCP tool description
+        read_only_hint: Whether the tool does not modify state
+        destructive_hint: Whether the tool may perform destructive updates
+        idempotent_hint: Whether repeated calls have the same effect
+        open_world_hint: Whether the tool interacts with external systems
+
+    Returns:
+        Decorator that marks a function as an MCP tool
+
+    """
+
+    def decorate(function: Callable[[Database], str]) -> MCPTool:
+        """Attach MCP metadata to a database function.
+
+        Args:
+            function: Database function to expose through MCP
+
+        Returns:
+            Function with MCP registration metadata
+
+        """
+        decorated = cast("MCPTool", function)
+        decorated.mcp_description = description
+        decorated.mcp_annotations = ToolAnnotations(
+            read_only_hint=read_only_hint,
+            destructive_hint=destructive_hint,
+            idempotent_hint=idempotent_hint,
+            open_world_hint=open_world_hint,
+        )
+        return decorated
+
+    return decorate
 
 
 class NamePair(NamedTuple):

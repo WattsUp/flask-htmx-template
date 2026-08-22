@@ -215,6 +215,7 @@ class FlaskExtension:
             "flask-htmx-template info",
             version=__version__,
         )
+        app.extensions["flask_htmx_template_metrics"] = metrics
 
     def url_for(
         self,
