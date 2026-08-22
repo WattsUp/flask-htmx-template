@@ -256,5 +256,5 @@ Follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html), implemented 
 [unittest-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/test.yml
 [static-analysis-image]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml/badge.svg
 [static-analysis-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml
-[coverage-image]: https://gist.githubusercontent.com/WattsUp/36d9705addcd44fb0fccec1d23dc1338/raw/flask-htmx-template__heads_master.svg
+[coverage-image]: https://gist.githubusercontent.com/WattsUp/36d9705addcd44fb0fccec1d23dc1338/raw/flask-htmx-template__heads_main.svg
 [coverage-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/coverage.yml

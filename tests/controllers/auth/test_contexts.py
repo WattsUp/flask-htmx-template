@@ -31,5 +31,5 @@ def test_json_api_allows_valid_bearer_token(
 
     # Assert
     urls = result["urls"]
-    assert isinstance(urls, list)
+    assert isinstance(urls, dict)
     assert "/j/items" in urls
