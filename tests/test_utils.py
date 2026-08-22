@@ -688,7 +688,14 @@ def test_validate_json(obj: object, type_: type, target: list[str]) -> None:
             [],
         ),
         (
-            datetime.datetime(2026, 4, 6, 15, 47, 1),  # noqa: DTZ001
+            datetime.datetime(  # ruff: ignore[call-datetime-without-tzinfo]
+                2026,
+                4,
+                6,
+                15,
+                47,
+                1,
+            ),
             datetime.datetime,
             ["json should be an ISO 8601 date time string with TZ, not a string"],
         ),

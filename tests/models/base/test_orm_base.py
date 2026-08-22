@@ -204,7 +204,7 @@ def test_comparators_same_session() -> None:
     parent_a = Parent.create()
     parent_b = Parent.create()
 
-    assert parent_a == parent_a  # noqa: PLR0124
+    assert parent_a == parent_a  # ruff: ignore[comparison-with-itself]
     assert parent_a != parent_b
 
 

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 from flask_htmx_template.commands.unlock import Unlock
 
 if TYPE_CHECKING:
-
     import pytest
 
     from flask_htmx_template.database import SQLiteDatabase

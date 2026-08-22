@@ -15,7 +15,6 @@ if TYPE_CHECKING:
 
 
 class MockDatabase(SQLiteDatabase):
-
     def __init__(self, *_args: object, **_kwargs: object) -> None:
         pass
 

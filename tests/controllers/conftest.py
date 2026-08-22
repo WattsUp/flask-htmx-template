@@ -265,7 +265,6 @@ Queries = dict[str, str] | dict[str, str | bool | list[str] | list[str | bool]]
 
 
 class HTMLValidator:
-
     def __init__(self) -> None:
         self._icons: set[str] = set()
 
@@ -366,7 +365,6 @@ def valid_html(today: datetime.date) -> Generator[HTMLValidator]:
 
 
 class WebClient:
-
     def __init__(self, app: flask.Flask, valid_html: HTMLValidator) -> None:
         self._flask_app = app
         self._client = self._flask_app.test_client()

@@ -43,7 +43,6 @@ def id_func(val: object) -> str | None:
 
 
 class RandomStringGenerator:
-
     @classmethod
     def __call__(cls, length: int = 20) -> str:
         return "".join(random.choice(string.ascii_letters) for _ in range(length))
@@ -72,7 +71,6 @@ def rand_str(rand_str_generator: RandomStringGenerator) -> str:
 
 
 class RandomRealGenerator:
-
     @classmethod
     def __call__(
         cls,
@@ -116,7 +114,6 @@ def sql_engine_args() -> None:
 
 
 class EmptyDatabaseGenerator:
-
     def __init__(
         self,
         tmp_path_factory: pytest.TempPathFactory,
@@ -283,7 +280,6 @@ def utc_frozen(
 
 
 class FlaskAppGenerator:
-
     def __init__(
         self,
         generator: EmptyDatabaseGenerator,
@@ -364,10 +360,9 @@ def item(session: orm.Session, today_ord: int) -> Item:
 # ---------------------------------------------------------------------------
 
 _pg_proc = postgresql_proc(
-    executable="/usr/lib/postgresql/16/bin/pg_ctl",
     host="127.0.0.1",
     user="postgres",
-    password="pgpassword",  # noqa: S106
+    password="pgpassword",  # ruff: ignore[hardcoded-password-func-arg]
     postgres_options="-c listen_addresses='127.0.0.1'",
 )
 
@@ -452,7 +447,7 @@ def pg_credentials(pg_proc: PostgreSQLExecutor) -> PGCredentials:
     host = pg_proc.host
     port = pg_proc.port
     user = "testuser"
-    password = "testpass"  # noqa: S105
+    password = "testpass"  # ruff: ignore[hardcoded-password-string]
     dbname = "testdb"
 
     with (
@@ -460,7 +455,7 @@ def pg_credentials(pg_proc: PostgreSQLExecutor) -> PGCredentials:
             host=host,
             port=port,
             user="postgres",
-            password="pgpassword",  # noqa: S106
+            password="pgpassword",  # ruff: ignore[hardcoded-password-func-arg]
             dbname="postgres",
             autocommit=True,
         ) as conn,

@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 
 class MockDatabase(SQLiteDatabase):
-
     @override
     def change_web_key(self, key: str) -> None:
         print(f"Changing web key to {key}", file=sys.stderr)

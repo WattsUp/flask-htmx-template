@@ -204,7 +204,7 @@ class Migrator(ABC):
             f"""\
             INSERT INTO "migration_temp" ({columns})
                 SELECT {columns}
-                FROM "{name}";""",  # noqa: S608
+                FROM "{name}";""",  # ruff: ignore[hardcoded-sql-expression]
         )
         s.execute(sqlalchemy.text(stmt))
 

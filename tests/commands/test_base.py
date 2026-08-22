@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
 
 class MockCommand(Command):
-
     @classmethod
     def setup_args(cls, parser: argparse.ArgumentParser) -> None:
         pass

@@ -21,13 +21,15 @@ from werkzeug.exceptions import HTTPException
 from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils, web_assets
-from flask_htmx_template.controllers import (
-    api_docs,
-    auth,
-    base,
-    common,
-    items,
-)
+from flask_htmx_template.controllers import base
+from flask_htmx_template.controllers.api_docs import ctx as api_docs_ctx
+from flask_htmx_template.controllers.api_docs import html as api_docs_html
+from flask_htmx_template.controllers.api_docs import json as api_docs_json
+from flask_htmx_template.controllers.auth import ctx as auth_ctx
+from flask_htmx_template.controllers.auth import html as auth_html
+from flask_htmx_template.controllers.common import html as common_html
+from flask_htmx_template.controllers.items import html as items_html
+from flask_htmx_template.controllers.items import json as items_json
 from flask_htmx_template.database import PostgresDatabase, SQLiteDatabase
 from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.version import __version__
@@ -90,7 +92,7 @@ class FlaskExtension:
         app.url_for = self.url_for
 
         self._add_routes(app)
-        api_docs.init_docs(app)
+        api_docs_ctx.init_docs(app)
         web_assets.build_bundles(app)
         self._init_auth(app, self._db)
         self._init_jinja_env(app.jinja_env)
@@ -120,17 +122,20 @@ class FlaskExtension:
     @classmethod
     def _add_routes(cls, app: flask.Flask) -> None:
         modules = [
-            api_docs,
-            auth,
-            common,
-            items,
+            api_docs_html,
+            api_docs_json,
+            auth_html,
+            common_html,
+            items_html,
+            items_json,
         ]
         n_trim = len(controllers.__name__) + 1
         urls: set[str] = set()
         for m in modules:
             routes: base.Routes = m.ROUTES
             for url, (view_func, methods) in routes.items():
-                endpoint = f"{m.__name__[n_trim:]}.{view_func.__name__}"
+                route_prefix = getattr(m, "ROUTE_PREFIX", m.__name__[n_trim:])
+                endpoint = f"{route_prefix}.{view_func.__name__}"
                 if url in urls:  # pragma: no cover
                     raise exc.DuplicateURLError(url, endpoint)
                 if url.startswith("/d/") and not app.debug:
@@ -157,10 +162,10 @@ class FlaskExtension:
 
         login_manager = flask_login.LoginManager()
         login_manager.init_app(app)
-        login_manager.user_loader(auth.get_user)
+        login_manager.user_loader(auth_ctx.get_user)
         login_manager.login_view = "auth.page_login"
 
-        app.before_request(auth.default_login_required)
+        app.before_request(auth_ctx.default_login_required)
 
     @classmethod
     def _init_jinja_env(cls, env: jinja2.Environment) -> None:
