@@ -122,6 +122,41 @@ class MCPTool(Protocol[MCPResult_co]):
         raise NotImplementedError
 
 
+_MCP_TOOLS: dict[str, MCPTool[object]] = {}
+
+
+def register_mcp_tool[ResultT](
+    tool: MCPTool[ResultT],
+) -> MCPTool[ResultT]:
+    """Register an MCP tool in the application-wide tool registry.
+
+    Args:
+        tool: MCP tool to register
+
+    Returns:
+        The registered tool
+
+    Raises:
+        DuplicateMCPToolError: If another registered tool has the same name
+
+    """
+    if tool.__name__ in _MCP_TOOLS:
+        message = f"Duplicate MCP tool name: {tool.__name__}"
+        raise exc.DuplicateMCPToolError(message)
+    _MCP_TOOLS[tool.__name__] = tool
+    return tool
+
+
+def get_mcp_tools() -> tuple[MCPTool[object], ...]:
+    """Return all tools in the application-wide MCP registry.
+
+    Returns:
+        Registered MCP tools
+
+    """
+    return tuple(_MCP_TOOLS.values())
+
+
 def mcp_tool(
     description: str,
     *,
@@ -168,7 +203,7 @@ def mcp_tool(
         # stand-in while resolving the structured return annotation at runtime.
         hints = get_type_hints(function, localns={"Database": object})
         decorated.mcp_return_type = hints.get("return", object)
-        return decorated
+        return register_mcp_tool(decorated)
 
     return decorate
 
@@ -746,25 +781,25 @@ def parse_date(
         date object
 
     Raises:
-        ValueError: if failed to parse, empty, or in advance
+        InvalidDateError: if failed to parse, empty, or in advance
 
     """
     try:
         date = utils.parse_date(value)
     except ValueError as e:
         msg = "Unable to parse date"
-        raise ValueError(msg) from e
+        raise exc.InvalidDateError(msg) from e
     if date is None:
         msg = "Date must not be empty"
-        raise ValueError(msg)
+        raise exc.InvalidDateError(msg)
     if max_future == 0:
         if date > today:
             msg = "Cannot be in advance"
-            raise ValueError(msg)
+            raise exc.InvalidDateError(msg)
     elif max_future is not None and date > (
         today + datetime.timedelta(days=max_future)
     ):
         msg = f"Only up to {utils.format_days(max_future)} in advance"
-        raise ValueError(msg)
+        raise exc.InvalidDateError(msg)
 
     return date

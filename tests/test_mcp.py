@@ -9,7 +9,10 @@ import pytest
 from mcp import Client
 from starlette.testclient import TestClient
 
-from flask_htmx_template import asgi, mcp
+from flask_htmx_template import asgi
+from flask_htmx_template import exceptions as exc
+from flask_htmx_template import mcp
+from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.controllers.items import mcp as items_mcp
 from flask_htmx_template.models.config import Config, ConfigKey
@@ -113,6 +116,20 @@ async def _call_tool(
         return await client.call_tool(name)
 
 
+def _duplicate_items_tool(database: Database) -> dict[str, object]:
+    """Return a dummy result for duplicate-name registration tests.
+
+    Args:
+        database: Unused database argument matching MCP tool signatures
+
+    Returns:
+        Empty MCP tool result
+
+    """
+    del database
+    return {}
+
+
 def test_create_app_mounts_streamable_http_endpoint(
     flask_app: flask.Flask,
 ) -> None:
@@ -175,6 +192,31 @@ def test_create_server_registers_read_only_items_tool(
 
     # Assert
     assert tools == ["get_items"]
+
+
+def test_items_tool_is_registered_in_central_registry() -> None:
+    # Arrange
+    expected = items_mcp.get_items
+
+    # Act
+    registered_tools = base.get_mcp_tools()
+
+    # Assert
+    assert expected in registered_tools
+
+
+def test_mcp_tool_rejects_duplicate_name() -> None:
+    # Arrange
+    _duplicate_items_tool.__name__ = items_mcp.get_items.__name__
+
+    # Act
+    with pytest.raises(exc.DuplicateMCPToolError, match="get_items"):
+        base.mcp_tool("Duplicate item tool")(_duplicate_items_tool)
+
+    # Assert
+    registered_tools = base.get_mcp_tools()
+    assert _duplicate_items_tool not in registered_tools
+    assert registered_tools.count(items_mcp.get_items) == 1
 
 
 def test_get_items_returns_current_items(

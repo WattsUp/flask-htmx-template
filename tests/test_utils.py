@@ -357,12 +357,12 @@ def test_interpolate_linear(
 
 
 def test_pretty_table_no_rows() -> None:
-    with pytest.raises(ValueError, match="Table has no rows"):
+    with pytest.raises(exc.InvalidTableError, match="Table has no rows"):
         utils.pretty_table([])
 
 
 def test_pretty_table_no_header() -> None:
-    with pytest.raises(ValueError, match="First row cannot be None"):
+    with pytest.raises(exc.InvalidTableError, match="First row cannot be None"):
         utils.pretty_table([None])
 
 

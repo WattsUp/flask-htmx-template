@@ -13,13 +13,18 @@ from werkzeug import exceptions as http
 
 __all__ = [
     "DatabaseError",
+    "DuplicateMCPToolError",
     "DuplicateURLError",
     "EvaluationError",
     "IntegrityError",
+    "InvalidCipherBoxError",
+    "InvalidCipherError",
+    "InvalidDateError",
     "InvalidEndpointError",
     "InvalidJSONRouteError",
     "InvalidKeyError",
     "InvalidORMValueError",
+    "InvalidTableError",
     "InvalidURIError",
     "MigrationRequiredError",
     "MultipleResultsFound",
@@ -40,6 +45,10 @@ class InvalidKeyError(Exception):
 
 class InvalidEndpointError(Exception):
     """Error when an endpoint is not constructed properly."""
+
+
+class DuplicateMCPToolError(Exception):
+    """Error when an MCP tool name is already registered."""
 
 
 class DuplicateURLError(Exception):
@@ -77,8 +86,24 @@ class InvalidURIError(Exception):
     """Error when object does not match expected URI format."""
 
 
+class InvalidCipherBoxError(Exception):
+    """Error when a cipher substitution or permutation box is invalid."""
+
+
+class InvalidCipherError(Exception):
+    """Error when serialized cipher data is invalid."""
+
+
+class InvalidDateError(Exception):
+    """Error when a date cannot be parsed or violates date limits."""
+
+
 class InvalidORMValueError(Exception):
     """Error when validation fails for an ORM column."""
+
+
+class InvalidTableError(Exception):
+    """Error when tabular data cannot be formatted."""
 
 
 class EvaluationError(Exception):

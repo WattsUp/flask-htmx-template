@@ -218,7 +218,7 @@ def test_parse_date(
     target: str | None,
 ) -> None:
     if target:
-        with pytest.raises(ValueError, match=target):
+        with pytest.raises(exc.InvalidDateError, match=target):
             base.parse_date(s, today, max_future=max_future)
     else:
         date = base.parse_date(s, today, max_future=max_future)

@@ -43,7 +43,7 @@ def cipher() -> Cipher:
     ],
 )
 def test_reverse_box_invalid(box: list[int], target: str) -> None:
-    with pytest.raises(ValueError, match=target):
+    with pytest.raises(exc.InvalidCipherBoxError, match=target):
         Cipher._reverse_box(box)
 
 
@@ -157,7 +157,7 @@ def test_from_bytes(cipher: Cipher) -> None:
 
 
 def test_from_bytes_empty() -> None:
-    with pytest.raises(ValueError, match="Buf is 0B long"):
+    with pytest.raises(exc.InvalidCipherError, match="Buf is 0B long"):
         Cipher.from_bytes(b"")
 
 

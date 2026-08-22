@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import functools
+import importlib
+import pkgutil
 from typing import NamedTuple, TYPE_CHECKING
 
 import prometheus_client
 from mcp.server.mcpserver import MCPServer
 
-from flask_htmx_template.controllers.items import mcp as items_mcp
+from flask_htmx_template import controllers
+from flask_htmx_template.controllers import base
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from flask_htmx_template.controllers import base
     from flask_htmx_template.database import Database
 
 
@@ -27,7 +29,22 @@ class MCPMetrics(NamedTuple):
 
 _METRICS: dict[prometheus_client.CollectorRegistry, MCPMetrics] = {}
 
-_TOOLS = [*items_mcp.TOOLS]
+
+def _load_tools() -> None:
+    """Import MCP controller modules into the central tool registry."""
+    modules = sorted(
+        pkgutil.walk_packages(
+            controllers.__path__,
+            f"{controllers.__name__}.",
+        ),
+        key=lambda module: module.name,
+    )
+    for module in modules:
+        if module.name.rpartition(".")[2] == "mcp":
+            importlib.import_module(module.name)
+
+
+_load_tools()
 
 
 def create_server(
@@ -50,7 +67,7 @@ def create_server(
         version=__version__,
     )
 
-    for tool in _TOOLS:
+    for tool in base.get_mcp_tools():
         bound_tool = _bind_database(tool, database, _get_metrics(registry))
         server.add_tool(
             bound_tool,

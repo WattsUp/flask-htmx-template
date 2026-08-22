@@ -609,19 +609,18 @@ def pretty_table(table: list[list[str] | None]) -> list[str]:
         list of lines to print
 
     Raises:
-        ValueError: If table has no rows
-        ValueError: If first row is None
+        InvalidTableError: If table has no rows or the first row is None
 
     """
     if len(table) < 1:
         msg = "Table has no rows"
-        raise ValueError(msg)
+        raise exc.InvalidTableError(msg)
     table = list(table)
 
     header_raw = table.pop(0)
     if header_raw is None:
         msg = "First row cannot be None"
-        raise ValueError(msg)
+        raise exc.InvalidTableError(msg)
 
     header = [c.strip("<>^./") for c in header_raw]
     label_widths = [max(4, len(c)) for c in header]

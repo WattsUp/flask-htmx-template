@@ -27,6 +27,3 @@ def get_items(database: Database) -> ctx.AllItemsContext:
     """
     with database.begin_session():
         return ctx.items()
-
-
-TOOLS: tuple[base.MCPTool[object], ...] = (get_items,)
