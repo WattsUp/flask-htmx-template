@@ -6,11 +6,10 @@ from pathlib import Path
 
 import flask
 
-from flask_htmx_template import web, web_theme
+from flask_htmx_template import web_theme
 from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.auth import ctx as auth_ctx
 from flask_htmx_template.controllers.common import ctx
-from flask_htmx_template.models.config import Config, ConfigKey
 
 
 @auth_ctx.login_exempt
@@ -27,15 +26,8 @@ def theme_css() -> flask.Response:
     mood_name = flask.request.args.get("mood") or flask.request.cookies.get(
         ctx.COOKIE_MOOD,
     )
-    if not swatch or not mood_name:
-        with web.db.begin_session():
-            swatch = swatch or Config.fetch(ConfigKey.WEB_THEME_SWATCH)
-            mood_name = mood_name or Config.fetch(ConfigKey.WEB_THEME_MOOD)
-    try:
-        mood = web_theme.Mood[mood_name]
-    except KeyError:
-        mood = web_theme.DEFAULT_MOOD
-    theme = web_theme.generate(swatch, mood)
+    selection = ctx.ctx_theme(swatch, mood_name)
+    theme = web_theme.generate(selection.swatch, selection.mood)
 
     def css_vars(colors: web_theme.Colors | web_theme.FixedColors) -> list[str]:
         """Build CSS custom-property declarations.
@@ -72,16 +64,11 @@ def theme() -> str | flask.Response:
     if flask.request.method == "GET":
         swatch = flask.request.cookies.get(ctx.COOKIE_SWATCH)
         mood_name = flask.request.cookies.get(ctx.COOKIE_MOOD)
-        if not swatch or not mood_name:
-            with web.db.begin_session():
-                swatch = swatch or Config.fetch(ConfigKey.WEB_THEME_SWATCH)
-                mood_name = mood_name or Config.fetch(ConfigKey.WEB_THEME_MOOD)
-        if mood_name not in web_theme.Mood.__members__:
-            mood_name = web_theme.DEFAULT_MOOD.name
+        selection = ctx.ctx_theme(swatch, mood_name)
         return flask.render_template(
             "shared/theme-edit.jinja",
-            swatch=swatch,
-            mood=mood_name,
+            swatch=selection.swatch,
+            mood=selection.mood.name,
             moods=list(web_theme.Mood),
         )
 
