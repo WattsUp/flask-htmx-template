@@ -84,7 +84,7 @@ class FlaskExtension:
             app: Flask app to initialize
 
         """
-        config = flask.Config(app.root_path)  # flask_htmx_template: ignore
+        config = flask.Config(app.root_path)  # flask_htmx_template: ignore[mixins]
         config.from_prefixed_env("DB")
         self._db = self._open_db(config)
 

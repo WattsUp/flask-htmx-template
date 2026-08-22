@@ -464,7 +464,7 @@ def check_no_query_col0(line: str) -> str:
 def test_use_of_mixins(path: Path) -> None:
     lines = path.read_text("utf-8").splitlines()
 
-    ignore = "# flask_htmx_template: ignore"
+    ignore = "# flask_htmx_template: ignore[mixins]"
 
     errors: list[str] = []
 
@@ -490,7 +490,7 @@ def test_use_of_mixins(path: Path) -> None:
                 errors.extend(checks)
         elif line.endswith(ignore):
             errors.append(
-                f"{path}:{i + 1}: Use of unnecessary 'flask_htmx_template: ignore'",
+                f"{path}:{i + 1}: Use of unnecessary '{ignore}'",
             )
 
     print("\n".join(errors))

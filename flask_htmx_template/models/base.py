@@ -94,7 +94,7 @@ class QueryMixIn(SessionMixIn):
         """
         i = cls(**kwargs)
         s = cls.session()
-        s.add(i)  # flask_htmx_template: ignore
+        s.add(i)  # flask_htmx_template: ignore[mixins]
         s.flush()
         return i
 
@@ -186,7 +186,7 @@ class QueryMixIn(SessionMixIn):
             raise exc.NoKeywordArgumentsError
         query: orm.Query[Self] = cls.session().query(cls)
         if columns:
-            return query.with_entities(*columns)  # flask_htmx_template: ignore
+            return query.with_entities(*columns)  # flask_htmx_template: ignore[mixins]
         return query
 
     @classmethod

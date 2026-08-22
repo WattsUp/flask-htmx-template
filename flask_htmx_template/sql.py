@@ -213,7 +213,10 @@ def count[T](query: orm.Query[T]) -> int:
         maintain_column_froms=True,
     )
     counter = counter.order_by(None)
-    return query.session.execute(counter).scalar() or 0  # flask_htmx_template: ignore
+    return (
+        query.session.execute(counter).scalar()  # flask_htmx_template: ignore[mixins]
+        or 0
+    )
 
 
 def any_[T](query: orm.Query[T]) -> bool:
@@ -255,7 +258,7 @@ def one[T](query: orm.Query[T]) -> object:
         One result
 
     """
-    ret: T | Sequence[T] = query.one()  # flask_htmx_template: ignore
+    ret: T | Sequence[T] = query.one()  # flask_htmx_template: ignore[mixins]
     if not isinstance(ret, Sequence):
         return ret
     seq = cast("Sequence[T]", ret)
@@ -296,7 +299,7 @@ def scalar[T](query: orm.Query[T]) -> object | None:
         One result
 
     """
-    return query.scalar()  # flask_htmx_template: ignore
+    return query.scalar()  # flask_htmx_template: ignore[mixins]
 
 
 @overload
@@ -320,7 +323,7 @@ def yield_[T](query: orm.Query[T]) -> Iterable[object]:
 
     """
     # Yield per instead of fetch all is faster
-    for r in query.yield_per(100):  # flask_htmx_template: ignore
+    for r in query.yield_per(100):  # flask_htmx_template: ignore[mixins]
         yield r[0:] if isinstance(r, Sequence) else r
 
 

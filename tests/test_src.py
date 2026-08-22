@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
+from typing import override
 
 import pytest
 
@@ -70,19 +72,19 @@ def _parse_tuple_args(inner: str) -> list[str]:
 def _find_anon_tuple_violations(source: str) -> dict[int, str]:
     """Return ``{line_number: annotation}`` for non-trivial anonymous tuples.
 
-    Flags any ``tuple[...]`` annotation with 3+ type args — those always
+    Flags any ``tuple[...]`` annotation with 3+ type args - those always
     warrant a ``NamedTuple``. Two-element tuples are considered trivial.
 
     Args:
         source: source string
 
     Returns:
-        dict of violations
+        Dict of violations.
 
     """
     violations: dict[int, str] = {}
     # Tuples whose every arg is a bare TypeVar name or ellipsis are generic
-    # overloads — allowed.
+    # overloads - allowed.
     re_typevar = re.compile(r"^[A-Z][0-9A-Z]*$")
     marker = "tuple["
     i = 0
@@ -115,6 +117,88 @@ def _find_anon_tuple_violations(source: str) -> dict[int, str]:
     return violations
 
 
+def _find_hardcoded_url_violations(source: str) -> dict[int, str]:
+    """Return ``{line_number: literal}`` for hardcoded URL literals.
+
+    Args:
+        source: Python source to inspect.
+
+    Returns:
+        Dict of URL-policy violations.
+
+    """
+    allowed_url_prefixes: set[str] = set()
+    http_methods = {
+        "DELETE",
+        "GET",
+        "HEAD",
+        "OPTIONS",
+        "PATCH",
+        "POST",
+        "PUT",
+        "delete",
+        "get",
+        "head",
+        "options",
+        "patch",
+        "post",
+        "put",
+    }
+    http_clients = {"c", "client", "requests", "web_client"}
+    violations: dict[int, str] = {}
+    tree = ast.parse(source)
+    docstring_ids = {
+        id(container.body[0].value)
+        for container in ast.walk(tree)
+        if isinstance(
+            container,
+            (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef),
+        )
+        and container.body
+        and isinstance(container.body[0], ast.Expr)
+        and isinstance(container.body[0].value, ast.Constant)
+        and isinstance(container.body[0].value.value, str)
+    }
+
+    class URLVisitor(ast.NodeVisitor):
+        """Collect hardcoded URL literals and HTTP client paths."""
+
+        EXTERNAL_SCHEMES = ("http://", "https://")
+
+        @override
+        def visit_Constant(self, node: ast.Constant) -> None:
+            if (
+                id(node) not in docstring_ids
+                and isinstance(node.value, str)
+                and node.value.startswith(self.EXTERNAL_SCHEMES)
+                and node.value not in self.EXTERNAL_SCHEMES
+                and not any(
+                    node.value.startswith(prefix) for prefix in allowed_url_prefixes
+                )
+            ):
+                violations[node.lineno] = node.value
+
+        @override
+        def visit_Call(self, node: ast.Call) -> None:
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in http_methods
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in http_clients
+            ):
+                for arg in node.args:
+                    if (
+                        isinstance(arg, ast.Constant)
+                        and isinstance(arg.value, str)
+                        and arg.value.startswith("/")
+                    ):
+                        violations[arg.lineno] = arg.value
+            self.generic_visit(node)
+
+    URLVisitor().visit(tree)
+    return violations
+
+
 _SOURCE_PATHS = sorted(
     [
         *Path(flask_htmx_template.__file__).parent.glob("**/*.py"),
@@ -124,25 +208,27 @@ _SOURCE_PATHS = sorted(
 
 
 @pytest.mark.parametrize("path", _SOURCE_PATHS, ids=id_func)
-def test_noqa(path: Path) -> None:
+def test_ruff_ignore(path: Path) -> None:
     lines = path.read_text("utf-8").splitlines()
 
     allowed_noqa = (
         {
-            "ANN202",
-            "DTZ001",
-            "PLR0124",
-            "S105",
-            "S106",
-            "S603",
-            "SLF001",
+            "call-datetime-without-tzinfo",
+            "comparison-with-itself",
+            "hardcoded-password-func-arg",
+            "hardcoded-password-string",
+            "missing-return-type-private-function",
+            "private-member-access",
+            "subprocess-without-shell-equals-true",
         }
         if "tests" in path.parts
-        else {"S608", "PLR0913"}
+        else {
+            "hardcoded-sql-expression",
+            "typing-only-standard-library-import",
+        }
     )
 
-    re_noqa = re.compile(r"noqa: ([\w, ]+)")
-
+    re_noqa = re.compile(r"ruff: ignore\[([\w, -]+)\]")
     errors: list[str] = []
 
     for i, line in enumerate(lines):
@@ -167,6 +253,32 @@ def test_anonymous_tuples(path: Path) -> None:
         f"{path}:{line}: non-trivial anonymous tuple: {ann}"
         for line, ann in violations.items()
     ]
+    print("\n".join(errors))
+    assert not errors
+
+
+@pytest.mark.parametrize("path", _SOURCE_PATHS, ids=id_func)
+def test_no_hardcoded_url(path: Path) -> None:
+    """Require URL generation instead of hardcoded HTTP paths."""
+    lines = path.read_text("utf-8").splitlines()
+    ignore = "# flask-htmx-template: ignore[url]"
+    violations = _find_hardcoded_url_violations("\n".join(lines))
+
+    errors: list[str] = []
+    for i, line in enumerate(lines):
+        line_no = i + 1
+        ignored = line.rstrip().endswith(ignore)
+        if line_no in violations:
+            if not ignored:
+                errors.append(
+                    f"{path}:{line_no}: hardcoded URL literal: "
+                    f"{violations[line_no]}, replace with url_for",
+                )
+        elif ignored:
+            errors.append(
+                f"{path}:{line_no}: Use of unnecessary '{ignore}'",
+            )
+
     print("\n".join(errors))
     assert not errors
 
