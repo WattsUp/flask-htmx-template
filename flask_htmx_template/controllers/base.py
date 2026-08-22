@@ -9,7 +9,15 @@ import re
 import textwrap
 from decimal import Decimal
 from pathlib import Path
-from typing import cast, NamedTuple, Protocol, TYPE_CHECKING, TypedDict
+from typing import (
+    cast,
+    get_type_hints,
+    NamedTuple,
+    Protocol,
+    TYPE_CHECKING,
+    TypedDict,
+    TypeVar,
+)
 
 import flask
 from flask.typing import RouteCallable
@@ -98,14 +106,18 @@ class BasePageContext(TypedDict):
     current_year: int
 
 
-class MCPTool(Protocol):
+MCPResult_co = TypeVar("MCPResult_co", covariant=True)
+
+
+class MCPTool(Protocol[MCPResult_co]):
     """A database MCP tool with its registration metadata."""
 
     __name__: str
     mcp_annotations: ToolAnnotations
     mcp_description: str
+    mcp_return_type: object
 
-    def __call__(self, database: Database) -> str:
+    def __call__(self, database: Database) -> MCPResult_co:
         """Run the tool for a database."""
         raise NotImplementedError
 
@@ -117,7 +129,7 @@ def mcp_tool(
     destructive_hint: bool | None = None,
     idempotent_hint: bool | None = None,
     open_world_hint: bool | None = None,
-) -> Callable[[Callable[[Database], str]], MCPTool]:
+) -> Callable[[Callable[[Database], MCPResult_co]], MCPTool[MCPResult_co]]:
     """Decorate a database function with MCP registration metadata.
 
     Args:
@@ -132,7 +144,9 @@ def mcp_tool(
 
     """
 
-    def decorate(function: Callable[[Database], str]) -> MCPTool:
+    def decorate(
+        function: Callable[[Database], MCPResult_co],
+    ) -> MCPTool[MCPResult_co]:
         """Attach MCP metadata to a database function.
 
         Args:
@@ -142,7 +156,7 @@ def mcp_tool(
             Function with MCP registration metadata
 
         """
-        decorated = cast("MCPTool", function)
+        decorated = cast("MCPTool[MCPResult_co]", function)
         decorated.mcp_description = description
         decorated.mcp_annotations = ToolAnnotations(
             read_only_hint=read_only_hint,
@@ -150,6 +164,10 @@ def mcp_tool(
             idempotent_hint=idempotent_hint,
             open_world_hint=open_world_hint,
         )
+        # NOTE: Database is imported only while type checking, so provide a local
+        # stand-in while resolving the structured return annotation at runtime.
+        hints = get_type_hints(function, localns={"Database": object})
+        decorated.mcp_return_type = hints.get("return", object)
         return decorated
 
     return decorate

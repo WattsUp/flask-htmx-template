@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
 
-from flask_htmx_template import utils
 from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.items import ctx
 
@@ -17,19 +15,18 @@ if TYPE_CHECKING:
     "List all items with their names, dates, values, and notes.",
     read_only_hint=True,
 )
-def get_items(database: Database) -> str:
+def get_items(database: Database) -> ctx.AllItemsContext:
     """List all items for the MCP tool.
 
     Args:
         database: Database to query
 
     Returns:
-        JSON object containing all items and their total
+        All items and their total
 
     """
     with database.begin_session():
-        result: ctx.AllItemsContext = ctx.items()
-    return json.dumps(utils.json_mutate(result))
+        return ctx.items()
 
 
-TOOLS: tuple[base.MCPTool, ...] = (get_items,)
+TOOLS: tuple[base.MCPTool[object], ...] = (get_items,)

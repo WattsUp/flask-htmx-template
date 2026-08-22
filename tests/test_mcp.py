@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import json
 from typing import cast, TYPE_CHECKING
 
 import anyio
@@ -11,11 +10,13 @@ from mcp import Client
 from starlette.testclient import TestClient
 
 from flask_htmx_template import asgi, mcp
+from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.controllers.items import mcp as items_mcp
 from flask_htmx_template.models.config import Config, ConfigKey
 
 if TYPE_CHECKING:
     import flask
+    from mcp_types import CallToolResult, Tool
     from sqlalchemy import orm
     from starlette.routing import Mount, Route
 
@@ -69,6 +70,47 @@ async def _list_tools(server: mcp.MCPServer) -> list[str]:
     async with Client(server) as client:
         result = await client.list_tools()
     return [tool.name for tool in result.tools]
+
+
+async def _get_tool(server: mcp.MCPServer, name: str) -> Tool:
+    """Return one tool definition from an in-process MCP server.
+
+    Args:
+        server: MCP server to inspect
+        name: Tool name to find
+
+    Returns:
+        Matching MCP tool definition
+
+    Raises:
+        AssertionError: If the named tool is not registered
+
+    """
+    async with Client(server) as client:
+        result = await client.list_tools()
+    for tool in result.tools:
+        if tool.name == name:
+            return tool
+    message = f"MCP tool is not registered: {name}"
+    raise AssertionError(message)
+
+
+async def _call_tool(
+    server: mcp.MCPServer,
+    name: str,
+) -> CallToolResult:
+    """Call an MCP tool through an in-process client.
+
+    Args:
+        server: MCP server hosting the tool
+        name: Tool name to call
+
+    Returns:
+        MCP tool call result
+
+    """
+    async with Client(server) as client:
+        return await client.call_tool(name)
 
 
 def test_create_app_mounts_streamable_http_endpoint(
@@ -135,12 +177,64 @@ def test_create_server_registers_read_only_items_tool(
     assert tools == ["get_items"]
 
 
-def test_mcp_tool_records_metrics(
+def test_get_items_returns_current_items(
+    current_session_database: Database,
+    item: Item,
+) -> None:
+    # Arrange
+    database = current_session_database
+
+    # Act
+    value: ctx.AllItemsContext = items_mcp.get_items(database)
+
+    # Assert
+    assert not isinstance(value, str)
+    assert value["items"][0]["name"] == item.name
+    assert value["total"] == item.value
+
+
+def test_get_items_publishes_output_schema(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
     # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    # Act
+    tool = anyio.run(_get_tool, server, "get_items")
+
+    # Assert
+    assert tool.output_schema is not None
+    assert tool.output_schema["type"] == "object"
+    assert set(tool.output_schema["required"]) == {"items", "total"}
+    assert set(tool.output_schema["properties"]) == {"items", "total"}
+
+
+def test_get_items_returns_structured_content_in_process(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+    item: Item,
+) -> None:
+    # Arrange
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    # Act
+    result = anyio.run(_call_tool, server, "get_items")
+
+    # Assert
+    assert not result.is_error
+    assert result.structured_content is not None
+    assert result.structured_content["items"][0]["name"] == item.name
+    assert result.structured_content["total"] == str(item.value)
+
+
+def test_mcp_tool_records_metrics(
+    current_session_database: Database,
+) -> None:
+    # Arrange
+    registry = prometheus_client.CollectorRegistry()
     tool = mcp._bind_database(
         items_mcp.get_items,
         current_session_database,
@@ -157,18 +251,3 @@ def test_mcp_tool_records_metrics(
         'flask_htmx_template_mcp_tool_duration_seconds_count{tool="get_items"} 1.0'
         in metrics
     )
-
-
-def test_get_items_returns_current_items(
-    current_session_database: Database,
-    item: Item,
-) -> None:
-    # Arrange
-    database = current_session_database
-
-    # Act
-    value = items_mcp.get_items(database)
-
-    # Assert
-    result = json.loads(value)
-    assert result["items"][0]["name"] == item.name

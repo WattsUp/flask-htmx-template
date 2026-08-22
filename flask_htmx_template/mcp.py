@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import NamedTuple, TYPE_CHECKING
 
 import prometheus_client
@@ -55,6 +56,7 @@ def create_server(
             bound_tool,
             description=tool.mcp_description,
             annotations=tool.mcp_annotations,
+            structured_output=True,
         )
 
     return server
@@ -89,10 +91,10 @@ def _get_metrics(registry: prometheus_client.CollectorRegistry) -> MCPMetrics:
 
 
 def _bind_database(
-    tool: base.MCPTool,
+    tool: base.MCPTool[base.MCPResult_co],
     database: Database,
     metrics: MCPMetrics,
-) -> Callable[[], str]:
+) -> Callable[[], base.MCPResult_co]:
     """Bind an MCP tool to the server's database.
 
     Args:
@@ -105,7 +107,8 @@ def _bind_database(
 
     """
 
-    def bound_tool() -> str:
+    @functools.wraps(tool)
+    def bound_tool() -> base.MCPResult_co:
         """Call the MCP tool with its bound database.
 
         Returns:
@@ -116,5 +119,11 @@ def _bind_database(
         with metrics.duration.labels(tool=tool.__name__).time():
             return tool(database)
 
-    bound_tool.__name__ = tool.__name__
+    # The wrapper has no database argument, so the MCP SDK can inspect its
+    # return type without trying to resolve the database's TYPE_CHECKING-only
+    # annotation.  ``wraps`` preserves the original metadata for callers; its
+    # ``__wrapped__`` link is removed so inspection does not expose the bound
+    # database parameter.
+    bound_tool.__dict__.pop("__wrapped__", None)
+    bound_tool.__annotations__ = {"return": tool.mcp_return_type}
     return bound_tool
