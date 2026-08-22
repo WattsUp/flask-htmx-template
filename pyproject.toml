@@ -142,7 +142,6 @@ force_alphabetical_sort_within_sections = true
 include = ["flask_htmx_template", "tests", "tools", "typings"]
 exclude = ["**/__pycache__"]
 venvPath = "."
-venv = ".venv"
 typeCheckingMode = "strict"
 
 reportUnknownParameterType = "warning"
