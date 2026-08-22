@@ -16,12 +16,21 @@ from flask_htmx_template.models.item import Item
 def json_all() -> ctx.AllItemsContext | base.JSONResponse:
     """GET all items.
 
+    Query args:
+        before: filter items that appear before this date, optional
+
     Returns:
-        Item-list context.
+        Item-list context or JSON validation error.
 
     """
+    try:
+        before = utils.parse_date(flask.request.args.get("before"))
+    except ValueError:
+        return {
+            "errors": ["before must be an ISO 8601 date string"],
+        }, base.HTTP_CODE_BAD_REQUEST
     with web.db.begin_session():
-        return ctx.items()
+        return ctx.items(before=before)
 
 
 def json_new() -> ctx.ItemContext | base.JSONResponse:

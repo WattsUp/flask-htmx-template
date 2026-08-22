@@ -31,6 +31,53 @@ def test_get_all(web_client: WebClient, item: Item) -> None:
     assert result == target
 
 
+def test_get_all_before_filters_items_and_total(
+    web_client: WebClient,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    with session.begin_nested():
+        older = Item.create(
+            name="Apples",
+            date_ord=today_ord - 1,
+            value=Decimal(2),
+        )
+        Item.create(
+            name="Cherries",
+            date_ord=today_ord + 1,
+            value=Decimal(3),
+        )
+
+    result, _ = web_client.GET_J(
+        "items.json_all",
+        query_string={"before": item.date.isoformat()},
+    )
+
+    assert result == {
+        "total": 2,
+        "items": [
+            {
+                "uri": older.uri,
+                "name": older.name,
+                "date": older.date.isoformat(),
+                "value": 2,
+                "note": older.note,
+            },
+        ],
+    }
+
+
+def test_get_all_before_rejects_invalid_date(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J(
+        "items.json_all",
+        query_string={"before": "not-a-date"},
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert result == {"errors": ["before must be an ISO 8601 date string"]}
+
+
 def test_get(web_client: WebClient, item: Item, session: orm.Session) -> None:
     with session.begin_nested():
         item.value = Decimal("1.234567")

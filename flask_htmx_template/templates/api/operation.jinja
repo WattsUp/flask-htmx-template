@@ -27,6 +27,19 @@
       </dl>
     </div>
   {% endif %}
+  {% if op.query_args %}
+    <div class="px-2">
+      <h2 class="font-bold">Query parameters</h2>
+      <dl>
+        {% for name, desc in op.query_args.items() %}
+          <dt>
+            <code>{{ name | e }}</code>
+          </dt>
+          <dd class="italic">{{ desc | e }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
   <div class="px-2">
     <h2 class="font-bold">Request</h2>
     {% if op.request_schema_json %}

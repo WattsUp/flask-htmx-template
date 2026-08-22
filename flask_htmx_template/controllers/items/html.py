@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import flask
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, web
+from flask_htmx_template import sql, utils, web
 from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
@@ -21,12 +21,28 @@ if TYPE_CHECKING:
 def page_all() -> flask.Response:
     """GET all items page.
 
+    Query args:
+        before: Filter items that appear before this date, optional
+
     Returns:
         Rendered all-items page.
 
+    Raises:
+        BadRequest: If before is not an ISO 8601 date string.
+
     """
+    try:
+        before = utils.parse_date(flask.request.args.get("before"))
+    except ValueError as error:
+        msg = "before must be an ISO 8601 date string"
+        raise exc.http.BadRequest(msg) from error
     with web.db.begin_session():
-        return base.page("items/page-all.jinja", "Items", ctx=ctx.items())
+        return base.page(
+            "items/page-all.jinja",
+            "Items",
+            before="" if before is None else before.isoformat(),
+            ctx=ctx.items(before=before),
+        )
 
 
 def page(uri: str) -> flask.Response:
@@ -117,7 +133,8 @@ def validation() -> str:
         return base.validate_real(args["value"], is_required=True)
 
     with web.db.begin_session():
-        uri = args.get("uri")
+        # NOTE: New-item forms have no URI; treat an empty query value as absent.
+        uri = args.get("uri") or None
         for key, (required, column) in properties.items():
             if key in args:
                 return base.validate_string(

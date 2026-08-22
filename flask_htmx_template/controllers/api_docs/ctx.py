@@ -132,11 +132,41 @@ def _extract_url_args(
     return result
 
 
+def _extract_query_args(view: Callable[..., object]) -> dict[str, str]:
+    """Extract query argument descriptions from a ``Query args:`` pydoc section.
+
+    Args:
+        view: View function whose docstring is parsed.
+
+    Returns:
+        Dict mapping each query arg name to its description string.
+
+    """
+    raw_doc = inspect.getdoc(view) or ""
+    in_query_args = False
+    result: dict[str, str] = {}
+    for line in raw_doc.splitlines():
+        if line.startswith("Query args:"):
+            in_query_args = True
+            continue
+        if not in_query_args:
+            continue
+        if line and not line[0].isspace():
+            break
+        stripped = line.strip()
+        if not stripped or ":" not in stripped:
+            continue
+        name, _, desc = stripped.partition(":")
+        result[name.strip()] = desc.strip()
+    return result
+
+
 class _Operation(NamedTuple):
     url: str
     method: _Method
     description: list[str]
     url_args: dict[str, str]
+    query_args: dict[str, str]
     request_schema: dict[str, object] | None
     request_example: dict[str, object] | None
     responses: dict[str, _ResponseInfo]
@@ -161,7 +191,7 @@ class _Operation(NamedTuple):
         paragraphs: list[str] = [""]
         raw_doc = inspect.getdoc(view) or "The devs forgot pydocs, grr"
         for raw in raw_doc.splitlines():
-            if raw.startswith(("Args:", "Returns:", "Raises:")):
+            if raw.startswith(("Args:", "Query args:", "Returns:", "Raises:")):
                 break
             line = raw.strip()
             if not line:
@@ -171,6 +201,7 @@ class _Operation(NamedTuple):
         desc = [p.strip() for p in paragraphs if p.strip()]
 
         url_args = _extract_url_args(path, view)
+        query_args = _extract_query_args(view)
         request_td = _extract_request_type(view)
         response_anns = _extract_response_annotations(view)
 
@@ -209,6 +240,7 @@ class _Operation(NamedTuple):
             method,
             desc,
             url_args,
+            query_args,
             req_schema,
             req_example,
             responses,
@@ -230,6 +262,7 @@ class _ResponseInfoJSON(TypedDict):
 class _OperationJSON(TypedDict):
     description: list[str]
     url_args: dict[str, str]
+    query_args: dict[str, str]
     request_schema: dict[str, object] | None
     request_example: dict[str, object] | None
     responses: dict[Status, _ResponseInfoJSON]
@@ -964,6 +997,7 @@ def api() -> _APIDocsJSON:
             methods[Method(op.method.name)] = _OperationJSON(
                 description=op.description,
                 url_args=op.url_args,
+                query_args=op.query_args,
                 request_schema=op.request_schema,
                 request_example=op.request_example,
                 responses={
