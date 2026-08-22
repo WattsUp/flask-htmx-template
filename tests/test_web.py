@@ -165,7 +165,7 @@ def test_open_db_postgres_url(
 def test_http_exception_json_path(flask_app: flask.Flask) -> None:
     # 404 on a /j/ path must return ErrorJSON, not HTML
     with flask_app.test_client() as client:
-        resp = client.get("/j/does-not-exist")
+        resp = client.get("/j/does-not-exist")  # flask-htmx-template: ignore[url]
     assert resp.status_code == base.HTTP_CODE_NOT_FOUND
     assert resp.content_type == "application/json"
     data = resp.get_json()
@@ -175,9 +175,11 @@ def test_http_exception_json_path(flask_app: flask.Flask) -> None:
 
 def test_http_exception_json_parse_error(flask_app: flask.Flask) -> None:
     # Empty body must return the descriptive decode error, not a bare 400
+    with flask_app.test_request_context():
+        url = flask.url_for("items.json_new")
     with flask_app.test_client() as client:
         resp = client.post(
-            "/j/items/new",
+            url,
             data=b"",
             content_type="application/json",
         )
@@ -189,9 +191,11 @@ def test_http_exception_json_parse_error(flask_app: flask.Flask) -> None:
 
 def test_http_exception_json_type_error(flask_app: flask.Flask) -> None:
     # Empty body must return the descriptive decode error, not a bare 400
+    with flask_app.test_request_context():
+        url = flask.url_for("items.json_new")
     with flask_app.test_client() as client:
         resp = client.post(
-            "/j/items/new",
+            url,
             data=b"",
         )
     assert resp.status_code == base.HTTP_CODE_UNSUPPORTED_MEDIA_TYPE
@@ -205,6 +209,6 @@ def test_http_exception_json_type_error(flask_app: flask.Flask) -> None:
 def test_http_exception_non_json_path(flask_app: flask.Flask) -> None:
     # 404 on a non-/j/ path must return the default HTML response
     with flask_app.test_client() as client:
-        resp = client.get("/h/does-not-exist")
+        resp = client.get("/h/does-not-exist")  # flask-htmx-template: ignore[url]
     assert resp.status_code == base.HTTP_CODE_NOT_FOUND
     assert "text/html" in resp.content_type

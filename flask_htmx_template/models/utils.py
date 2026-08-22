@@ -82,7 +82,7 @@ def dump_table_configs(model: type[Base]) -> list[str]:
         WHERE
             type='table'
             AND name='{model.__tablename__}'
-        """.strip()  # noqa: S608
+        """.strip()  # ruff: ignore[hardcoded-sql-expression]
     query: orm.query.RowReturningQuery[tuple[str]] = cast(
         "orm.query.RowReturningQuery[tuple[str]]",
         model.session().execute(sqlalchemy.text(stmt)),

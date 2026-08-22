@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
 
 class MockMigrator(Migrator):
-
     @override
     def migrate(self, d: Database) -> list[str]:
         return ["Comments"]

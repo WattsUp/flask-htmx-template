@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 
 class ORMBase(orm.DeclarativeBase):
-
     id_: orm.Mapped[int] = orm.mapped_column(primary_key=True, autoincrement=True)
 
     def __repr__(self) -> str:

@@ -32,7 +32,7 @@ def when_ready(_) -> None:
 
 def post_fork(_, _worker: gunicorn.workers.base.Worker) -> None:
     """Dispose inherited DB connections after fork to prevent SSL corruption."""
-    from flask_htmx_template import web  # noqa: PLC0415
+    from flask_htmx_template import web  # ruff: ignore[import-outside-top-level]
 
     web.ext.db.dispose()
 

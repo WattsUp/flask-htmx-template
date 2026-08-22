@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def test_entrypoints() -> None:
     # Check can execute entrypoint
     path = Path(sys.executable).with_name("flask_htmx_template")
-    with subprocess.Popen(  # noqa: S603
+    with subprocess.Popen(  # ruff: ignore[subprocess-without-shell-equals-true]
         [str(path), "--version"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

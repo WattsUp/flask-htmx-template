@@ -60,7 +60,7 @@ test = [
   "pytest-postgresql",
 ]
 dev = [
-  "flask-htmx-template[deploy,test]",
+  "flask-htmx-template[deploy,test,postgres]",
   "ruff>=0.15.20",
   "codespell>=2.4.1",
   "black>=26.5",
@@ -167,62 +167,62 @@ preview = true
 future-annotations = true
 
 ignore = [
-  "FIX002", # Permit TODOs
-  "I001",   # mismatch between ruff and isort
-  "CPY001", # No copyright
-  "D104",   # Missing docstring in public package
-  "D203",   # No blank line before pydocs
-  "D213",   # Summary on not on second line
+  "line-contains-todo",                # Permit TODOs
+  "unsorted-imports",                  # mismatch between ruff and isort
+  "missing-copyright-notice",          # No copyright
+  "undocumented-public-package",       # Missing docstring in public package
+  "incorrect-blank-line-before-class", # No blank line before pydocs
+  "multi-line-summary-second-line",    # Summary on not on second line
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "docker/*.py" = [
-  "D100",   # Disable missing docstrings in tests
-  "INP001", # Implicit namespace
-  "S104",   # binding to 0.0.0.0
+  "undocumented-public-module",    # Disable missing docstrings in tests
+  "implicit-namespace-package",    # Implicit namespace
+  "hardcoded-bind-all-interfaces", # binding to 0.0.0.0
 ]
 "flask_htmx_template/database.py" = [
-  "SLF001", # Allow self for reloading
+  "private-member-access", # Allow self for reloading
 ]
 "flask_htmx_template/commands/*.py" = [
-  "T201",    # Allow printing for commands
-  "PLC0415", # Allow imports outside of top for faster time to main
+  "print",                    # Allow printing for commands
+  "import-outside-top-level", # Allow imports outside of top for faster time to main
 ]
-"flask_htmx_template/controllers/api_docs.py" = [
-  "BLE001", # Allow blind except
+"flask_htmx_template/controllers/api_docs/ctx.py" = [
+  "blind-except", # Allow blind except
 ]
 "flask_htmx_template/models/base_uri.py" = [
-  "PLW0603", # Allow global CIPHER
+  "global-statement", # Allow global CIPHER
 ]
 "flask_htmx_template/migrations/v*.py" = [
-  "N801", # Allow underscore in class name for version names
+  "invalid-class-name", # Allow underscore in class name for version names
 ]
 "tests/**/*.py" = [
-  "D100",    # Disable missing docstrings in tests
-  "D101",
-  "D102",
-  "D103",
-  "D105",
-  "D106",
-  "D107",
-  "S608",    # Disable possible SQL injection
-  "PLC2701", # Private import
-  "S404",    # subprocess import
-  "S101",    # Uses asserts in pytest
-  "S311",    # Uses random in pytest
-  "PLR2004", # Uses magic numbers in pytest
-  "FBT001",  # Boolean positional arguments
-  "T201",    # Allow printing for extra context
-  "SLF001",  # Allow access to privates
-  "ARG001",  # Allow unused arguments for fixtures
-  "PLR0913", # Allow many arguments
-  "PLR0917", # Allow many arguments
+  "undocumented-public-module",                # Disable missing docstrings in tests
+  "undocumented-public-class",
+  "undocumented-public-method",
+  "undocumented-public-function",
+  "undocumented-magic-method",
+  "undocumented-public-nested-class",
+  "undocumented-public-init",
+  "hardcoded-sql-expression",                  # Disable possible SQL injection
+  "import-private-name",                       # Private import
+  "suspicious-subprocess-import",              # subprocess import
+  "assert",                                    # Uses asserts in pytest
+  "suspicious-non-cryptographic-random-usage", # Uses random in pytest
+  "magic-value-comparison",                    # Uses magic numbers in pytest
+  "boolean-type-hint-positional-argument",     # Boolean positional arguments
+  "print",                                     # Allow printing for extra context
+  "private-member-access",                     # Allow access to privates
+  "unused-function-argument",                  # Allow unused arguments for fixtures
+  "too-many-arguments",                        # Allow many arguments
+  "too-many-positional-arguments",             # Allow many arguments
 ]
 "tests/controllers/*.py" = [
-  "N802", # Allow CAPS methods
+  "invalid-function-name", # Allow CAPS methods
 ]
 "tests/mock*.py" = [
-  "TRY002", # Allow base Exception
+  "raise-vanilla-class", # Allow base Exception
 ]
 
 [tool.ruff.lint.flake8-annotations]

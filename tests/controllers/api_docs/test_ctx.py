@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import datetime
 import types
-from typing import Any, Literal, TYPE_CHECKING, TypedDict
+from typing import Any, cast, Literal, NotRequired, TYPE_CHECKING, TypedDict
 
 import flask
 import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
-from flask_htmx_template.controllers import api_docs
-from flask_htmx_template.controllers.items import ItemCategory
+from flask_htmx_template.controllers.api_docs import ctx as api_docs
+from flask_htmx_template.controllers.items.ctx import ItemCategory
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -38,7 +38,52 @@ def _view_with_attr_validate() -> api_docs._ResponseInfo:
 
 
 class _SimpleTypedDict(TypedDict):
+    """Minimal response type for API-doc tests."""
+
     key: str
+
+
+class _TypedDictWithOptional(TypedDict):
+    """Request type with an optional field."""
+
+    name: str
+    count: NotRequired[int]
+
+
+def _view_with_valid_td() -> _SimpleTypedDict:
+    """Create a response after validating a typed request body.
+
+    Returns:
+        Minimal response context.
+
+    """
+    utils.validate_json(dict[str, Any](), _SimpleTypedDict)
+    return {"key": "value"}
+
+
+def _json_multi() -> _SimpleTypedDict:
+    """Dispatch an endpoint shared by multiple HTTP methods."""
+    raise NotImplementedError
+
+
+def _json_multi_get() -> _SimpleTypedDict:
+    """Return the GET response for the multi-method endpoint.
+
+    Returns:
+        Minimal response context.
+
+    """
+    return {"key": "get"}
+
+
+def _json_multi_put() -> _SimpleTypedDict:
+    """Return the PUT response for the multi-method endpoint.
+
+    Returns:
+        Minimal response context.
+
+    """
+    return {"key": "put"}
 
 
 def _minimal_app(
@@ -131,7 +176,7 @@ def test_extract_url_args_none() -> None:
 
 
 def test_get_operations_missing_response_type() -> None:
-    def no_return_view():  # noqa: ANN202
+    def no_return_view():  # ruff: ignore[missing-return-type-private-function]
         """Have no return type annotation."""
 
     app = _minimal_app({"/j/test": no_return_view})
@@ -269,6 +314,14 @@ def test_example_collection_dict_object() -> None:
 def test_example_value_union_non_none() -> None:
     # str | int has no NoneType → falls through to return non-None example
     result = api_docs._example_value(str | int)
+    assert result == "a string of words"
+
+
+def test_example_value_union_optional_prefers_non_none() -> None:
+    annotation = str | None
+
+    result = api_docs._example_value(annotation)
+
     assert result == "a string of words"
 
 
@@ -427,3 +480,131 @@ def test_find_typed_dict_dict_object_value() -> None:
     # dict[str, object] has bare object as value → not treated as documentable
     result = api_docs._find_typed_dict(dict[str, object])
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Request body schemas
+# ---------------------------------------------------------------------------
+
+
+def test_example_from_typed_dict_skips_not_required_fields() -> None:
+    result = api_docs._example_from_typed_dict(
+        cast("type[dict[str, object]]", _TypedDictWithOptional),
+        skip_not_required=True,
+    )
+
+    assert result == {"name": "Example item"}
+
+
+def test_schema_from_typed_dict_skips_not_required_fields() -> None:
+    result = api_docs._schema_from_typed_dict(
+        cast("type[dict[str, object]]", _TypedDictWithOptional),
+        skip_not_required=True,
+    )
+
+    assert result == {"name": "string"}
+
+
+def test_operation_serializes_request_schema_and_example() -> None:
+    operation = api_docs._Operation(
+        url="/j/test",
+        method=api_docs._Method.GET,
+        description=["Test"],
+        url_args={},
+        request_schema={"key": "string"},
+        request_example={"key": "value"},
+        responses={},
+        enums=set(),
+    )
+
+    schema_json = operation.request_schema_json
+    example_json = operation.request_example_json
+
+    assert schema_json is not None
+    assert "key" in schema_json
+    assert example_json is not None
+    assert "key" in example_json
+
+
+def test_extract_request_type_finds_typed_dict() -> None:
+    result = api_docs._extract_request_type(_view_with_valid_td)
+
+    assert result is _SimpleTypedDict
+
+
+def test_get_operations_includes_request_body_schema_and_example() -> None:
+    app = _minimal_app({"/j/test": (_view_with_valid_td, ["POST"])})
+
+    groups = api_docs.get_operations(app)
+
+    _, operations = next(iter(groups.values()))
+    assert operations[0].request_schema is not None
+    assert operations[0].request_example is not None
+
+
+# ---------------------------------------------------------------------------
+# Response annotations and multi-method dispatch
+# ---------------------------------------------------------------------------
+
+
+def test_response_arms_expands_type_alias() -> None:
+    class _MockAlias:
+        """Minimal Python 3.12 type-alias stand-in."""
+
+        __value__ = _SimpleTypedDict
+
+    result = api_docs._response_arms(_MockAlias)
+
+    assert "200" in result
+
+
+def test_response_arms_combines_union_arms() -> None:
+    result = api_docs._response_arms(_SimpleTypedDict | str)
+
+    assert "200" in result
+
+
+def test_response_arms_uses_default_error_status() -> None:
+    result = api_docs._response_arms(tuple[_SimpleTypedDict, int])
+
+    assert "4xx" in result
+
+
+def test_response_arms_uses_literal_error_status() -> None:
+    result = api_docs._response_arms(tuple[_SimpleTypedDict, Literal[422]])
+
+    assert "422" in result
+
+
+def test_response_arms_ignores_undocumented_type() -> None:
+    result = api_docs._response_arms(str)
+
+    assert result == {}
+
+
+def test_extract_response_annotations_without_package_module() -> None:
+    def view() -> _SimpleTypedDict:
+        """Get a resource.
+
+        Returns:
+            Minimal response context.
+
+        """
+        return {"key": "value"}
+
+    view.__module__ = "toplevelmod"
+
+    result = api_docs._extract_response_annotations(view)
+
+    assert "200" in result
+
+
+def test_get_operations_dispatches_each_method() -> None:
+    assert callable(_json_multi_get)
+    assert callable(_json_multi_put)
+    app = _minimal_app({"/j/test": (_json_multi, ["GET", "PUT"])})
+
+    groups = api_docs.get_operations(app)
+
+    _, operations = next(iter(groups.values()))
+    assert len(operations) == 2

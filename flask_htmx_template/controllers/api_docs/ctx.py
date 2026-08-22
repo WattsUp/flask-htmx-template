@@ -1,4 +1,4 @@
-"""Interactive JSON API documentation controller.
+"""API documentation context builders.
 
 Title: API documentation
 """
@@ -9,6 +9,7 @@ import ast
 import datetime
 import inspect
 import json
+import sys
 import textwrap
 import typing
 from decimal import Decimal
@@ -243,16 +244,6 @@ GROUPS: list[_Group] = []
 ENUMS: dict[str, list[str]] = {}
 
 
-def page() -> flask.Response:
-    """GET interactive JSON API documentation page.
-
-    Returns:
-        HTML page
-
-    """
-    return base.page("api/page.jinja", "API", groups=GROUPS)
-
-
 # NOTE: Field-name overrides provide meaningful seed values for common fields
 # that would otherwise be empty strings or None.
 _FIELD_HINTS: dict[str, object] = {
@@ -348,8 +339,10 @@ def _collect_enums_from_annotation(
 
     if _is_typed_dict(cast("object", ann)):
         try:
+            td_cls = cast("type[dict[str, object]]", ann)
             hints = get_type_hints(
-                cast("type[dict[str, object]]", ann),
+                td_cls,
+                localns=_build_localns(td_cls.__module__),
                 include_extras=True,
             )
         except Exception:  # pragma: no cover
@@ -486,7 +479,11 @@ def _example_from_typed_dict(
 
     """
     try:
-        hints = get_type_hints(td, include_extras=True)
+        hints = get_type_hints(
+            td,
+            localns=_build_localns(getattr(td, "__module__", "")),
+            include_extras=True,
+        )
     except Exception:  # pragma: no cover
         return {}
     result: dict[str, object] = {}
@@ -643,7 +640,11 @@ def _schema_from_typed_dict(
 
     """
     try:
-        hints = get_type_hints(td, include_extras=True)
+        hints = get_type_hints(
+            td,
+            localns=_build_localns(getattr(td, "__module__", "")),
+            include_extras=True,
+        )
     except Exception:  # pragma: no cover
         return {}
     result: dict[str, object] = {}
@@ -697,6 +698,41 @@ def _response_arms(t: object) -> dict[str, object]:
     return {}
 
 
+def _build_localns(module_name: str) -> dict[str, object]:
+    """Build a namespace that resolves type hints imported only while type checking.
+
+    Args:
+        module_name: Module that defines the annotated object.
+
+    Returns:
+        Namespace suitable for ``typing.get_type_hints``.
+
+    """
+    top = module_name.split(".", 1)[0]
+    own_mod = sys.modules.get(module_name)
+    localns: dict[str, object] = {"base": base}
+    for mod_name, mod in sys.modules.items():
+        if mod is own_mod:
+            continue
+        if mod_name == top or mod_name.startswith(f"{top}."):
+            localns.update(
+                {
+                    key: value
+                    for key, value in vars(mod).items()
+                    if not key.startswith("_")
+                },
+            )
+    if own_mod is not None:
+        localns.update(
+            {
+                key: value
+                for key, value in vars(own_mod).items()
+                if not key.startswith("_")
+            },
+        )
+    return localns
+
+
 def _extract_response_annotations(
     view_func: Callable[..., object],
 ) -> dict[str, object]:
@@ -708,10 +744,10 @@ def _extract_response_annotations(
 
     """
     try:
-        # NOTE: Some controllers import base under TYPE_CHECKING only, so
-        # get_type_hints() can't resolve "base.JSONResponse" from module
-        # globals.  Supplying base explicitly fixes the NameError.
-        hints = get_type_hints(view_func, localns={"base": base})
+        hints = get_type_hints(
+            view_func,
+            localns=_build_localns(view_func.__module__),
+        )
     except Exception:  # pragma: no cover
         return {}
     ret = hints.get("return")
@@ -823,7 +859,6 @@ def get_operations(
             continue
         view = app.view_functions.get(rule.endpoint)
         if not view:  # pragma: no cover
-
             continue
         group = str(rule.endpoint).split(".", 1)[0].replace("_", " ").capitalize()
         methods = (rule.methods or set()) - {"HEAD", "OPTIONS"}
@@ -902,8 +937,8 @@ def init_docs(app: flask.Flask) -> None:
                 break
 
 
-def json_api_enums() -> dict[str, list[str]]:
-    """GET known enum values for JSON API fields.
+def api_enums() -> dict[str, list[str]]:
+    """Build known enum values for JSON API fields.
 
     Returns:
         JSON response structured as ``{EnumName: [value, ...]}`` mapping each
@@ -913,8 +948,8 @@ def json_api_enums() -> dict[str, list[str]]:
     return ENUMS
 
 
-def json_api() -> _APIDocsJSON:
-    """GET machine-readable API documentation.
+def api() -> _APIDocsJSON:
+    """Build machine-readable API documentation.
 
     Returns:
         JSON response structured as ``{"urls": {url: {method: {info}}},
@@ -940,10 +975,3 @@ def json_api() -> _APIDocsJSON:
                 },
             )
     return {"urls": urls, "enums": dict(ENUMS)}
-
-
-ROUTES: base.Routes = {
-    "/api": (page, ["GET"]),
-    "/j/api": (cast("base.RouteCallable", json_api), ["GET"]),
-    "/j/api/enums": (cast("base.RouteCallable", json_api_enums), ["GET"]),
-}
