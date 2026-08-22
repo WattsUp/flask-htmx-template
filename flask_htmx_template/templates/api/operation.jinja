@@ -48,13 +48,11 @@
       <pre
         class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
       >
-{{- op.request_example_json | e -}}</pre
-      >
+{{- op.request_example_json | e -}}</pre>
       <pre
         class="snippet-schema hidden rounded-md bg-surface-container-highest p-1 font-mono"
       >
-{{- op.request_schema_json | e -}}</pre
-      >
+{{- op.request_schema_json | e -}}</pre>
     {% else %}
       <div class="italic">no body needed</div>
     {% endif %}
@@ -82,13 +80,11 @@
       <pre
         class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
       >
-{{- resp.example_json | e -}}</pre
-      >
+{{- resp.example_json | e -}}</pre>
       <pre
         class="snippet-schema hidden rounded-md bg-surface-container-highest p-1 font-mono"
       >
-{{- resp.schema_json | e -}}</pre
-      >
+{{- resp.schema_json | e -}}</pre>
     {% endfor %}
   </div>
 </details>

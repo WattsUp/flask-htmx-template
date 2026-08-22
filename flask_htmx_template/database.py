@@ -218,6 +218,7 @@ class SQLiteDatabase(Database):
                 Config.set_(ConfigKey.CIPHER, cipher_b64)
                 Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
                 Config.set_(ConfigKey.WEB_KEY, secrets.token_hex())
+                Config.set_(ConfigKey.API_BEARER_TOKEN, secrets.token_urlsafe(32))
 
                 Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
                 Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)
@@ -292,6 +293,7 @@ class PostgresDatabase(Database):
                 Config.set_(ConfigKey.CIPHER, cipher_b64)
                 Config.set_(ConfigKey.SECRET_KEY, secrets.token_hex())
                 Config.set_(ConfigKey.WEB_KEY, secrets.token_hex())
+                Config.set_(ConfigKey.API_BEARER_TOKEN, secrets.token_urlsafe(32))
 
                 Config.set_(ConfigKey.WEB_THEME_SWATCH, web_theme.DEFAULT_SWATCH)
                 Config.set_(ConfigKey.WEB_THEME_MOOD, web_theme.DEFAULT_MOOD.name)

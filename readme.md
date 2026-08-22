@@ -8,20 +8,20 @@ A production-ready Flask + HTMX template for building modern web applications wi
 
 ## What's Included
 
-| Feature               | Details                                                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| **Authentication**    | Flask-Login with secure session cookies, `@login_exempt` decorator                         |
-| **Database**          | SQLAlchemy 2 with active-record helpers,  PostgreSQL support |
-| **Migrations**        | Versioned schema migrations with auto-detection on startup                                 |
-| **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector                   |
-| **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies                      |
-| **HTMX patterns**     | Dialog system, snackbar notifications, partial page swaps, nav components                  |
-| **JSON API**          | Type-validated JSON endpoints with full error reporting                                    |
-| **CLI**               | `create`, `migrate`, `backup`, `restore`, `unlock`, `change-password`, `clean`             |
-| **Metrics**           | Prometheus exporter on a separate port                                                     |
-| **Asset pipeline**    | Tailwind CSS v4, JS minification, automatic rebuild on package install                     |
-| **Testing**           | 100% coverage enforced, migration tests                                                    |
-| **Docker**            | Multi-stage build, non-root user, configurable via environment variables                   |
+| Feature               | Details                                                                         |
+| --------------------- | ------------------------------------------------------------------------------- |
+| **Authentication**    | Password/session authentication, debug login, and database-backed bearer tokens |
+| **Database**          | SQLAlchemy 2 with active-record helpers, PostgreSQL support                     |
+| **Migrations**        | Versioned schema migrations with auto-detection on startup                      |
+| **Material Design 3** | Icons, dynamic color palettes from a single swatch color + mood selector        |
+| **Theme editor**      | Live-preview dialog with hue slider and mood picker, saved to cookies           |
+| **HTMX patterns**     | Dialog system, snackbar notifications, partial page swaps, nav components       |
+| **JSON API**          | Type-validated JSON endpoints with full error reporting                         |
+| **CLI**               | `create`, `migrate`, `backup`, `restore`, `unlock`, `change-password`, `clean`  |
+| **Metrics**           | Prometheus exporter on a separate port                                          |
+| **Asset pipeline**    | Tailwind CSS v4, JS minification, automatic rebuild on package install          |
+| **Testing**           | 100% coverage enforced, migration tests                                         |
+| **Docker**            | Multi-stage build, non-root user, configurable via environment variables        |
 
 ---
 
@@ -95,6 +95,12 @@ flask_htmx_template create
 flask --app flask_htmx_template.web run
 ```
 
+### API bearer token
+
+New databases receive an opaque API token in `ConfigKey.API_BEARER_TOKEN`. Send it
+as `Authorization: Bearer <token>` to authenticate API requests. The token is stored
+only in the database and is not issued or validated by an external identity provider.
+
 ---
 
 ## Docker
@@ -111,15 +117,15 @@ docker run \
 
 ### Configuration
 
-| Env                | Default             | Description                                                      |
-| ------------------ | ------------------- | ---------------------------------------------------------------- |
-| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL                         |
-| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database                    |
-| `WEB_PORT`         | `8000`              | Port to bind server to                                           |
-| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                                   |
-| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                                       |
-| `WEB_N_THREADS`    | `1`                 | Threads per worker                                               |
-| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)                                  |
+| Env                | Default             | Description                                   |
+| ------------------ | ------------------- | --------------------------------------------- |
+| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL      |
+| `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database |
+| `WEB_PORT`         | `8000`              | Port to bind server to                        |
+| `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                |
+| `WEB_CONCURRENCY`  | n(CPU) × 2 + 1      | Number of gunicorn workers                    |
+| `WEB_N_THREADS`    | `1`                 | Threads per worker                            |
+| `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)               |
 
 ---
 
@@ -250,5 +256,5 @@ Follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html), implemented 
 [unittest-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/test.yml
 [static-analysis-image]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml/badge.svg
 [static-analysis-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/static-analysis.yml
-[coverage-image]: https://gist.githubusercontent.com/WattsUp/36d9705addcd44fb0fccec1d23dc1338/raw/flask-htmx-template__heads_master.svg
+[coverage-image]: https://gist.githubusercontent.com/WattsUp/36d9705addcd44fb0fccec1d23dc1338/raw/flask-htmx-template__heads_main.svg
 [coverage-url]: https://github.com/WattsUp/flask-htmx-template/actions/workflows/coverage.yml

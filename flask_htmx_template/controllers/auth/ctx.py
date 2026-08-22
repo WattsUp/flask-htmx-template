@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import flask
-import flask.typing
 import flask_login
 
+from flask_htmx_template.controllers import base
 
-def login_exempt(func: flask.typing.RouteCallable) -> flask.typing.RouteCallable:
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+def login_exempt[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     """Exclude a route from requiring authentication.
 
     Returns:
         The marked route callable.
 
     """
-    # login_exempt is not an attribute of RouteCallable.
-    func.login_exempt = True  # type: ignore[attr-defined]
+    # NOTE: The marker is read by default_login_required before the view runs.
+    func.__dict__["login_exempt"] = True
     return func
 
 
@@ -23,7 +29,8 @@ def default_login_required() -> flask.Response | None:
     """Require authentication for routes that are not explicitly exempt.
 
     Returns:
-        Login response when authentication is required, otherwise ``None``.
+        Login or JSON authorization response when authentication is required,
+        otherwise ``None``.
 
     """
     endpoint = flask.request.endpoint
@@ -34,6 +41,15 @@ def default_login_required() -> flask.Response | None:
     view = flask.current_app.view_functions[endpoint]
     if getattr(view, "login_exempt", False):
         return None
+
+    if flask.request.path.startswith("/j/"):
+        if flask_login.current_user.is_authenticated:
+            return None
+        response = flask.jsonify({"errors": ["Bearer token required"]})
+        response.status_code = base.HTTP_CODE_UNAUTHORIZED
+        response.headers["WWW-Authenticate"] = "Bearer"
+        return response
+
     return flask_login.login_required(lambda: None)()
 
 
