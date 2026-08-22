@@ -205,6 +205,14 @@ def test_extract_query_args_none() -> None:
     assert result == {}
 
 
+def test_build_localns_resolves_type_checking_datetime() -> None:
+    result = api_docs._build_localns(
+        "flask_htmx_template.controllers.items.ctx",
+    )
+
+    assert result["datetime"] is datetime
+
+
 # ---------------------------------------------------------------------------
 # get_operations — error cases
 # ---------------------------------------------------------------------------
@@ -281,6 +289,8 @@ def test_json_api_query_args(web_client: WebClient) -> None:
     assert isinstance(item_get, dict)
     assert item_get["query_args"] == {
         "before": "filter items that appear before this date, optional",
+        "limit": "maximum items to return, 1 to 100, defaults to 50",
+        "offset": "filtered items to skip, at least 0, defaults to 0",
     }
 
 

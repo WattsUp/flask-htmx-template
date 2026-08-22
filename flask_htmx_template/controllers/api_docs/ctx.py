@@ -743,7 +743,11 @@ def _build_localns(module_name: str) -> dict[str, object]:
     """
     top = module_name.split(".", 1)[0]
     own_mod = sys.modules.get(module_name)
-    localns: dict[str, object] = {"base": base}
+    # NOTE: Endpoint modules may import standard-library types only under
+    # TYPE_CHECKING.  Keep the runtime namespace useful for annotations such as
+    # ``datetime.date`` without requiring every endpoint module to duplicate
+    # the import at runtime.
+    localns: dict[str, object] = {"base": base, "datetime": datetime}
     for mod_name, mod in sys.modules.items():
         if mod is own_mod:
             continue

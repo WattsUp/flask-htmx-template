@@ -111,7 +111,7 @@ def _bind_database(
     tool: base.MCPTool[base.MCPResult_co],
     database: Database,
     metrics: MCPMetrics,
-) -> Callable[[], base.MCPResult_co]:
+) -> Callable[..., base.MCPResult_co]:
     """Bind an MCP tool to the server's database.
 
     Args:
@@ -120,12 +120,12 @@ def _bind_database(
         metrics: Prometheus metrics for the tool call
 
     Returns:
-        Parameterless MCP tool function
+        MCP tool function without its database parameter
 
     """
 
     @functools.wraps(tool)
-    def bound_tool() -> base.MCPResult_co:
+    def bound_tool(*args: object, **kwargs: object) -> base.MCPResult_co:
         """Call the MCP tool with its bound database.
 
         Returns:
@@ -134,13 +134,10 @@ def _bind_database(
         """
         metrics.call_count.labels(tool=tool.__name__).inc()
         with metrics.duration.labels(tool=tool.__name__).time():
-            return tool(database)
+            return tool(database, *args, **kwargs)
 
-    # The wrapper has no database argument, so the MCP SDK can inspect its
-    # return type without trying to resolve the database's TYPE_CHECKING-only
-    # annotation.  ``wraps`` preserves the original metadata for callers; its
-    # ``__wrapped__`` link is removed so inspection does not expose the bound
-    # database parameter.
+    # NOTE: The explicit signature hides the TYPE_CHECKING-only Database type while
+    # preserving typed tool arguments for MCP SDK schema generation.
     bound_tool.__dict__.pop("__wrapped__", None)
-    bound_tool.__annotations__ = {"return": tool.mcp_return_type}
+    bound_tool.__dict__["__signature__"] = tool.mcp_signature
     return bound_tool

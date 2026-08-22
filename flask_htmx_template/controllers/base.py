@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import datetime
+import inspect
 import ipaddress
 import json
 import re
+import sys
 import textwrap
 from decimal import Decimal
 from pathlib import Path
 from typing import (
     cast,
+    get_args,
     get_type_hints,
+    is_typeddict,
     NamedTuple,
     Protocol,
     TYPE_CHECKING,
@@ -115,9 +119,14 @@ class MCPTool(Protocol[MCPResult_co]):
     __name__: str
     mcp_annotations: ToolAnnotations
     mcp_description: str
-    mcp_return_type: object
+    mcp_signature: inspect.Signature
 
-    def __call__(self, database: Database) -> MCPResult_co:
+    def __call__(
+        self,
+        database: Database,
+        *args: object,
+        **kwargs: object,
+    ) -> MCPResult_co:
         """Run the tool for a database."""
         raise NotImplementedError
 
@@ -164,7 +173,7 @@ def mcp_tool(
     destructive_hint: bool | None = None,
     idempotent_hint: bool | None = None,
     open_world_hint: bool | None = None,
-) -> Callable[[Callable[[Database], MCPResult_co]], MCPTool[MCPResult_co]]:
+) -> Callable[[Callable[..., MCPResult_co]], MCPTool[MCPResult_co]]:
     """Decorate a database function with MCP registration metadata.
 
     Args:
@@ -180,7 +189,7 @@ def mcp_tool(
     """
 
     def decorate(
-        function: Callable[[Database], MCPResult_co],
+        function: Callable[..., MCPResult_co],
     ) -> MCPTool[MCPResult_co]:
         """Attach MCP metadata to a database function.
 
@@ -189,6 +198,9 @@ def mcp_tool(
 
         Returns:
             Function with MCP registration metadata
+
+        Raises:
+            TypeError: If the function does not accept database first
 
         """
         decorated = cast("MCPTool[MCPResult_co]", function)
@@ -201,11 +213,70 @@ def mcp_tool(
         )
         # NOTE: Database is imported only while type checking, so provide a local
         # stand-in while resolving the structured return annotation at runtime.
-        hints = get_type_hints(function, localns={"Database": object})
-        decorated.mcp_return_type = hints.get("return", object)
+        localns: dict[str, object] = {"Database": object, "datetime": datetime}
+        hints = get_type_hints(
+            function,
+            localns=localns,
+            include_extras=True,
+        )
+        _resolve_mcp_typed_dict(hints.get("return"), localns)
+        signature = inspect.signature(function)
+        parameters = tuple(signature.parameters.values())
+        if not parameters or parameters[0].name != "database":
+            message = f"MCP tool must accept database first: {function.__name__}"
+            raise TypeError(message)
+        decorated.mcp_signature = signature.replace(
+            parameters=[
+                parameter.replace(annotation=hints.get(parameter.name, object))
+                for parameter in parameters[1:]
+            ],
+            return_annotation=hints.get("return", object),
+        )
         return register_mcp_tool(decorated)
 
     return decorate
+
+
+def _resolve_mcp_typed_dict(
+    annotation: object,
+    localns: dict[str, object],
+    seen: set[int] | None = None,
+) -> None:
+    """Resolve nested TypedDict annotations used by an MCP result.
+
+    Pydantic evaluates TypedDict annotations from the defining module and does
+    not accept the extra namespace used for the outer function annotation.
+    Resolve the nested classes once before the MCP SDK builds its output model.
+
+    Args:
+        annotation: Candidate TypedDict or a type containing one
+        localns: Names available while resolving deferred annotations
+        seen: Annotation identities already visited
+
+    """
+    if seen is None:
+        seen = set()
+    if id(annotation) in seen:
+        return
+    seen.add(id(annotation))
+
+    if is_typeddict(annotation):
+        module = sys.modules.get(annotation.__module__)
+        if module is None:
+            return
+        hints = get_type_hints(
+            annotation,
+            globalns=vars(module),
+            localns=localns,
+            include_extras=True,
+        )
+        annotation.__annotations__ = hints
+        for hint in hints.values():
+            _resolve_mcp_typed_dict(hint, localns, seen)
+        return
+
+    for arg in get_args(annotation):
+        _resolve_mcp_typed_dict(arg, localns, seen)
 
 
 class NamePair(NamedTuple):

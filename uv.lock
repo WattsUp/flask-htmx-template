@@ -526,6 +526,7 @@ dependencies = [
     { name = "mcp" },
     { name = "packaging" },
     { name = "prometheus-flask-exporter" },
+    { name = "pydantic" },
     { name = "sqlalchemy" },
     { name = "tqdm" },
 ]
@@ -609,6 +610,7 @@ requires-dist = [
     { name = "prek", marker = "extra == 'dev'" },
     { name = "prometheus-flask-exporter" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'postgres'" },
+    { name = "pydantic", specifier = ">=2" },
     { name = "pytailwindcss", marker = "extra == 'test'" },
     { name = "pytest", marker = "extra == 'test'" },
     { name = "pytest-postgresql", marker = "extra == 'test'" },

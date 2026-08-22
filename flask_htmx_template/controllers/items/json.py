@@ -13,11 +13,52 @@ from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
 
 
-def json_all() -> ctx.AllItemsContext | base.JSONResponse:
+def _parse_query_int(
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int | None = None,
+) -> int:
+    """Parse and bound an integer query parameter.
+
+    Args:
+        name: Query parameter name
+        default: Value when the parameter is absent
+        minimum: Inclusive minimum value
+        maximum: Inclusive maximum value, if any
+
+    Returns:
+        Parsed integer value
+
+    Raises:
+        ValueError: If the value is not an integer or is outside its bounds
+
+    """
+    raw_value = flask.request.args.get(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        message = f"{name} must be an integer"
+        raise ValueError(message) from error
+    if value < minimum or (maximum is not None and value > maximum):
+        if maximum is None:
+            message = f"{name} must be at least {minimum}"
+        else:
+            message = f"{name} must be between {minimum} and {maximum}"
+        raise ValueError(message)
+    return value
+
+
+def json_all() -> ctx.ItemsContext | base.JSONResponse:
     """GET all items.
 
     Query args:
         before: filter items that appear before this date, optional
+        limit: maximum items to return, 1 to 100, defaults to 50
+        offset: filtered items to skip, at least 0, defaults to 0
 
     Returns:
         Item-list context or JSON validation error.
@@ -29,8 +70,18 @@ def json_all() -> ctx.AllItemsContext | base.JSONResponse:
         return {
             "errors": ["before must be an ISO 8601 date string"],
         }, base.HTTP_CODE_BAD_REQUEST
+    try:
+        limit = _parse_query_int(
+            "limit",
+            ctx.DEFAULT_PAGE_LIMIT,
+            minimum=1,
+            maximum=ctx.MAX_PAGE_LIMIT,
+        )
+        offset = _parse_query_int("offset", 0, minimum=0)
+    except ValueError as error:
+        return {"errors": [str(error)]}, base.HTTP_CODE_BAD_REQUEST
     with web.db.begin_session():
-        return ctx.items(before=before)
+        return ctx.items(before=before, limit=limit, offset=offset)
 
 
 def json_new() -> ctx.ItemContext | base.JSONResponse:

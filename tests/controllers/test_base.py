@@ -24,6 +24,22 @@ if TYPE_CHECKING:
     from tests.controllers.conftest import HTMLValidator, WebClient
 
 
+def _missing_database_tool() -> dict[str, object]:
+    """Return an empty result without accepting a database.
+
+    Returns:
+        Empty result
+
+    """
+    return {}
+
+
+def test_mcp_tool_requires_database_first() -> None:
+    # Act and assert
+    with pytest.raises(TypeError, match="must accept database first"):
+        base.mcp_tool("Invalid tool")(_missing_database_tool)
+
+
 def test_find(item: Item) -> None:
     assert base.find(Item, item.uri) == item
 

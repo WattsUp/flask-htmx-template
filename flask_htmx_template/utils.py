@@ -995,7 +995,14 @@ def _validate_json_dict[V: object](
                     return obj_upgrade, errors
         errors.extend(union_errors)
         return obj, errors
-    hints = get_type_hints(type_, include_extras=True)
+    # NOTE: Some endpoint context modules import annotation-only types under
+    # TYPE_CHECKING. Keep those modules lightweight at runtime while still
+    # resolving their annotations during JSON validation.
+    hints = get_type_hints(
+        type_,
+        localns={"datetime": datetime},
+        include_extras=True,
+    )
     if not hints:
         return obj, errors
     return _validate_typed_dict_hints(obj, hints, key)

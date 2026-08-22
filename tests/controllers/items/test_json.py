@@ -3,7 +3,11 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+import pytest
+
+from flask_htmx_template import utils
 from flask_htmx_template.controllers.base import HTTP_CODE_BAD_REQUEST
+from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
 
 if TYPE_CHECKING:
@@ -14,10 +18,27 @@ if TYPE_CHECKING:
     from tests.controllers.conftest import WebClient
 
 
+def test_validate_item_context_resolves_type_checking_datetime() -> None:
+    payload, errors = utils.validate_json(
+        {
+            "name": "New name",
+            "value": "1234",
+            "date": "2026-08-22",
+            "note": None,
+        },
+        ctx.ItemContext,
+    )
+
+    assert not errors
+    assert type(payload["date"]).__name__ == "date"
+
+
 def test_get_all(web_client: WebClient, item: Item) -> None:
     result, _ = web_client.GET_J("items.json_all")
     target = {
+        "count": 1,
         "total": 0,
+        "next_offset": None,
         "items": [
             {
                 "uri": item.uri,
@@ -55,7 +76,9 @@ def test_get_all_before_filters_items_and_total(
     )
 
     assert result == {
+        "count": 1,
         "total": 2,
+        "next_offset": None,
         "items": [
             {
                 "uri": older.uri,
@@ -76,6 +99,69 @@ def test_get_all_before_rejects_invalid_date(web_client: WebClient) -> None:
     )
 
     assert result == {"errors": ["before must be an ISO 8601 date string"]}
+
+
+def test_get_all_limit_and_offset_paginate_items(
+    web_client: WebClient,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    # Arrange
+    with session.begin_nested():
+        Item.create(name="Apples", date_ord=today_ord - 1, value=Decimal(2))
+        Item.create(name="Cherries", date_ord=today_ord + 1, value=Decimal(3))
+
+    # Act
+    result, _ = web_client.GET_J(
+        "items.json_all",
+        query_string={"limit": 1, "offset": 1},
+    )
+
+    # Assert
+    assert result == {
+        "count": 3,
+        "items": [
+            {
+                "uri": item.uri,
+                "name": item.name,
+                "date": item.date.isoformat(),
+                "value": 0,
+                "note": item.note,
+            },
+        ],
+        "next_offset": 2,
+        "total": 0,
+    }
+
+
+@pytest.mark.parametrize(
+    ("query_string", "message"),
+    [
+        ({"limit": "invalid"}, "limit must be an integer"),
+        ({"limit": 0}, f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}"),
+        (
+            {"limit": ctx.MAX_PAGE_LIMIT + 1},
+            f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}",
+        ),
+        ({"offset": "invalid"}, "offset must be an integer"),
+        ({"offset": -1}, "offset must be at least 0"),
+    ],
+)
+def test_get_all_rejects_invalid_pagination(
+    web_client: WebClient,
+    query_string: dict[str, object],
+    message: str,
+) -> None:
+    # Act
+    result, _ = web_client.GET_J(
+        "items.json_all",
+        query_string=query_string,
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+
+    # Assert
+    assert result == {"errors": [message]}
 
 
 def test_get(web_client: WebClient, item: Item, session: orm.Session) -> None:

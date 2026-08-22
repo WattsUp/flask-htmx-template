@@ -16,6 +16,7 @@ from flask_htmx_template.controllers import base
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.controllers.items import mcp as items_mcp
 from flask_htmx_template.models.config import Config, ConfigKey
+from flask_htmx_template.models.item import Item
 
 if TYPE_CHECKING:
     import flask
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
     from starlette.routing import Mount, Route
 
     from flask_htmx_template.database import Database
-    from flask_htmx_template.models.item import Item
 
 
 class CurrentSessionDatabase:
@@ -101,19 +101,21 @@ async def _get_tool(server: mcp.MCPServer, name: str) -> Tool:
 async def _call_tool(
     server: mcp.MCPServer,
     name: str,
+    arguments: dict[str, object] | None = None,
 ) -> CallToolResult:
     """Call an MCP tool through an in-process client.
 
     Args:
         server: MCP server hosting the tool
         name: Tool name to call
+        arguments: Typed tool arguments
 
     Returns:
         MCP tool call result
 
     """
     async with Client(server) as client:
-        return await client.call_tool(name)
+        return await client.call_tool(name, arguments=arguments)
 
 
 def _duplicate_items_tool(database: Database) -> dict[str, object]:
@@ -227,12 +229,51 @@ def test_get_items_returns_current_items(
     database = current_session_database
 
     # Act
-    value: ctx.AllItemsContext = items_mcp.get_items(database)
+    value: ctx.ItemsContext = items_mcp.get_items(database)
 
     # Assert
     assert not isinstance(value, str)
     assert value["items"][0]["name"] == item.name
     assert value["total"] == item.value
+    assert value["count"] == 1
+    assert value["next_offset"] is None
+
+
+def test_get_items_filters_and_paginates(
+    current_session_database: Database,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    # Arrange
+    with session.begin_nested():
+        older = Item.create(
+            name="Apples",
+            date_ord=today_ord - 1,
+            value=2,
+        )
+        Item.create(
+            name="Apricots",
+            date_ord=today_ord - 1,
+            value=3,
+        )
+    database = current_session_database
+
+    # Act
+    value = items_mcp.get_items(
+        database,
+        before=item.date,
+        limit=1,
+        offset=0,
+    )
+
+    # Assert
+    assert value == {
+        "count": 2,
+        "items": [ctx.item(older)],
+        "next_offset": 1,
+        "total": older.value,
+    }
 
 
 def test_get_items_publishes_output_schema(
@@ -249,8 +290,43 @@ def test_get_items_publishes_output_schema(
     # Assert
     assert tool.output_schema is not None
     assert tool.output_schema["type"] == "object"
-    assert set(tool.output_schema["required"]) == {"items", "total"}
-    assert set(tool.output_schema["properties"]) == {"items", "total"}
+    assert set(tool.output_schema["required"]) == {
+        "count",
+        "items",
+        "next_offset",
+        "total",
+    }
+    assert set(tool.output_schema["properties"]) == {
+        "count",
+        "items",
+        "next_offset",
+        "total",
+    }
+
+
+def test_get_items_publishes_typed_input_schema(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    # Arrange
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    # Act
+    tool = anyio.run(_get_tool, server, "get_items")
+
+    # Assert
+    assert "required" not in tool.input_schema
+    properties = tool.input_schema["properties"]
+    assert properties["before"]["anyOf"][0] == {
+        "format": "date",
+        "type": "string",
+    }
+    assert properties["limit"]["default"] == ctx.DEFAULT_PAGE_LIMIT
+    assert properties["limit"]["minimum"] == 1
+    assert properties["limit"]["maximum"] == ctx.MAX_PAGE_LIMIT
+    assert properties["offset"]["default"] == 0
+    assert properties["offset"]["minimum"] == 0
 
 
 def test_get_items_returns_structured_content_in_process(
@@ -270,6 +346,59 @@ def test_get_items_returns_structured_content_in_process(
     assert result.structured_content is not None
     assert result.structured_content["items"][0]["name"] == item.name
     assert result.structured_content["total"] == str(item.value)
+    assert result.structured_content["count"] == 1
+    assert result.structured_content["next_offset"] is None
+
+
+def test_get_items_accepts_typed_arguments_in_process(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+    item: Item,
+) -> None:
+    # Arrange
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+    arguments: dict[str, object] = {
+        "before": item.date.isoformat(),
+        "limit": 1,
+        "offset": 0,
+    }
+
+    # Act
+    result = anyio.run(_call_tool, server, "get_items", arguments)
+
+    # Assert
+    assert not result.is_error
+    assert result.structured_content == {
+        "count": 0,
+        "items": [],
+        "next_offset": None,
+        "total": "0",
+    }
+
+
+def test_get_items_rejects_invalid_pagination_in_process(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    # Arrange
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+    arguments: dict[str, object] = {
+        "limit": ctx.MAX_PAGE_LIMIT + 1,
+    }
+
+    # Act
+    result = anyio.run(
+        _call_tool,
+        server,
+        "get_items",
+        arguments,
+    )
+
+    # Assert
+    assert result.is_error
+    assert result.structured_content is None
 
 
 def test_mcp_tool_records_metrics(
@@ -284,7 +413,7 @@ def test_mcp_tool_records_metrics(
     )
 
     # Act
-    tool()
+    tool(limit=1, offset=0)
 
     # Assert
     metrics = prometheus_client.generate_latest(registry).decode()

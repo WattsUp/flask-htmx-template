@@ -24,8 +24,10 @@ def test_ctx_item(item: Item) -> None:
 def test_ctx_items(item: Item) -> None:
     result = ctx.items()
 
-    target: ctx.AllItemsContext = {
+    target: ctx.ItemsContext = {
+        "count": 1,
         "total": item.value,
+        "next_offset": None,
         "items": [
             {
                 "date": item.date,

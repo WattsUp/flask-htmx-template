@@ -33,6 +33,14 @@ class TreeNode(NamedTuple):
     parent: TreeNode | None
     children: list[TreeNode]
 
+    def __repr__(self) -> str:
+        return (
+            f"TreeNode(tag={self.tag!r}, attributes={self.attributes!r}, "
+            f"i_start={self.i_start}, i_end={self.i_end}, "
+            f"parent={'...' if self.parent else None}, "
+            f"children=[...{len(self.children)} nodes])"
+        )
+
     def set_parent(self, parent: TreeNode) -> TreeNode:
         return TreeNode(
             self.tag,
