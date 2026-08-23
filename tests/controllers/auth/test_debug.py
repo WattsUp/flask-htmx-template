@@ -12,11 +12,9 @@ if TYPE_CHECKING:
 
 
 def test_debug_login_rejects_when_debug_is_disabled(flask_app: flask.Flask) -> None:
-    # Arrange
     flask_app.debug = False
 
     try:
-        # Act
         with flask_app.test_request_context(), pytest.raises(exc.http.Unauthorized):
             debug.debug_login()
     finally:

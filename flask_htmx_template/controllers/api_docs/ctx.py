@@ -29,6 +29,8 @@ from typing import (
     TypedDict,
 )
 
+from pydantic import TypeAdapter
+
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
 from flask_htmx_template.controllers import base
@@ -36,7 +38,7 @@ from flask_htmx_template.models.base import BaseEnum
 
 if TYPE_CHECKING:
     import types
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     import flask
 
@@ -132,8 +134,200 @@ def _extract_url_args(
     return result
 
 
+def _is_named_tuple(t: object) -> bool:
+    """Return whether *t* is a class created by ``typing.NamedTuple``.
+
+    Returns:
+        True for a ``NamedTuple`` class, otherwise False.
+
+    """
+    return (
+        isinstance(t, type)
+        and issubclass(t, tuple)
+        and isinstance(getattr(t, "_fields", None), tuple)
+        and hasattr(t, "__annotations__")
+    )
+
+
+def _resolve_ast_object(node: ast.AST, module: types.ModuleType) -> object | None:
+    """Resolve a simple name or attribute expression from a view's module.
+
+    Returns:
+        The resolved object, or None when the expression cannot be resolved.
+
+    """
+    if isinstance(node, ast.Name):
+        return getattr(module, node.id, None)
+    if isinstance(node, ast.Attribute):
+        parent = _resolve_ast_object(node.value, module)
+        return getattr(parent, node.attr, None) if parent is not None else None
+    return None
+
+
+def _is_json_api_call(
+    node: ast.AST,
+    function_name: str,
+    module: types.ModuleType,
+) -> bool:
+    """Return whether an AST function expression targets a JSON API helper.
+
+    Qualified calls and direct imports with aliases are resolved to their
+    module-level objects and checked against the helper's defining module and
+    name.
+
+    Args:
+        node: AST function expression from a call.
+        function_name: Expected JSON API helper name.
+        module: Module containing the view.
+
+    Returns:
+        True when the expression refers to the requested helper.
+
+    """
+    if not isinstance(node, (ast.Name, ast.Attribute)):
+        return False
+    target = _resolve_ast_object(node, module)
+    return (
+        callable(target)
+        and getattr(target, "__name__", None) == function_name
+        and str(getattr(target, "__module__", "")).endswith(".json_api")
+    )
+
+
+def _extract_query_type(
+    view: Callable[..., object],
+) -> type[tuple[object, ...]] | None:
+    """Find the ``NamedTuple`` passed to ``json_api.args`` in a view.
+
+    The query model is the first positional argument.  Calls through a module
+    alias and direct imports are both supported.
+
+    Returns:
+        The query ``NamedTuple`` class, or None when no parser call is found.
+
+    """
+    try:
+        source = textwrap.dedent(inspect.getsource(view))
+        tree = ast.parse(source)
+    except (OSError, TypeError, SyntaxError):
+        return None
+
+    module = inspect.getmodule(view)
+    if module is None:  # pragma: no cover
+        return None
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not _is_json_api_call(func, "args", module) or not node.args:
+            continue
+        query_type = _resolve_ast_object(node.args[0], module)
+        if _is_named_tuple(query_type):
+            return cast("type[tuple[object, ...]]", query_type)
+    return None
+
+
+def _query_schema_label(schema: Mapping[str, object]) -> str:
+    """Return a readable query type label from a pydantic JSON schema.
+
+    Returns:
+        Human-readable type label.
+
+    """
+    if isinstance(description := schema.get("description"), str):
+        return description
+    if isinstance(any_of := schema.get("anyOf"), list):
+        arms = cast("list[object]", any_of)
+        arm_schemas = [
+            cast("dict[str, object]", arm) for arm in arms if isinstance(arm, dict)
+        ]
+        labels = [
+            _query_schema_label(arm) for arm in arm_schemas if arm.get("type") != "null"
+        ]
+        return " or ".join(dict.fromkeys(labels)) or "null"
+    if isinstance(values := schema.get("enum"), list):
+        return " or ".join(repr(value) for value in cast("list[object]", values))
+    items = schema.get("items")
+    if schema.get("type") == "array" and isinstance(items, dict):
+        return f"list of {_query_schema_label(cast('dict[str, object]', items))}"
+    schema_key = schema.get("format") or schema.get("type")
+    return {
+        "date": "ISO-8601 date string",
+        "date-time": "ISO-8601 date & time string",
+        "boolean": "boolean",
+        "integer": "integer",
+        "number": "number",
+        "string": "string",
+    }.get(cast("str", schema_key), "value")
+
+
+def _query_schema_constraints(schema: Mapping[str, object]) -> list[str]:
+    """Format pydantic JSON-schema bounds as a human-readable phrase.
+
+    Returns:
+        A list containing at most one human-readable constraint.
+
+    """
+    minimum = schema.get("minimum")
+    exclusive_minimum = schema.get("exclusiveMinimum")
+    maximum = schema.get("maximum")
+    exclusive_maximum = schema.get("exclusiveMaximum")
+    if minimum is not None and maximum is not None:
+        text = f"between {minimum} and {maximum}"
+    elif exclusive_minimum is not None and exclusive_maximum is not None:
+        text = f"greater than {exclusive_minimum} and less than {exclusive_maximum}"
+    elif minimum is not None:
+        text = f"at least {minimum}"
+    elif exclusive_minimum is not None:
+        text = f"greater than {exclusive_minimum}"
+    elif maximum is not None:
+        text = f"at most {maximum}"
+    elif exclusive_maximum is not None:
+        text = f"less than {exclusive_maximum}"
+    else:
+        return []
+    return [text]
+
+
+def _query_args_from_named_tuple(
+    query_type: type[tuple[object, ...]],
+) -> dict[str, str]:
+    """Build query argument descriptions from a ``NamedTuple`` declaration.
+
+    Returns:
+        Mapping of query parameter names to generated descriptions.
+
+    """
+    try:
+        hints = get_type_hints(
+            query_type,
+            localns=_build_localns(getattr(query_type, "__module__", "")),
+            include_extras=True,
+        )
+    except Exception:  # pragma: no cover
+        return {}
+
+    defaults = getattr(query_type, "_field_defaults", {})
+    result: dict[str, str] = {}
+    for name, annotation in hints.items():
+        schema = TypeAdapter(annotation).json_schema()
+        parts = [_query_schema_label(schema), *_query_schema_constraints(schema)]
+        if name in defaults and defaults[name] is not None:
+            parts.append(f"defaults to {defaults[name]}")
+        elif name in defaults:
+            parts.append("optional")
+        result[name] = ", ".join(parts)
+    return result
+
+
 def _extract_query_args(view: Callable[..., object]) -> dict[str, str]:
-    """Extract query argument descriptions from a ``Query args:`` pydoc section.
+    """Extract query argument descriptions from a query argument declaration.
+
+    JSON views declare parsed query arguments by passing a ``NamedTuple`` to
+    ``json_api.args``.  Its annotations, ``Field`` metadata, and
+    defaults are the source of truth for generated documentation.  The
+    docstring format remains supported for views that predate the parser.
 
     Args:
         view: View function whose docstring is parsed.
@@ -142,6 +336,10 @@ def _extract_query_args(view: Callable[..., object]) -> dict[str, str]:
         Dict mapping each query arg name to its description string.
 
     """
+    query_type = _extract_query_type(view)
+    if query_type is not None:
+        return _query_args_from_named_tuple(query_type)
+
     raw_doc = inspect.getdoc(view) or ""
     in_query_args = False
     result: dict[str, str] = {}
@@ -796,10 +994,11 @@ def _extract_response_annotations(
 def _extract_request_type(
     view_func: Callable[..., object],
 ) -> type[dict[str, object]] | None:
-    """Find the TypedDict passed to ``validate_json()`` in the function source.
+    """Find the TypedDict passed to ``json_api.body()`` in the source.
 
-    Scans the AST for ``validate_json(data, SomeTypedDict)`` and resolves
-    *SomeTypedDict* from the view function's module globals.
+    Scans the AST for calls to ``body(SomeTypedDict, raw)`` and resolves
+    *SomeTypedDict* from the view function's module globals.  The body helper
+    may be accessed through any module alias.
 
     Returns:
         TypedDict class or None.
@@ -815,20 +1014,14 @@ def _extract_request_type(
     if not module:  # pragma: no cover
         return None
 
-    min_validate_args = 2
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        is_validate = (
-            isinstance(func, ast.Attribute) and func.attr == "validate_json"
-        ) or (isinstance(func, ast.Name) and func.id == "validate_json")
-        if is_validate and len(node.args) >= min_validate_args:
-            type_arg = node.args[1]
-            if isinstance(type_arg, ast.Name):
-                type_obj = getattr(module, type_arg.id, None)
-                if type_obj and _is_typed_dict(type_obj):
-                    return cast("type[dict[str, object]]", type_obj)
+        if _is_json_api_call(func, "body", module) and node.args:
+            type_obj = _resolve_ast_object(node.args[0], module)
+            if type_obj and _is_typed_dict(type_obj):
+                return cast("type[dict[str, object]]", type_obj)
     return None
 
 
@@ -875,7 +1068,7 @@ def get_operations(
     """Scan /j/ routes and build operation documentation.
 
     Generates request/response examples by introspecting TypedDict annotations
-    on view functions and their ``validate_json()`` calls.
+    on view functions and their ``json_api.body()`` calls.
 
     Args:
         app: Flask application whose URL map is scanned.

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from flask_htmx_template import utils
+from flask_htmx_template.controllers import json_api
 from flask_htmx_template.controllers.base import HTTP_CODE_BAD_REQUEST
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
@@ -18,19 +18,19 @@ if TYPE_CHECKING:
     from tests.controllers.conftest import WebClient
 
 
-def test_validate_item_context_resolves_type_checking_datetime() -> None:
-    payload, errors = utils.validate_json(
+def test_body_item_context_resolves_type_checking_datetime() -> None:
+    payload, errors = json_api.body(
+        ctx.ItemContext,
         {
             "name": "New name",
             "value": "1234",
             "date": "2026-08-22",
             "note": None,
         },
-        ctx.ItemContext,
     )
 
     assert not errors
-    assert type(payload["date"]).__name__ == "date"
+    assert type(payload.get("date")).__name__ == "date"
 
 
 def test_get_all(web_client: WebClient, item: Item) -> None:
@@ -107,18 +107,15 @@ def test_get_all_limit_and_offset_paginate_items(
     session: orm.Session,
     today_ord: int,
 ) -> None:
-    # Arrange
     with session.begin_nested():
         Item.create(name="Apples", date_ord=today_ord - 1, value=Decimal(2))
         Item.create(name="Cherries", date_ord=today_ord + 1, value=Decimal(3))
 
-    # Act
     result, _ = web_client.GET_J(
         "items.json_all",
         query_string={"limit": 1, "offset": 1},
     )
 
-    # Assert
     assert result == {
         "count": 3,
         "items": [
@@ -139,7 +136,10 @@ def test_get_all_limit_and_offset_paginate_items(
     ("query_string", "message"),
     [
         ({"limit": "invalid"}, "limit must be an integer"),
-        ({"limit": 0}, f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}"),
+        (
+            {"limit": 0},
+            f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}",
+        ),
         (
             {"limit": ctx.MAX_PAGE_LIMIT + 1},
             f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}",
@@ -153,15 +153,35 @@ def test_get_all_rejects_invalid_pagination(
     query_string: dict[str, object],
     message: str,
 ) -> None:
-    # Act
     result, _ = web_client.GET_J(
         "items.json_all",
         query_string=query_string,
         rc=HTTP_CODE_BAD_REQUEST,
     )
 
-    # Assert
     assert result == {"errors": [message]}
+
+
+def test_get_all_collects_query_errors(web_client: WebClient) -> None:
+    result, _ = web_client.GET_J(
+        "items.json_all",
+        query_string={
+            "before": "not-a-date",
+            "limit": 0,
+            "offset": -1,
+            "unknown": "value",
+        },
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert result == {
+        "errors": [
+            "before must be an ISO 8601 date string",
+            f"limit must be between 1 and {ctx.MAX_PAGE_LIMIT}",
+            "offset must be at least 0",
+            "unknown is not recognized",
+        ],
+    }
 
 
 def test_get(web_client: WebClient, item: Item, session: orm.Session) -> None:

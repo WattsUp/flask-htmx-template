@@ -1,14 +1,25 @@
 from __future__ import annotations
 
+import ast
 import datetime
 import types
-from typing import Any, cast, Literal, NotRequired, TYPE_CHECKING, TypedDict
+from typing import (
+    Annotated,
+    Any,
+    cast,
+    Literal,
+    NamedTuple,
+    NotRequired,
+    TYPE_CHECKING,
+    TypedDict,
+)
 
 import flask
 import pytest
+from pydantic import Field
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import utils
+from flask_htmx_template.controllers import json_api
 from flask_htmx_template.controllers.api_docs import ctx as api_docs
 from flask_htmx_template.controllers.items.ctx import ItemCategory
 
@@ -27,13 +38,17 @@ class _NotATypedDict:
     pass
 
 
-def _view_with_non_td_validate() -> api_docs._ResponseInfo:
-    utils.validate_json(dict[str, Any](), _NotATypedDict)
+_json_args = json_api.args
+_json_body = json_api.body
+
+
+def _view_with_non_td_body() -> api_docs._ResponseInfo:
+    json_api.body(_NotATypedDict, raw={})
     return api_docs._ResponseInfo({}, {})
 
 
-def _view_with_attr_validate() -> api_docs._ResponseInfo:
-    utils.validate_json(dict[str, Any](), api_docs._Method)
+def _view_with_attr_body() -> api_docs._ResponseInfo:
+    json_api.body(api_docs._Method, raw={})
     return api_docs._ResponseInfo({}, {})
 
 
@@ -50,6 +65,26 @@ class _TypedDictWithOptional(TypedDict):
     count: NotRequired[int]
 
 
+class _QueryDocs(NamedTuple):
+    """Query model covering generated documentation types and constraints."""
+
+    enabled: bool
+    ratio: float
+    text: str
+    amount: api_docs.Decimal
+    when: datetime.datetime
+    choice: Literal["first", "second"]
+    names: list[str]
+    category: ItemCategory
+    interval: Annotated[int, Field(gt=0, lt=10)]
+    minimum_exclusive: Annotated[int, Field(gt=0)]
+    maximum_inclusive: Annotated[int, Field(le=10)]
+    maximum_exclusive: Annotated[int, Field(lt=10)]
+    described: Annotated[str, Field(description="Helpful text")]
+    optional: str | None = None
+    defaulted: int = 3
+
+
 def _view_with_valid_td() -> _SimpleTypedDict:
     """Create a response after validating a typed request body.
 
@@ -57,7 +92,52 @@ def _view_with_valid_td() -> _SimpleTypedDict:
         Minimal response context.
 
     """
-    utils.validate_json(dict[str, Any](), _SimpleTypedDict)
+    json_api.body(_SimpleTypedDict, raw={})
+    return {"key": "value"}
+
+
+def _view_with_aliased_body() -> _SimpleTypedDict:
+    """Return a response after calling an aliased JSON body helper.
+
+    Returns:
+        Minimal response context.
+
+    """
+    _json_body(_SimpleTypedDict, {})
+    return {"key": "value"}
+
+
+def _view_with_aliased_args() -> _SimpleTypedDict:
+    """Return a response after calling an aliased JSON args helper.
+
+    Returns:
+        Minimal response context.
+
+    """
+    _json_args(_QueryDocs, {})
+    return {"key": "value"}
+
+
+def _view_with_qualified_args() -> _SimpleTypedDict:
+    """Return a response after calling a qualified JSON args helper.
+
+    Returns:
+        Minimal response context.
+
+    """
+    json_api.args(_QueryDocs, {})
+    return {"key": "value"}
+
+
+def _view_with_non_named_tuple_then_valid_args() -> _SimpleTypedDict:
+    """Call the query parser with an invalid model before a valid model.
+
+    Returns:
+        Minimal response context.
+
+    """
+    _json_args(cast("type[tuple[object, ...]]", _NotATypedDict), {})
+    _json_args(_QueryDocs, {})
     return {"key": "value"}
 
 
@@ -171,6 +251,26 @@ def test_extract_url_args_none() -> None:
 
 
 # ---------------------------------------------------------------------------
+# AST helpers
+# ---------------------------------------------------------------------------
+
+
+def test_is_named_tuple_rejects_non_type() -> None:
+    result = api_docs._is_named_tuple("not a type")
+
+    assert result is False
+
+
+def test_is_json_api_call_rejects_other_ast_node() -> None:
+    node = ast.Constant(value="args")
+    module = types.ModuleType("test")
+
+    result = api_docs._is_json_api_call(node, "args", module)
+
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
 # _extract_query_args
 # ---------------------------------------------------------------------------
 
@@ -203,6 +303,46 @@ def test_extract_query_args_none() -> None:
     result = api_docs._extract_query_args(view)
 
     assert result == {}
+
+
+def test_query_args_from_named_tuple_documents_model() -> None:
+    result = api_docs._query_args_from_named_tuple(_QueryDocs)
+
+    assert result == {
+        "enabled": "boolean",
+        "ratio": "number",
+        "text": "string",
+        "amount": "number or string",
+        "when": "ISO-8601 date & time string",
+        "choice": "'first' or 'second'",
+        "names": "list of string",
+        "category": "Category of an item.",
+        "interval": "integer, greater than 0 and less than 10",
+        "minimum_exclusive": "integer, greater than 0",
+        "maximum_inclusive": "integer, at most 10",
+        "maximum_exclusive": "integer, less than 10",
+        "described": "Helpful text",
+        "optional": "string, optional",
+        "defaulted": "integer, defaults to 3",
+    }
+
+
+def test_extract_query_type_finds_qualified_args_call() -> None:
+    result = api_docs._extract_query_type(_view_with_qualified_args)
+
+    assert result is _QueryDocs
+
+
+def test_extract_query_type_finds_aliased_args_call() -> None:
+    result = api_docs._extract_query_type(_view_with_aliased_args)
+
+    assert result is _QueryDocs
+
+
+def test_extract_query_type_skips_non_named_tuple_call() -> None:
+    result = api_docs._extract_query_type(_view_with_non_named_tuple_then_valid_args)
+
+    assert result is _QueryDocs
 
 
 def test_build_localns_resolves_type_checking_datetime() -> None:
@@ -288,9 +428,9 @@ def test_json_api_query_args(web_client: WebClient) -> None:
     item_get = url_ops["GET"]
     assert isinstance(item_get, dict)
     assert item_get["query_args"] == {
-        "before": "filter items that appear before this date, optional",
-        "limit": "maximum items to return, 1 to 100, defaults to 50",
-        "offset": "filtered items to skip, at least 0, defaults to 0",
+        "before": "ISO-8601 date string, optional",
+        "limit": "integer, between 1 and 100, defaults to 50",
+        "offset": "integer, at least 0, defaults to 0",
     }
 
 
@@ -435,20 +575,20 @@ def test_response_arms_tuple_no_typed_dict() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _extract_request_type — non-TypedDict name branch
+# _extract_request_type - non-TypedDict argument branches
 # ---------------------------------------------------------------------------
 
 
 def test_extract_request_type_non_typed_dict_name() -> None:
     # _NotATypedDict is not a TypedDict → _is_typed_dict returns False → None
-    result = api_docs._extract_request_type(_view_with_non_td_validate)
+    result = api_docs._extract_request_type(_view_with_non_td_body)
     assert result is None
 
 
 def test_extract_request_type_attribute_type_arg() -> None:
-    # _view_with_attr_validate uses api_docs._Method as type arg (ast.Attribute,
-    # not ast.Name) → isinstance(type_arg, ast.Name) is False → 658->649 branch
-    result = api_docs._extract_request_type(_view_with_attr_validate)
+    # The resolver supports attribute expressions, but _Method is not a
+    # TypedDict.
+    result = api_docs._extract_request_type(_view_with_attr_body)
     assert result is None
 
 
@@ -591,6 +731,12 @@ def test_operation_serializes_request_schema_and_example() -> None:
 
 def test_extract_request_type_finds_typed_dict() -> None:
     result = api_docs._extract_request_type(_view_with_valid_td)
+
+    assert result is _SimpleTypedDict
+
+
+def test_extract_request_type_finds_aliased_body_call() -> None:
+    result = api_docs._extract_request_type(_view_with_aliased_body)
 
     assert result is _SimpleTypedDict
 

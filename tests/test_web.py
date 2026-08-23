@@ -63,6 +63,19 @@ def test_getattr() -> None:
         _ = web.fake
 
 
+def test_json_encoder_dumps_without_request_context(flask_app: flask.Flask) -> None:
+    result = flask_app.json.dumps({"value": Decimal("1.2")})
+
+    assert result == '{"value": "1.2"}'
+
+
+def test_json_encoder_honors_indent_header(flask_app: flask.Flask) -> None:
+    with flask_app.test_request_context(headers={"X-Indent": "2"}):
+        result = flask_app.json.dumps({"value": 1})
+
+    assert result == '{\n  "value": 1\n}'
+
+
 @pytest.mark.parametrize(
     ("kwargs", "target"),
     [

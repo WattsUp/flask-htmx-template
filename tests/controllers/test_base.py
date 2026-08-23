@@ -4,7 +4,7 @@ import datetime
 import re
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 import flask
 import pytest
@@ -34,10 +34,26 @@ def _missing_database_tool() -> dict[str, object]:
     return {}
 
 
+class _UnloadedTypedDict(TypedDict):
+    """Typed dictionary whose defining module can be removed for testing."""
+
+    value: str
+
+
 def test_mcp_tool_requires_database_first() -> None:
-    # Act and assert
     with pytest.raises(TypeError, match="must accept database first"):
         base.mcp_tool("Invalid tool")(_missing_database_tool)
+
+
+def test_resolve_mcp_typed_dict_ignores_unloaded_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    annotations = _UnloadedTypedDict.__annotations__.copy()
+    monkeypatch.setattr(_UnloadedTypedDict, "__module__", "missing_module")
+
+    base._resolve_mcp_typed_dict(_UnloadedTypedDict, {})
+
+    assert _UnloadedTypedDict.__annotations__ == annotations
 
 
 def test_find(item: Item) -> None:

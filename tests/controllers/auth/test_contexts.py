@@ -15,13 +15,11 @@ def test_json_api_allows_valid_bearer_token(
     web_client: WebClient,
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     with web.db.begin_session():
         token = Config.fetch(ConfigKey.API_BEARER_TOKEN)
     flask_app.testing = False
 
     try:
-        # Act
         result, _ = web_client.GET_J(
             "api_docs.json_api",
             headers={"Authorization": f"Bearer {token}", "HX-Request": "true"},
@@ -29,7 +27,6 @@ def test_json_api_allows_valid_bearer_token(
     finally:
         flask_app.testing = True
 
-    # Assert
     urls = result["urls"]
     assert isinstance(urls, dict)
     assert "/j/items" in urls

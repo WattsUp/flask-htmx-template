@@ -69,6 +69,12 @@ class JSONEncoder(flask.json.provider.JSONProvider):
 
     @override
     def dumps(self, obj: object, **kwargs: object) -> str:
+        # NOTE: Flask also uses this provider to encode test request bodies before
+        # it creates a request context.
+        if flask.has_request_context():
+            indent = flask.request.headers.get("X-Indent", type=int)
+            if indent is not None:
+                kwargs["indent"] = indent
         return json.dumps(utils.json_mutate(obj), **cast("Any", kwargs))
 
     @override

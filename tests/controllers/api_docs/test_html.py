@@ -16,4 +16,4 @@ def test_page_includes_query_parameters(web_client: WebClient) -> None:
 
     assert "Query parameters" in result
     assert "before" in result
-    assert "filter items that appear before this date, optional" in result
+    assert "ISO-8601 date string, optional" in result

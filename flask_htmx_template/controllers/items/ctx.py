@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal, NotRequired, TYPE_CHECKING, TypedDict
+from typing import Annotated, Literal, NamedTuple, NotRequired, TYPE_CHECKING, TypedDict
+
+from pydantic import Field
 
 from flask_htmx_template import sql
 from flask_htmx_template.models import utils as model_utils
@@ -28,7 +30,7 @@ class ItemCategory(BaseEnum):
 class ItemContext(TypedDict):
     """Type definition for Item context."""
 
-    # NOTE: ``utils.validate_json`` resolves these annotations at runtime.
+    # NOTE: ``json_api.body()`` resolves these annotations at runtime.
     uri: NotRequired[str]
     name: str
     value: Decimal
@@ -47,6 +49,15 @@ class ItemsContext(TypedDict):
 
     count: int
     next_offset: int | None
+
+
+class ItemsQuery(NamedTuple):
+    """Query parameters for listing items."""
+
+    # NOTE: ``json_api.args()`` resolves these annotations at runtime.
+    before: datetime.date | None = None
+    limit: Annotated[int, Field(ge=1, le=MAX_PAGE_LIMIT)] = DEFAULT_PAGE_LIMIT
+    offset: Annotated[int, Field(ge=0)] = 0
 
 
 def item(item: Item) -> ItemContext:

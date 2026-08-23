@@ -135,13 +135,10 @@ def _duplicate_items_tool(database: Database) -> dict[str, object]:
 def test_create_app_mounts_streamable_http_endpoint(
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     app = asgi.create_app(flask_app)
 
-    # Act
     routes = cast("list[Route | Mount]", app.routes)
 
-    # Assert
     assert routes[0].path == "/mcp"
     assert routes[1].path == "/mcp"
     assert not routes[2].path
@@ -150,14 +147,11 @@ def test_create_app_mounts_streamable_http_endpoint(
 def test_mcp_endpoint_requires_bearer_token(
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     app = asgi.create_app(flask_app)
     client: TestClient = TestClient(app)
 
-    # Act
     response = client.get(asgi.MCP_PATH)
 
-    # Assert
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
 
@@ -165,19 +159,16 @@ def test_mcp_endpoint_requires_bearer_token(
 def test_mcp_endpoint_accepts_api_bearer_token(
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     app = asgi.create_app(flask_app)
     client: TestClient = TestClient(app)
     token = Config.fetch(ConfigKey.API_BEARER_TOKEN)
 
-    # Act
     with client:
         response = client.get(
             asgi.MCP_PATH,
             headers={"Authorization": f"Bearer {token}"},
         )
 
-    # Assert
     assert response.status_code != 401
 
 
@@ -185,37 +176,28 @@ def test_create_server_registers_read_only_items_tool(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
 
-    # Act
     tools = anyio.run(_list_tools, server)
 
-    # Assert
     assert tools == ["get_items"]
 
 
 def test_items_tool_is_registered_in_central_registry() -> None:
-    # Arrange
     expected = items_mcp.get_items
 
-    # Act
     registered_tools = base.get_mcp_tools()
 
-    # Assert
     assert expected in registered_tools
 
 
 def test_mcp_tool_rejects_duplicate_name() -> None:
-    # Arrange
     _duplicate_items_tool.__name__ = items_mcp.get_items.__name__
 
-    # Act
     with pytest.raises(exc.DuplicateMCPToolError, match="get_items"):
         base.mcp_tool("Duplicate item tool")(_duplicate_items_tool)
 
-    # Assert
     registered_tools = base.get_mcp_tools()
     assert _duplicate_items_tool not in registered_tools
     assert registered_tools.count(items_mcp.get_items) == 1
@@ -225,13 +207,10 @@ def test_get_items_returns_current_items(
     current_session_database: Database,
     item: Item,
 ) -> None:
-    # Arrange
     database = current_session_database
 
-    # Act
     value: ctx.ItemsContext = items_mcp.get_items(database)
 
-    # Assert
     assert not isinstance(value, str)
     assert value["items"][0]["name"] == item.name
     assert value["total"] == item.value
@@ -245,7 +224,6 @@ def test_get_items_filters_and_paginates(
     session: orm.Session,
     today_ord: int,
 ) -> None:
-    # Arrange
     with session.begin_nested():
         older = Item.create(
             name="Apples",
@@ -259,7 +237,6 @@ def test_get_items_filters_and_paginates(
         )
     database = current_session_database
 
-    # Act
     value = items_mcp.get_items(
         database,
         before=item.date,
@@ -267,7 +244,6 @@ def test_get_items_filters_and_paginates(
         offset=0,
     )
 
-    # Assert
     assert value == {
         "count": 2,
         "items": [ctx.item(older)],
@@ -280,14 +256,11 @@ def test_get_items_publishes_output_schema(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
 
-    # Act
     tool = anyio.run(_get_tool, server, "get_items")
 
-    # Assert
     assert tool.output_schema is not None
     assert tool.output_schema["type"] == "object"
     assert set(tool.output_schema["required"]) == {
@@ -308,14 +281,11 @@ def test_get_items_publishes_typed_input_schema(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
 
-    # Act
     tool = anyio.run(_get_tool, server, "get_items")
 
-    # Assert
     assert "required" not in tool.input_schema
     properties = tool.input_schema["properties"]
     assert properties["before"]["anyOf"][0] == {
@@ -334,14 +304,11 @@ def test_get_items_returns_structured_content_in_process(
     flask_app: flask.Flask,
     item: Item,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
 
-    # Act
     result = anyio.run(_call_tool, server, "get_items")
 
-    # Assert
     assert not result.is_error
     assert result.structured_content is not None
     assert result.structured_content["items"][0]["name"] == item.name
@@ -355,7 +322,6 @@ def test_get_items_accepts_typed_arguments_in_process(
     flask_app: flask.Flask,
     item: Item,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
     arguments: dict[str, object] = {
@@ -364,10 +330,8 @@ def test_get_items_accepts_typed_arguments_in_process(
         "offset": 0,
     }
 
-    # Act
     result = anyio.run(_call_tool, server, "get_items", arguments)
 
-    # Assert
     assert not result.is_error
     assert result.structured_content == {
         "count": 0,
@@ -381,14 +345,12 @@ def test_get_items_rejects_invalid_pagination_in_process(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
-    # Arrange
     registry = flask_app.extensions["flask_htmx_template_metrics"].registry
     server = mcp.create_server(registry, current_session_database)
     arguments: dict[str, object] = {
         "limit": ctx.MAX_PAGE_LIMIT + 1,
     }
 
-    # Act
     result = anyio.run(
         _call_tool,
         server,
@@ -396,7 +358,6 @@ def test_get_items_rejects_invalid_pagination_in_process(
         arguments,
     )
 
-    # Assert
     assert result.is_error
     assert result.structured_content is None
 
@@ -404,7 +365,6 @@ def test_get_items_rejects_invalid_pagination_in_process(
 def test_mcp_tool_records_metrics(
     current_session_database: Database,
 ) -> None:
-    # Arrange
     registry = prometheus_client.CollectorRegistry()
     tool = mcp._bind_database(
         items_mcp.get_items,
@@ -412,10 +372,8 @@ def test_mcp_tool_records_metrics(
         mcp._get_metrics(registry),
     )
 
-    # Act
     tool(limit=1, offset=0)
 
-    # Assert
     metrics = prometheus_client.generate_latest(registry).decode()
     assert 'flask_htmx_template_mcp_tool_calls_total{tool="get_items"} 1.0' in metrics
     assert (
