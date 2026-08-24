@@ -1,4 +1,4 @@
-# Partial stub — only symbols used in this project.
+# Partial stub -- only symbols used in this project.
 
 from .login_manager import LoginManager as LoginManager
 from .mixins import AnonymousUserMixin as AnonymousUserMixin

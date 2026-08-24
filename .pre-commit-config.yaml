@@ -1,3 +1,4 @@
+default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.15.20
@@ -19,11 +20,12 @@ repos:
       - id: black
         types: [python]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
       - id: check-ast
       - id: check-byte-order-marker
+        exclude: ^tests/data
       - id: check-builtin-literals
       - id: check-case-conflict
       - id: check-docstring-first
@@ -54,6 +56,7 @@ repos:
     rev: v2.4.1
     hooks:
       - id: codespell
+        exclude: ^tests/data
         additional_dependencies:
           - tomli
   - repo: https://github.com/Riverside-Healthcare/djLint
@@ -74,9 +77,26 @@ repos:
         name: prettier
         entry: npx prettier --write
         language: node
-        files: \.(jinja|css|js)$
+        files: \.(md|jinja|css|js)$
       - id: grep-console
         name: grep-console
         entry: console.log
         language: pygrep
         files: \.(jinja|css|js)$
+      - id: grep-unittest
+        name: grep-unittest
+        entry: '\bunittest\b(?!\.mock\b)'
+        language: pygrep
+        files: \.py$
+      - id: no-unicode-dashes
+        name: no-unicode-dashes
+        # NOTE: yamlfmt emits literal characters, so this hook must exclude its config.
+        entry: "–|—|‒|―|−|﹘|﹣|－"
+        language: pygrep
+        files: \.(py|jinja|js|css|sh|toml|yaml|yml|md|adoc|rst|txt)$
+        exclude: ^\.pre-commit-config\.yaml$
+      - id: vale
+        name: vale
+        entry: vale
+        language: system
+        files: \.(md|rst|txt|adoc)$

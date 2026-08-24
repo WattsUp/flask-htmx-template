@@ -1,4 +1,4 @@
-# Partial stub — only symbols used in this project.
+# Partial stub -- only symbols used in this project.
 
 import io
 

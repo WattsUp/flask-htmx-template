@@ -60,7 +60,7 @@ def _column_names(d: Database) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Parameterized fixture — SQLite or Postgres
+# Parameterized fixture -- SQLite or Postgres
 # ---------------------------------------------------------------------------
 
 

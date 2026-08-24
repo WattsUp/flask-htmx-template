@@ -27,7 +27,7 @@ const themeEdit = {
   /**
    * Update the visible swatch preview and the hidden swatch value.
    *
-   * @param {number} hue - Hue 0–359
+   * @param {number} hue - Hue 0-359
    */
   _updateSwatch(hue) {
     const hex = tinycolor({ h: hue, s: 0.6, l: 0.4 }).toHexString();
