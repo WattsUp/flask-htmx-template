@@ -26,39 +26,31 @@ def test_page_includes_query_parameters(web_client: WebClient) -> None:
 def test_page_explains_when_four_xx_responses_are_possible(
     web_client: WebClient,
 ) -> None:
-    # Act
     result, _ = web_client.GET("api_docs.page")
     explanation = " ".join(re.sub(r"<[^>]+>", " ", result).lower().split())
 
-    # Assert
     assert "no url, query, or body inputs" in explanation
     assert "never return a 4xx" in explanation
     assert "may return a 4xx" in explanation
 
 
 def test_page_renders_configured_bearer_token(web_client: WebClient) -> None:
-    # Arrange
     configured_value = "configured-test-bearer-token"
     with web.db.begin_session():
         Config.set_(ConfigKey.API_BEARER_TOKEN, configured_value)
 
-    # Act
     result, _ = web_client.GET("api_docs.page")
 
-    # Assert
     assert 'id="api-bearer-token"' in result
     assert configured_value in result
 
 
 def test_page_includes_api_usage_instructions(web_client: WebClient) -> None:
-    # Arrange
     with web.db.begin_session():
         token = Config.fetch(ConfigKey.API_BEARER_TOKEN)
 
-    # Act
     result, _ = web_client.GET("api_docs.page")
 
-    # Assert
     assert "Calling the API" in result
     assert "BEARER_TOKEN" in result
     assert "Authorization: Bearer ${BEARER_TOKEN}" in result

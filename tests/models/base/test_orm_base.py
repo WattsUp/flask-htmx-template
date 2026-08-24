@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from contextvars import Context
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -319,10 +320,8 @@ def test_query_kwargs() -> None:
 
 
 def test_unbound_error() -> None:
-    s = Base._sessions.pop()
     with pytest.raises(exc.UnboundExecutionError):
-        Base.session()
-    Base._sessions.append(s)
+        Context().run(Base.session)
 
 
 def noop[T](x: T) -> T:

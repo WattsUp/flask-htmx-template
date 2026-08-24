@@ -852,10 +852,8 @@ def test_response_arms_ignores_undocumented_type() -> None:
     ],
 )
 def test_is_client_error_status(status: str, expected: bool) -> None:
-    # Act
     result = api_docs._is_client_error_status(status)
 
-    # Assert
     assert result is expected
 
 
