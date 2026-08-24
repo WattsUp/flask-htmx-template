@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 import pytest
@@ -34,3 +35,9 @@ def test_init_properties(
 def test_short(item: Item) -> None:
     with pytest.raises(exc.InvalidORMValueError):
         item.name = "a"
+
+
+def test_value_is_truncated(item: Item) -> None:
+    item.value = Decimal("1.2345678")
+
+    assert item.value == Decimal("1.234567")

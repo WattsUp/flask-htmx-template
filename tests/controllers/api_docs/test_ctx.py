@@ -261,6 +261,56 @@ def test_is_named_tuple_rejects_non_type() -> None:
     assert result is False
 
 
+@pytest.mark.parametrize(
+    ("method", "target"),
+    [
+        (api_docs._Method.GET, "bg-primary text-on-primary"),
+        (api_docs._Method.POST, "bg-secondary text-on-secondary"),
+        (api_docs._Method.PUT, "bg-tertiary text-on-tertiary"),
+        (api_docs._Method.DELETE, "bg-error text-on-error"),
+    ],
+)
+def test_method_badge(method: api_docs._Method, target: str) -> None:
+    assert method.badge == target
+
+
+@pytest.mark.parametrize(
+    ("method", "target"),
+    [
+        (
+            api_docs._Method.GET,
+            "bg-primary-container text-on-primary-container",
+        ),
+        (
+            api_docs._Method.POST,
+            "bg-secondary-container text-on-secondary-container",
+        ),
+        (
+            api_docs._Method.PUT,
+            "bg-tertiary-container text-on-tertiary-container",
+        ),
+        (
+            api_docs._Method.DELETE,
+            "bg-error-container text-on-error-container",
+        ),
+    ],
+)
+def test_method_container(method: api_docs._Method, target: str) -> None:
+    assert method.container == target
+
+
+def test_response_info_schema_json() -> None:
+    response = api_docs._ResponseInfo({"value": "string"}, {})
+
+    assert response.schema_json == '{\n  "value": "string"\n}'
+
+
+def test_response_info_example_json() -> None:
+    response = api_docs._ResponseInfo({}, {"value": "example"})
+
+    assert response.example_json == '{\n  "value": "example"\n}'
+
+
 def test_is_json_api_call_rejects_other_ast_node() -> None:
     node = ast.Constant(value="args")
     module = types.ModuleType("test")

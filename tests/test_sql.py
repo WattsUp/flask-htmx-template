@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
 from sqlalchemy import orm
 
@@ -8,6 +8,7 @@ from flask_htmx_template import sql
 from flask_htmx_template.models.config import Config, ConfigKey
 
 if TYPE_CHECKING:
+    import sqlite3
     from pathlib import Path
 
 
@@ -165,6 +166,20 @@ def test_normalize_postgres_url_postgres_scheme() -> None:
 def test_get_engine_postgres_no_ssl() -> None:
     original = sql._POSTGRES_SSL_MODE
     sql._POSTGRES_SSL_MODE = ""
+    try:
+        engine = sql.get_engine_postgres("postgresql+psycopg://user:pass@localhost/db")
+        assert engine is not None
+    finally:
+        sql._POSTGRES_SSL_MODE = original
+
+
+def test_set_sqlite_pragma_ignores_non_sqlite_connection() -> None:
+    sql.set_sqlite_pragma(cast("sqlite3.Connection", object()))
+
+
+def test_get_engine_postgres_ssl_mode() -> None:
+    original = sql._POSTGRES_SSL_MODE
+    sql._POSTGRES_SSL_MODE = "require"
     try:
         engine = sql.get_engine_postgres("postgresql+psycopg://user:pass@localhost/db")
         assert engine is not None

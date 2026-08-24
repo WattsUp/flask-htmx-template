@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import datetime
+import logging
 import textwrap
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -10,6 +11,7 @@ import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
+from flask_htmx_template.models.config import ConfigKey
 from tests import conftest
 
 if TYPE_CHECKING:
@@ -583,3 +585,49 @@ def test_set_sub_keys() -> None:
     }
     target = {"a", "b", 3}
     assert utils.set_sub_keys(d) == target
+
+
+def test_json_mutate_nested_values() -> None:
+    date = datetime.date(2024, 1, 2)
+    timestamp = datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+    value = {
+        "enum": ConfigKey.VERSION,
+        "integer": Decimal(3),
+        "fraction": Decimal("3.14"),
+        "date": date,
+        "datetime": timestamp,
+        "sequence": (Decimal(2), [date]),
+    }
+
+    result = utils.json_mutate(value)
+
+    assert result == {
+        "enum": "version",
+        "integer": 3,
+        "fraction": "3.14",
+        "date": "2024-01-02",
+        "datetime": "2024-01-02T03:04:05+00:00",
+        "sequence": [2, ["2024-01-02"]],
+    }
+
+
+def test_json_mutate_skip_decimal() -> None:
+    value = Decimal("3.14")
+
+    result = utils.json_mutate(value, skip_decimal=True)
+
+    assert result == value
+
+
+def test_init_logger_debug() -> None:
+    logger = logging.getLogger("flask_htmx_template")
+    original_handlers = list(logger.handlers)
+    try:
+        utils.init_logger(debug=True)
+
+        assert logger.level == logging.DEBUG
+        assert len(logger.handlers) == len(original_handlers) + 1
+        assert isinstance(logger.handlers[-1], logging.StreamHandler)
+    finally:
+        for handler in logger.handlers[len(original_handlers) :]:
+            logger.removeHandler(handler)

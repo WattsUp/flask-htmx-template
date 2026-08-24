@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 import decimal
 from types import NoneType
-from typing import Annotated, cast, NamedTuple, TypedDict
+from typing import Annotated, cast, NamedTuple, NotRequired, TypedDict
 
 import flask
 import pytest
@@ -52,6 +52,13 @@ class MaximumQueryArgs(NamedTuple):
     """Query arguments with an upper bound and no lower bound."""
 
     value: Annotated[int, Field(le=10)]
+
+
+class OptionalTop(TypedDict):
+    """Typed dictionary with an optional field omitted from a request."""
+
+    required: str
+    optional: NotRequired[str]
 
 
 def test_args_uses_defaults_and_converts_values() -> None:
@@ -125,6 +132,15 @@ def test_args_reports_upper_bound_without_lower_bound() -> None:
 
     assert tuple(result) == (None,)
     assert errors == ["value must be at most 10"]
+
+
+def test_args_reports_upper_bound_with_lower_bound() -> None:
+    app = flask.Flask(__name__)
+
+    with app.test_request_context("/?limit=101"):
+        _, errors = json_api.args(QueryArgs)
+
+    assert errors == ["limit must be between 1 and 100"]
 
 
 def test_query_bound_error_ignores_other_error_types() -> None:
@@ -220,8 +236,9 @@ def test_body(obj: object, type_: type, target: list[str]) -> None:
         data="null",
         content_type="application/json",
     ):
-        obj_upgraded, errors = (
-            json_api.body(type_) if obj is None else json_api.body(type_, raw=obj)
+        obj_upgraded, errors = cast(
+            "tuple[object, list[str]]",
+            json_api.body(type_) if obj is None else json_api.body(type_, raw=obj),
         )
     assert errors == target
     if not target:
@@ -278,7 +295,10 @@ def test_body(obj: object, type_: type, target: list[str]) -> None:
     ids=conftest.id_func,
 )
 def test_body_upgrade(obj: object, type_: type, target: list[str]) -> None:
-    obj_upgraded, errors = json_api.body(type_, raw=utils.json_mutate(obj))
+    obj_upgraded, errors = cast(
+        "tuple[object, list[str]]",
+        json_api.body(type_, raw=utils.json_mutate(obj)),
+    )
     assert errors == target
     if not target:
         assert obj_upgraded == obj
@@ -311,6 +331,12 @@ def test_body_preserves_explicit_empty_body() -> None:
         "json.none is missing",
         "json.object is missing",
     ]
+
+
+def test_body_allows_missing_not_required_field() -> None:
+    _, errors = json_api.body(OptionalTop, raw={"required": "value"})
+
+    assert errors == []
 
 
 def test_body_nested_error() -> None:

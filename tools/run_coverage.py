@@ -126,7 +126,10 @@ def expand_source_paths(raw_paths: Sequence[Path]) -> list[Path]:
             message = f"Source directory contains no Python files: {source_path}"
             raise ValueError(message)
         for expanded_path in expanded_paths:
-            if expanded_path not in seen_paths and expanded_path.name != "__init__.py":
+            if expanded_path not in seen_paths and expanded_path.name not in {
+                "__init__.py",
+                "version.py",
+            }:
                 seen_paths.add(expanded_path)
                 source_paths.append(expanded_path)
     return sorted(source_paths)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from typing import TYPE_CHECKING
 
 from flask_htmx_template.commands.unlock import Unlock
@@ -22,3 +23,11 @@ def test_empty(
     target = "Database is unlocked\n"
     assert captured.out == target
     assert not captured.err
+
+
+def test_setup_args() -> None:
+    parser = argparse.ArgumentParser()
+
+    Unlock.setup_args(parser)
+
+    assert vars(parser.parse_args([])) == {}

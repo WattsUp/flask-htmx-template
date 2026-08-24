@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import ForeignKey, orm
+from sqlalchemy.dialects.sqlite import dialect as sqlite_dialect
 
 import flask_htmx_template
 import tests
@@ -184,6 +185,20 @@ def test_set_decimal_value(session: orm.Session, child: Child) -> None:
     child.height = height
     assert isinstance(child.height, Decimal)
     assert child.height == height
+
+
+def test_decimal6_process_bind_param() -> None:
+    value = Decimal("1.2345678")
+
+    result = Decimal6().process_bind_param(value, sqlite_dialect())
+
+    assert result == 1234567
+
+
+def test_decimal6_process_result_value() -> None:
+    result = Decimal6().process_result_value(1234567, sqlite_dialect())
+
+    assert result == Decimal("1.234567")
 
 
 def test_set_enum(session: orm.Session, child: Child) -> None:

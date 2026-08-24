@@ -39,3 +39,23 @@ def test_ctx_items(item: Item) -> None:
         ],
     }
     assert result == target
+
+
+def test_ctx_items_excludes_items_on_or_after_before(item: Item) -> None:
+    result = ctx.items(before=item.date)
+
+    assert result == {
+        "count": 0,
+        "items": [],
+        "next_offset": None,
+        "total": 0,
+    }
+
+
+def test_ctx_items_returns_paginated_results(item: Item) -> None:
+    result = ctx.items(limit=1)
+
+    assert result["count"] == 1
+    assert result["items"]
+    assert result["next_offset"] is None
+    assert result["total"] == item.value

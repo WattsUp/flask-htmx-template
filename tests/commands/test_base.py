@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from typing import override, TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -113,6 +114,20 @@ def test_postgres_url_normalized_in_command(pg_url: str) -> None:
     c = MockCommand(pg_url, do_unlock=False)
     assert isinstance(c._path_db, str)
     assert c._path_db.startswith("postgresql+psycopg://")
+
+
+def test_unlock_connection_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pg_url = "postgresql://user:pass@host/db"
+
+    mock_database = MagicMock()
+    monkeypatch.setattr("flask_htmx_template.database.PostgresDatabase", mock_database)
+
+    database = MockCommand._unlock(pg_url, check_migration=False)
+
+    assert database is mock_database.return_value
+    mock_database.assert_called_once_with(pg_url, check_migration=False)
 
 
 def test_get_input_insecure(

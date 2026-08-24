@@ -40,9 +40,40 @@ class _UnloadedTypedDict(TypedDict):
     value: str
 
 
+class _ResolvableTypedDict(TypedDict):
+    """Typed dictionary used to exercise annotation resolution."""
+
+    value: str
+
+
 def test_mcp_tool_requires_database_first() -> None:
     with pytest.raises(TypeError, match="must accept database first"):
         base.mcp_tool("Invalid tool")(_missing_database_tool)
+
+
+def test_mcp_tool_registers_valid_database_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(base, "_MCP_TOOLS", {})
+
+    def database_tool(database: object, value: int) -> dict[str, object]:
+        return {"value": value}
+
+    registered = base.mcp_tool("Valid tool")(database_tool)
+
+    assert registered in base.get_mcp_tools()
+    assert registered.mcp_description == "Valid tool"
+    assert tuple(registered.mcp_signature.parameters) == ("value",)
+    with pytest.raises(exc.DuplicateMCPToolError):
+        base.register_mcp_tool(registered)
+
+
+def test_mcp_tool_rejects_non_database_first_parameter() -> None:
+    def invalid_tool(value: object) -> dict[str, object]:
+        return {"value": value}
+
+    with pytest.raises(TypeError, match="must accept database first"):
+        base.mcp_tool("Invalid tool")(invalid_tool)
 
 
 def test_resolve_mcp_typed_dict_ignores_unloaded_module(
@@ -54,6 +85,15 @@ def test_resolve_mcp_typed_dict_ignores_unloaded_module(
     base._resolve_mcp_typed_dict(_UnloadedTypedDict, {})
 
     assert _UnloadedTypedDict.__annotations__ == annotations
+
+
+def test_resolve_mcp_typed_dict_resolves_annotations_and_seen_guard() -> None:
+    seen: set[int] = set()
+
+    base._resolve_mcp_typed_dict(_ResolvableTypedDict, {}, seen)
+    base._resolve_mcp_typed_dict(_ResolvableTypedDict, {}, seen)
+
+    assert _ResolvableTypedDict.__annotations__ == {"value": str}
 
 
 def test_find(item: Item) -> None:
@@ -516,6 +556,14 @@ def test_change_redirect_no_changes() -> None:
     resp = flask.Response()
     result = base.change_redirect_to_htmx(resp)
     assert "HX-Redirect" not in result.headers
+
+
+def test_append_json_newline() -> None:
+    response = flask.Response(b'{"value": 1}', content_type="application/json")
+
+    result = base.append_json_newline(response)
+
+    assert result.data.endswith(b"\n")
 
 
 def test_change_redirect(web_client: WebClient) -> None:
