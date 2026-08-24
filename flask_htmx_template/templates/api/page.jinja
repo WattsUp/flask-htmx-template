@@ -1,22 +1,62 @@
 <div>
   <h1>JSON API</h1>
 </div>
-<div class="mx-auto max-w-3xl px-2 pb-8">
-  <p class="mb-6 text-on-surface-variant">
+<div class="mx-auto max-w-3xl space-y-6 px-2 pb-8">
+  <p class="text-on-surface-variant">
     Interactive documentation for the JSON API. All endpoints accept and return
     <code>application/json</code>. Expand a path to see examples and schema. Any
     request formats will self describe errors in types or missing fields.
   </p>
 
+  <section class="mx-auto prose rounded-md bg-surface-container-high p-3">
+    <h2>Calling the API</h2>
+    <p>
+      Set <code>BEARER_TOKEN</code> in your shell, then include it in the
+      <code>Authorization</code> header. The configured token is shown below for
+      convenience. Hover over it or focus it with the keyboard to reveal it.
+    </p>
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        id="api-bearer-token"
+        class="cursor-default rounded bg-surface-container-highest px-2 py-1 font-mono blur-sm transition hover:blur-none focus:blur-none"
+        title="Hover or focus to reveal the bearer token"
+        type="button"
+      >
+        {{ bearer_token | e }}
+      </button>
+      <button
+        class="btn-tonal"
+        type="button"
+        onclick="apiDocs.copyBearerToken(event)"
+      >
+        <icon>content_copy</icon>
+        Copy token
+      </button>
+      <span id="api-bearer-token-copy-status"></span>
+    </div>
+    <pre><code>export BEARER_TOKEN='your-token-here'
+curl \
+  -H "Authorization: Bearer ${BEARER_TOKEN}" \
+  -H "Accept: application/json" \
+  -H "X-Indent: 2" \
+  {{ url_for("items.json_all", _external=True) }}</code></pre>
+    <p class="text-on-surface-variant">
+      The <code>X-Indent: 2</code> header is optional and formats JSON responses
+      with indentation. Remove it for compact responses.
+    </p>
+  </section>
+
   {% for group in groups %}
-    <h2 class="mt-6 mb-3 font-serif text-2xl text-primary">{{ group.name }}</h2>
-    <div class="mx-auto prose px-2">
-      {% for p in group.description %}<p>{{ p }}</p>{% endfor %}
-    </div>
-    <div class="flex flex-col gap-2">
-      {% for op in group.operations %}
-        {% include "api/operation.jinja" %}
-      {% endfor %}
-    </div>
+    <section>
+      <h2 class="font-serif text-2xl text-primary">{{ group.name }}</h2>
+      <div class="prose">
+        {% for p in group.description %}<p>{{ p }}</p>{% endfor %}
+      </div>
+      <div class="flex flex-col gap-2">
+        {% for op in group.operations %}
+          {% include "api/operation.jinja" %}
+        {% endfor %}
+      </div>
+    </section>
   {% endfor %}
 </div>
