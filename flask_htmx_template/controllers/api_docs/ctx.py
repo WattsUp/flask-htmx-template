@@ -245,7 +245,7 @@ def _query_schema_label(schema: Mapping[str, object]) -> str:
         labels = [
             _query_schema_label(arm) for arm in arm_schemas if arm.get("type") != "null"
         ]
-        return " or ".join(dict.fromkeys(labels)) or "null"
+        return " or ".join(sorted(set(labels))) or "null"
     if isinstance(values := schema.get("enum"), list):
         return " or ".join(repr(value) for value in cast("list[object]", values))
     items = schema.get("items")
