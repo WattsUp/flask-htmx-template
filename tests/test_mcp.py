@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import contextlib
-from typing import cast, TYPE_CHECKING
+from typing import cast, NoReturn, TYPE_CHECKING
 
 import anyio
 import prometheus_client
 import pytest
 from mcp import Client
+from mcp.shared.exceptions import MCPError
 from starlette.testclient import TestClient
 
 from flask_htmx_template import asgi
@@ -47,6 +48,21 @@ class CurrentSessionDatabase:
 
         """
         return contextlib.nullcontext(self._session)
+
+
+class ErrorDatabase:
+    """Database adapter whose session setup fails."""
+
+    @staticmethod
+    def begin_session() -> NoReturn:
+        """Raise the database failure used by metrics tests.
+
+        Raises:
+            RuntimeError: Always, to exercise an MCP tool error
+
+        """
+        message = "database unavailable"
+        raise RuntimeError(message)
 
 
 @pytest.fixture
@@ -360,6 +376,54 @@ def test_get_items_rejects_invalid_pagination_in_process(
 
     assert result.is_error
     assert result.structured_content is None
+    assert result.meta is not None
+    assert result.meta["errorCode"] == int(mcp.MCPErrorCode.INVALID_PARAMS)
+    assert result.content[0].model_dump() == {
+        "type": "text",
+        "text": "MCP tool arguments are invalid.",
+        "annotations": None,
+        "meta": None,
+    }
+
+
+def test_mcp_tool_hides_internal_error_details(
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, cast("Database", ErrorDatabase()))
+
+    result = anyio.run(_call_tool, server, "get_items")
+
+    assert result.is_error
+    assert result.meta is not None
+    assert result.meta["errorCode"] == int(mcp.MCPErrorCode.INTERNAL_ERROR)
+    assert result.content[0].model_dump() == {
+        "type": "text",
+        "text": "MCP tool execution failed.",
+        "annotations": None,
+        "meta": None,
+    }
+    assert "database unavailable" not in str(result)
+
+
+def test_mcp_tool_returns_safe_code_when_tool_is_missing(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    result = anyio.run(_call_tool, server, "missing_tool")
+
+    assert result.is_error
+    assert result.meta is not None
+    assert result.meta["errorCode"] == int(mcp.MCPErrorCode.METHOD_NOT_FOUND)
+    assert result.content[0].model_dump() == {
+        "type": "text",
+        "text": "MCP tool was not found.",
+        "annotations": None,
+        "meta": None,
+    }
 
 
 def test_mcp_tool_records_metrics(
@@ -375,8 +439,33 @@ def test_mcp_tool_records_metrics(
     tool(limit=1, offset=0)
 
     metrics = prometheus_client.generate_latest(registry).decode()
-    assert 'flask_htmx_template_mcp_tool_calls_total{tool="get_items"} 1.0' in metrics
     assert (
-        'flask_htmx_template_mcp_tool_duration_seconds_count{tool="get_items"} 1.0'
-        in metrics
+        'flask_htmx_template_mcp_tool_calls_total{error_code="none",status="success",'
+        'tool="get_items"} 1.0'
+    ) in metrics
+    assert (
+        'flask_htmx_template_mcp_tool_duration_seconds_count{error_code="none",'
+        'status="success",tool="get_items"} 1.0' in metrics
     )
+
+
+def test_mcp_tool_records_error_metrics() -> None:
+    registry = prometheus_client.CollectorRegistry()
+    tool = mcp._bind_database(
+        items_mcp.get_items,
+        cast("Database", ErrorDatabase()),
+        mcp._get_metrics(registry),
+    )
+
+    with pytest.raises(MCPError, match="MCP tool execution failed"):
+        tool(limit=1, offset=0)
+
+    metrics = prometheus_client.generate_latest(registry).decode()
+    assert (
+        'flask_htmx_template_mcp_tool_calls_total{error_code="internal",status="error",'
+        'tool="get_items"} 1.0'
+    ) in metrics
+    assert (
+        'flask_htmx_template_mcp_tool_duration_seconds_count{error_code="internal",'
+        'status="error",tool="get_items"} 1.0'
+    ) in metrics

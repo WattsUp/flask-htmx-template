@@ -188,6 +188,7 @@ ignore = [
 "flask_htmx_template/database.py" = ["private-member-access"]
 "flask_htmx_template/commands/*.py" = ["print", "import-outside-top-level"]
 "flask_htmx_template/controllers/api_docs/ctx.py" = ["blind-except"]
+"flask_htmx_template/mcp.py" = ["blind-except"]
 "flask_htmx_template/models/base_uri.py" = ["global-statement"]
 "flask_htmx_template/migrations/v*.py" = ["invalid-class-name"]
 "tools/**/*.py" = ["print"]
