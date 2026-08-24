@@ -27,6 +27,7 @@ def page() -> flask.Response:
         "API",
         groups=ctx.GROUPS,
         bearer_token=bearer_token,
+        error_response=ctx.ERROR_RESPONSE,
     )
 
 

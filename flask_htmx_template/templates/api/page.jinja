@@ -8,7 +8,7 @@
     request formats will self describe errors in types or missing fields.
   </p>
 
-  <section class="mx-auto prose rounded-md bg-surface-container-high p-3">
+  <section class="mx-auto prose rounded-md bg-surface-container p-3">
     <h2>Calling the API</h2>
     <p>
       Set <code>BEARER_TOKEN</code> in your shell, then include it in the
@@ -34,16 +34,49 @@
       </button>
       <span id="api-bearer-token-copy-status"></span>
     </div>
-    <pre><code>export BEARER_TOKEN='your-token-here'
+    <pre
+      class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
+    >
+export BEARER_TOKEN='your-token-here'
 curl \
   -H "Authorization: Bearer ${BEARER_TOKEN}" \
   -H "Accept: application/json" \
   -H "X-Indent: 2" \
-  {{ url_for("items.json_all", _external=True) }}</code></pre>
+  {{ url_for("items.json_all", _external=True) }}</pre>
     <p class="text-on-surface-variant">
       The <code>X-Indent: 2</code> header is optional and formats JSON responses
       with indentation. Remove it for compact responses.
     </p>
+  </section>
+
+  <section class="mx-auto prose rounded-md bg-surface-container p-3">
+    <h2>Client errors</h2>
+    <p>
+      All <code>4xx</code> responses use the same JSON structure shown below. An
+      endpoint with no inputs (no URL, query, or body inputs) will never return
+      a <code>4xx</code> response. An endpoint with URL, query, or body inputs
+      may return a <code>4xx</code> response when those inputs are invalid or
+      missing.
+    </p>
+    <div class="flex items-center gap-1 py-1">
+      <button
+        class="btn-example btn-tonal"
+        onclick="apiDocs.loadSnippet(event)"
+      >
+        Example
+      </button>
+      <button class="btn-schema btn-text" onclick="apiDocs.loadSnippet(event)">
+        Schema
+      </button>
+    </div>
+    <pre
+      class="snippet-example rounded-md bg-surface-container-highest p-1 font-mono"
+    >
+{{- error_response.example_json | e -}}</pre>
+    <pre
+      class="snippet-schema hidden rounded-md bg-surface-container-highest p-1 font-mono"
+    >
+{{- error_response.schema_json | e -}}</pre>
   </section>
 
   {% for group in groups %}

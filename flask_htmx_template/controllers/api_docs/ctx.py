@@ -88,6 +88,15 @@ class _ResponseInfo(NamedTuple):
         return json.dumps(self.example, indent=2)
 
 
+# NOTE: Every JSON API client error uses this response shape. Keep it outside the
+# individual operations so the generated documentation does not repeat the
+# same schema and example for every endpoint that accepts input.
+ERROR_RESPONSE = _ResponseInfo(
+    schema={"errors": ["string"]},
+    example={"errors": ["a string of words"]},
+)
+
+
 def _extract_url_args(
     path: str,
     view: Callable[..., object],
@@ -425,6 +434,7 @@ class _Operation(NamedTuple):
                 utils.json_mutate(_example_value(ann)),
             )
             for status, ann in response_anns.items()
+            if not _is_client_error_status(status)
         }
 
         enum_set: set[type[IntEnum]] = set()
@@ -469,6 +479,7 @@ class _OperationJSON(TypedDict):
 class _APIDocsJSON(TypedDict):
     urls: dict[URL, dict[Method, _OperationJSON]]
     enums: dict[str, list[str]]
+    errors: _ResponseInfoJSON
 
 
 GROUPS: list[_Group] = []
@@ -929,6 +940,21 @@ def _response_arms(t: object) -> dict[str, object]:
     return {}
 
 
+def _is_client_error_status(status: str) -> bool:
+    """Return whether *status* describes an HTTP 4xx response.
+
+    Returns:
+        True for the generic 4xx marker or a concrete 4xx status code.
+
+    """
+    if status == "4xx":
+        return True
+    try:
+        return base.HTTP_CODE_BAD_REQUEST <= int(status) < base.HTTP_CODE_INTERNAL_ERROR
+    except ValueError:
+        return False
+
+
 def _build_localns(module_name: str) -> dict[str, object]:
     """Build a namespace that resolves type hints imported only while type checking.
 
@@ -1205,4 +1231,11 @@ def api() -> _APIDocsJSON:
                     for status, resp in op.responses.items()
                 },
             )
-    return {"urls": urls, "enums": dict(ENUMS)}
+    return {
+        "urls": urls,
+        "enums": dict(ENUMS),
+        "errors": _ResponseInfoJSON(
+            schema=ERROR_RESPONSE.schema,
+            example=ERROR_RESPONSE.example,
+        ),
+    }

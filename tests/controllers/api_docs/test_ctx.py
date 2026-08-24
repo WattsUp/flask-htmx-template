@@ -841,6 +841,24 @@ def test_response_arms_ignores_undocumented_type() -> None:
     assert result == {}
 
 
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        ("4xx", True),
+        ("400", True),
+        ("499", True),
+        ("500", False),
+        ("success", False),
+    ],
+)
+def test_is_client_error_status(status: str, expected: bool) -> None:
+    # Act
+    result = api_docs._is_client_error_status(status)
+
+    # Assert
+    assert result is expected
+
+
 def test_extract_response_annotations_without_package_module() -> None:
     def view() -> _SimpleTypedDict:
         """Get a resource.
