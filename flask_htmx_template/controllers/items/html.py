@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 import flask
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, utils, web
-from flask_htmx_template.controllers import base
+from flask_htmx_template import sql, web
+from flask_htmx_template.controllers import base, json_api
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
 
@@ -23,25 +23,36 @@ def page_all() -> flask.Response:
 
     Query args:
         before: Filter items that appear before this date, optional
+        limit: Maximum items to return, 1 to 100, defaults to 50
+        offset: Filtered items to skip, at least 0, defaults to 0
 
     Returns:
         Rendered all-items page.
 
     Raises:
-        BadRequest: If before is not an ISO 8601 date string.
+        BadRequest: If a query argument is invalid.
 
     """
-    try:
-        before = utils.parse_date(flask.request.args.get("before"))
-    except ValueError as error:
-        msg = "before must be an ISO 8601 date string"
-        raise exc.http.BadRequest(msg) from error
+    query_args = flask.request.args.to_dict()
+    # NOTE: An empty date input is submitted as ``before=`` by the browser, but
+    # an empty filter has always meant no date cutoff in the HTML interface.
+    if not query_args.get("before"):
+        query_args.pop("before", None)
+    args, errors = json_api.args(ctx.ItemsQuery, query_args=query_args)
+    if errors:
+        raise exc.http.BadRequest("; ".join(errors))
     with web.db.begin_session():
         return base.page(
             "items/page-all.jinja",
             "Items",
-            before="" if before is None else before.isoformat(),
-            ctx=ctx.items(before=before),
+            before="" if args.before is None else args.before.isoformat(),
+            limit=args.limit,
+            offset=args.offset,
+            ctx=ctx.items(
+                before=args.before,
+                limit=args.limit,
+                offset=args.offset,
+            ),
         )
 
 
@@ -67,7 +78,7 @@ def new() -> str | flask.Response:
     today = datetime.datetime.now(datetime.UTC).date()
     with web.db.begin_session() as session:
         if flask.request.method == "GET":
-            item: ctx.ItemContext = {
+            item: ctx.ItemPayload = {
                 "name": "",
                 "date": today,
                 "value": Decimal(),

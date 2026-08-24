@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 from typing import override, TYPE_CHECKING
 
@@ -55,3 +56,12 @@ def test_aborted_when_get_password_returns_none(
 
     captured = capsys.readouterr()
     assert "Aborted change password" in captured.out
+
+
+def test_setup_args(rand_str: str) -> None:
+    parser = argparse.ArgumentParser()
+
+    ChangePassword.setup_args(parser)
+
+    args = parser.parse_args(["--new-pass", rand_str])
+    assert args.new_pass == rand_str

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 from typing import override, TYPE_CHECKING
 
@@ -112,3 +113,12 @@ def test_create_postgres_force(
     captured = capsys.readouterr()
     assert not captured.out
     assert "--force is not supported for postgres databases" in captured.err
+
+
+def test_setup_args() -> None:
+    parser = argparse.ArgumentParser()
+
+    Create.setup_args(parser)
+
+    args = parser.parse_args(["--force"])
+    assert args.force

@@ -50,6 +50,10 @@ def test_create(tmp_path: Path) -> None:
         assert sql.count(Config.query()) == len(ConfigKey)
 
 
+def test_sqlite_database_kind(empty_database: SQLiteDatabase) -> None:
+    assert not empty_database.is_postgres
+
+
 def test_migration_required(tmp_path: Path, data_path: Path) -> None:
     path_original = data_path / "old_versions" / "v0.0.0.db"
     path_db = tmp_path / "database.v0.1.db"

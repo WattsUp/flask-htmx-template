@@ -61,20 +61,20 @@ class Cipher:
             The reversed box
 
         Raises:
-            ValueError: if box is not properly defined
+            InvalidCipherBoxError: if box is not properly defined
 
         """
         # Validate box is a box
         n = len(box)
         if min(box) != 0:
             msg = f"Box's minimum should be zero: {box}"
-            raise ValueError(msg)
+            raise exc.InvalidCipherBoxError(msg)
         if max(box) != (n - 1):
             msg = f"Box's maximum should be n - 1: {box}"
-            raise ValueError(msg)
+            raise exc.InvalidCipherBoxError(msg)
         if sum(box) != (n * (n - 1) // 2):
             msg = f"Box's sum should be n * (n - 1) / 2: {box}"
-            raise ValueError(msg)
+            raise exc.InvalidCipherBoxError(msg)
         box_rev = [0] * n
         for i, n in enumerate(box):
             box_rev[n] = i
@@ -195,13 +195,13 @@ class Cipher:
             Loaded Cipher
 
         Raises:
-            ValueError: if Cipher fails to load
+            InvalidCipherError: if Cipher fails to load
 
         """
         n = ID_BYTES * _ROUNDS + 256 + ID_BITS
         if len(buf) != n:
             msg = f"Buf is {len(buf)}B long, expected {n}B"
-            raise ValueError(msg)
+            raise exc.InvalidCipherError(msg)
 
         keys: list[int] = []
         for _ in range(_ROUNDS):

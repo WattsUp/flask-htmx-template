@@ -2,26 +2,20 @@ from __future__ import annotations
 
 import ast
 import datetime
+import logging
 import textwrap
 from decimal import Decimal
-from types import NoneType
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 import pytest
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import utils
-from flask_htmx_template.models.base import BaseEnum
+from flask_htmx_template.models.config import ConfigKey
 from tests import conftest
 
 if TYPE_CHECKING:
     from tests.conftest import RandomStringGenerator
-
-
-class Derived(BaseEnum):
-    RED = 1
-    BLUE = 2
-    SEAFOAM_GREEN = 3
 
 
 @pytest.mark.parametrize(
@@ -357,12 +351,12 @@ def test_interpolate_linear(
 
 
 def test_pretty_table_no_rows() -> None:
-    with pytest.raises(ValueError, match="Table has no rows"):
+    with pytest.raises(exc.InvalidTableError, match="Table has no rows"):
         utils.pretty_table([])
 
 
 def test_pretty_table_no_header() -> None:
-    with pytest.raises(ValueError, match="First row cannot be None"):
+    with pytest.raises(exc.InvalidTableError, match="First row cannot be None"):
         utils.pretty_table([None])
 
 
@@ -593,169 +587,47 @@ def test_set_sub_keys() -> None:
     assert utils.set_sub_keys(d) == target
 
 
-class Top(TypedDict):
-    bool: bool
-    list: list[bool]
-    none: None
-    object: Top | None
-
-
-@pytest.mark.parametrize(
-    ("obj", "type_", "target"),
-    [
-        (True, NoneType, ["json should be null, not a boolean"]),
-        ([], NoneType, ["json should be null, not an array"]),
-        ({}, NoneType, ["json should be null, not an object"]),
-        (
-            {},
-            Top,
-            [
-                "json.bool is missing",
-                "json.list is missing",
-                "json.none is missing",
-                "json.object is missing",
-            ],
-        ),
-        (None, NoneType, []),
-        (None, bool, ["json should be a boolean, not null"]),
-        (True, bool, []),
-        (None, int, ["json should be an integer, not null"]),
-        (0.0, int, ["json should be an integer, not a number"]),
-        (0, int, []),
-        (None, float, ["json should be a number, not null"]),
-        (0, float, []),
-        (0.0, float, []),
-        (None, list, ["json should be an array, not null"]),
-        # Generic typing won't check contents
-        ([None], list, []),
-        ([None], list[bool], ["json[0] should be a boolean, not null"]),
-        (None, list[bool] | None, []),
-        ([True], list[bool] | None, []),
-        ([None], list[bool] | None, ["json[0] should be a boolean, not null"]),
-        (
-            [0, None, True],
-            list[bool | int],
-            ["json[1] should be a boolean or an integer, not null"],
-        ),
-        (None, dict, ["json should be an object, not null"]),
-        # Generic typing won't check contents
-        ({"k": None}, dict, []),
-        ({"k": None}, dict[str, bool], ["json.k should be a boolean, not null"]),
-        ({"k": None}, dict[str, bool] | None, ["json.k should be a boolean, not null"]),
-        ({"k": None}, dict[str, bool | None] | None, []),
-        (
-            {"k": None},
-            dict[str, bool | int],
-            ["json.k should be a boolean or an integer, not null"],
-        ),
-        (None, str, ["json should be a string, not null"]),
-        ("", str, []),
-        (None, int | float, ["json should be an integer or a number, not null"]),
-        (None, int | float | None, []),
-        (
-            {},
-            int | float | None,
-            ["json should be an integer or a number or null, not an object"],
-        ),
-    ],
-    ids=conftest.id_func,
-)
-def test_validate_json(obj: object, type_: type, target: list[str]) -> None:
-    obj_upgraded, errors = utils.validate_json(obj, type_)
-    assert errors == target
-    if not target:
-        assert obj_upgraded == obj
-
-
-@pytest.mark.parametrize(
-    ("obj", "type_", "target"),
-    [
-        (datetime.date(2026, 4, 6), datetime.date, []),
-        (datetime.date(2026, 4, 6), datetime.date | None, []),
-        (
-            0,
-            datetime.date | None,
-            ["json should be an ISO 8601 date string or null, not an integer"],
-        ),
-        (
-            "4/6/2026",
-            datetime.date,
-            ["json should be an ISO 8601 date string, not a string"],
-        ),
-        (
-            datetime.datetime(2026, 4, 6, 15, 47, 1, tzinfo=datetime.UTC),
-            datetime.datetime,
-            [],
-        ),
-        (
-            datetime.datetime(  # ruff: ignore[call-datetime-without-tzinfo]
-                2026,
-                4,
-                6,
-                15,
-                47,
-                1,
-            ),
-            datetime.datetime,
-            ["json should be an ISO 8601 date time string with TZ, not a string"],
-        ),
-        (Derived.SEAFOAM_GREEN, Derived, []),
-        (
-            "1",
-            Derived,
-            ['json should be "red" or "blue" or "seafoam_green", not a string'],
-        ),
-        (
-            1,
-            Derived,
-            ['json should be "red" or "blue" or "seafoam_green", not an integer'],
-        ),
-        (Decimal(), Decimal, []),
-        (Decimal("1234.5"), Decimal, []),
-        ("abc", Decimal, ["json should be a number, not a string"]),
-    ],
-    ids=conftest.id_func,
-)
-def test_validate_json_upgrade(obj: object, type_: type, target: list[str]) -> None:
-    obj_upgraded, errors = utils.validate_json(utils.json_mutate(obj), type_)
-    assert errors == target
-    if not target:
-        assert obj_upgraded == obj
-
-
-def test_validate_json_nested() -> None:
-    j: dict[str, object] = {
-        "bool": False,
-        "none": None,
-        "list": [],
-        "object": {
-            "bool": False,
-            "none": None,
-            "list": [True, False],
-            "object": None,
-        },
+def test_json_mutate_nested_values() -> None:
+    date = datetime.date(2024, 1, 2)
+    timestamp = datetime.datetime(2024, 1, 2, 3, 4, 5, tzinfo=datetime.UTC)
+    value = {
+        "enum": ConfigKey.VERSION,
+        "integer": Decimal(3),
+        "fraction": Decimal("3.14"),
+        "date": date,
+        "datetime": timestamp,
+        "sequence": (Decimal(2), [date]),
     }
-    assert not utils.validate_json(j, Top)[1]
 
+    result = utils.json_mutate(value)
 
-def test_validate_json_nested_error() -> None:
-    j: dict[str, object] = {
-        "list": [None],
-        "none": True,
-        "object": {
-            "bool": None,
-            "list": [True, {}],
-            "object": [True, False],
-        },
-        "fake": None,
+    assert result == {
+        "enum": "version",
+        "integer": 3,
+        "fraction": "3.14",
+        "date": "2024-01-02",
+        "datetime": "2024-01-02T03:04:05+00:00",
+        "sequence": [2, ["2024-01-02"]],
     }
-    assert utils.validate_json(j, Top)[1] == [
-        "json.bool is missing",
-        "json.list[0] should be a boolean, not null",
-        "json.none should be null, not a boolean",
-        "json.object.bool should be a boolean, not null",
-        "json.object.list[1] should be a boolean, not an object",
-        "json.object.none is missing",
-        "json.object.object should be an object or null, not an array",
-        "json.fake is not recognized",
-    ]
+
+
+def test_json_mutate_skip_decimal() -> None:
+    value = Decimal("3.14")
+
+    result = utils.json_mutate(value, skip_decimal=True)
+
+    assert result == value
+
+
+def test_init_logger_debug() -> None:
+    logger = logging.getLogger("flask_htmx_template")
+    original_handlers = list(logger.handlers)
+    try:
+        utils.init_logger(debug=True)
+
+        assert logger.level == logging.DEBUG
+        assert len(logger.handlers) == len(original_handlers) + 1
+        assert isinstance(logger.handlers[-1], logging.StreamHandler)
+    finally:
+        for handler in logger.handlers[len(original_handlers) :]:
+            logger.removeHandler(handler)

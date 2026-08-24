@@ -7,30 +7,28 @@ import datetime
 import flask
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import utils, web
-from flask_htmx_template.controllers import base
+from flask_htmx_template import web
+from flask_htmx_template.controllers import base, json_api
 from flask_htmx_template.controllers.items import ctx
 from flask_htmx_template.models.item import Item
 
 
-def json_all() -> ctx.AllItemsContext | base.JSONResponse:
+def json_all() -> ctx.ItemsContext | base.JSONResponse:
     """GET all items.
-
-    Query args:
-        before: filter items that appear before this date, optional
 
     Returns:
         Item-list context or JSON validation error.
 
     """
-    try:
-        before = utils.parse_date(flask.request.args.get("before"))
-    except ValueError:
-        return {
-            "errors": ["before must be an ISO 8601 date string"],
-        }, base.HTTP_CODE_BAD_REQUEST
+    args, errors = json_api.args(ctx.ItemsQuery)
+    if errors:
+        return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
     with web.db.begin_session():
-        return ctx.items(before=before)
+        return ctx.items(
+            before=args.before,
+            limit=args.limit,
+            offset=args.offset,
+        )
 
 
 def json_new() -> ctx.ItemContext | base.JSONResponse:
@@ -40,11 +38,10 @@ def json_new() -> ctx.ItemContext | base.JSONResponse:
         Created item context or JSON validation error.
 
     """
+    payload, errors = json_api.body(ctx.ItemPayload)
+    if errors:
+        return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
     with web.db.begin_session() as session:
-        payload: ctx.ItemContext = flask.request.json
-        payload, errors = utils.validate_json(payload, ctx.ItemContext)
-        if errors:
-            return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
         try:
             with session.begin_nested():
                 item = Item.create(
@@ -90,8 +87,7 @@ def json_put(uri: str) -> ctx.ItemContext | base.JSONResponse:
             item = base.find(Item, uri)
         except exc.http.HTTPException as error:
             return {"errors": [str(error)]}, error.code or base.HTTP_CODE_INTERNAL_ERROR
-        payload: ctx.ItemContext = flask.request.json
-        payload, errors = utils.validate_json(payload, ctx.ItemContext)
+        payload, errors = json_api.body(ctx.ItemPayload)
         if errors:
             return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
         try:
@@ -105,8 +101,32 @@ def json_put(uri: str) -> ctx.ItemContext | base.JSONResponse:
         return ctx.item(item)
 
 
+def json_delete(uri: str) -> ctx.ItemContext | base.JSONResponse:
+    """DELETE an item by URI.
+
+    Args:
+        uri: Item URI
+
+    Returns:
+        Deleted item context or JSON error response.
+
+    """
+    with web.db.begin_session() as session:
+        try:
+            item = base.find(Item, uri)
+        except exc.http.HTTPException as error:
+            return {"errors": [str(error)]}, error.code or base.HTTP_CODE_INTERNAL_ERROR
+        deleted = ctx.item(item)
+        try:
+            with session.begin_nested():
+                item.delete()
+        except (exc.IntegrityError, exc.InvalidORMValueError) as error:
+            return {"errors": [str(error)]}, base.HTTP_CODE_BAD_REQUEST
+        return deleted
+
+
 def json(uri: str) -> ctx.ItemContext | base.JSONResponse:
-    """GET or PUT an item by URI.
+    """GET, PUT, or DELETE an item by URI.
 
     Args:
         uri: Item URI
@@ -120,6 +140,8 @@ def json(uri: str) -> ctx.ItemContext | base.JSONResponse:
             return json_get(uri)
         case "PUT":
             return json_put(uri)
+        case "DELETE":
+            return json_delete(uri)
         case _:
             raise NotImplementedError
 
@@ -128,5 +150,5 @@ ROUTE_PREFIX = "items"
 ROUTES: base.Routes = {
     "/j/items": (json_all, ["GET"]),
     "/j/items/new": (json_new, ["POST"]),
-    "/j/items/i/<path:uri>": (json, ["GET", "PUT"]),
+    "/j/items/i/<path:uri>": (json, ["GET", "PUT", "DELETE"]),
 }

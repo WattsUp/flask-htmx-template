@@ -3,16 +3,29 @@
 from __future__ import annotations
 
 import datetime
+import inspect
 import ipaddress
 import json
 import re
+import sys
 import textwrap
 from decimal import Decimal
 from pathlib import Path
-from typing import NamedTuple, TYPE_CHECKING, TypedDict
+from typing import (
+    cast,
+    get_args,
+    get_type_hints,
+    is_typeddict,
+    NamedTuple,
+    Protocol,
+    TYPE_CHECKING,
+    TypedDict,
+    TypeVar,
+)
 
 import flask
 from flask.typing import RouteCallable
+from mcp_types import ToolAnnotations
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils
@@ -20,6 +33,9 @@ from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from flask_htmx_template.database import Database
     from flask_htmx_template.models.base import (
         Base,
     )
@@ -92,6 +108,175 @@ class BasePageContext(TypedDict):
     icons: str
     version: str
     current_year: int
+
+
+MCPResult_co = TypeVar("MCPResult_co", covariant=True)
+
+
+class MCPTool(Protocol[MCPResult_co]):
+    """A database MCP tool with its registration metadata."""
+
+    __name__: str
+    mcp_annotations: ToolAnnotations
+    mcp_description: str
+    mcp_signature: inspect.Signature
+
+    def __call__(
+        self,
+        database: Database,
+        *args: object,
+        **kwargs: object,
+    ) -> MCPResult_co:
+        """Run the tool for a database."""
+        raise NotImplementedError
+
+
+_MCP_TOOLS: dict[str, MCPTool[object]] = {}
+
+
+def register_mcp_tool[ResultT](
+    tool: MCPTool[ResultT],
+) -> MCPTool[ResultT]:
+    """Register an MCP tool in the application-wide tool registry.
+
+    Args:
+        tool: MCP tool to register
+
+    Returns:
+        The registered tool
+
+    Raises:
+        DuplicateMCPToolError: If another registered tool has the same name
+
+    """
+    if tool.__name__ in _MCP_TOOLS:
+        message = f"Duplicate MCP tool name: {tool.__name__}"
+        raise exc.DuplicateMCPToolError(message)
+    _MCP_TOOLS[tool.__name__] = tool
+    return tool
+
+
+def get_mcp_tools() -> tuple[MCPTool[object], ...]:
+    """Return all tools in the application-wide MCP registry.
+
+    Returns:
+        Registered MCP tools
+
+    """
+    return tuple(_MCP_TOOLS.values())
+
+
+def mcp_tool(
+    description: str,
+    *,
+    read_only_hint: bool | None = None,
+    destructive_hint: bool | None = None,
+    idempotent_hint: bool | None = None,
+    open_world_hint: bool | None = None,
+) -> Callable[[Callable[..., MCPResult_co]], MCPTool[MCPResult_co]]:
+    """Decorate a database function with MCP registration metadata.
+
+    Args:
+        description: Human-readable MCP tool description
+        read_only_hint: Whether the tool does not modify state
+        destructive_hint: Whether the tool may perform destructive updates
+        idempotent_hint: Whether repeated calls have the same effect
+        open_world_hint: Whether the tool interacts with external systems
+
+    Returns:
+        Decorator that marks a function as an MCP tool
+
+    """
+
+    def decorate(
+        function: Callable[..., MCPResult_co],
+    ) -> MCPTool[MCPResult_co]:
+        """Attach MCP metadata to a database function.
+
+        Args:
+            function: Database function to expose through MCP
+
+        Returns:
+            Function with MCP registration metadata
+
+        Raises:
+            TypeError: If the function does not accept database first
+
+        """
+        decorated = cast("MCPTool[MCPResult_co]", function)
+        decorated.mcp_description = description
+        decorated.mcp_annotations = ToolAnnotations(
+            read_only_hint=read_only_hint,
+            destructive_hint=destructive_hint,
+            idempotent_hint=idempotent_hint,
+            open_world_hint=open_world_hint,
+        )
+        # NOTE: Database is imported only while type checking, so provide a local
+        # stand-in while resolving the structured return annotation at runtime.
+        localns: dict[str, object] = {"Database": object, "datetime": datetime}
+        hints = get_type_hints(
+            function,
+            localns=localns,
+            include_extras=True,
+        )
+        _resolve_mcp_typed_dict(hints.get("return"), localns)
+        signature = inspect.signature(function)
+        parameters = tuple(signature.parameters.values())
+        if not parameters or parameters[0].name != "database":
+            message = f"MCP tool must accept database first: {function.__name__}"
+            raise TypeError(message)
+        decorated.mcp_signature = signature.replace(
+            parameters=[
+                parameter.replace(annotation=hints.get(parameter.name, object))
+                for parameter in parameters[1:]
+            ],
+            return_annotation=hints.get("return", object),
+        )
+        return register_mcp_tool(decorated)
+
+    return decorate
+
+
+def _resolve_mcp_typed_dict(
+    annotation: object,
+    localns: dict[str, object],
+    seen: set[int] | None = None,
+) -> None:
+    """Resolve nested TypedDict annotations used by an MCP result.
+
+    Pydantic evaluates TypedDict annotations from the defining module and does
+    not accept the extra namespace used for the outer function annotation.
+    Resolve the nested classes once before the MCP SDK builds its output model.
+
+    Args:
+        annotation: Candidate TypedDict or a type containing one
+        localns: Names available while resolving deferred annotations
+        seen: Annotation identities already visited
+
+    """
+    if seen is None:
+        seen = set()
+    if id(annotation) in seen:
+        return
+    seen.add(id(annotation))
+
+    if is_typeddict(annotation):
+        module = sys.modules.get(annotation.__module__)
+        if module is None:
+            return
+        hints = get_type_hints(
+            annotation,
+            globalns=vars(module),
+            localns=localns,
+            include_extras=True,
+        )
+        annotation.__annotations__ = hints
+        for hint in hints.values():
+            _resolve_mcp_typed_dict(hint, localns, seen)
+        return
+
+    for arg in get_args(annotation):
+        _resolve_mcp_typed_dict(arg, localns, seen)
 
 
 class NamePair(NamedTuple):
@@ -667,25 +852,25 @@ def parse_date(
         date object
 
     Raises:
-        ValueError: if failed to parse, empty, or in advance
+        InvalidDateError: if failed to parse, empty, or in advance
 
     """
     try:
         date = utils.parse_date(value)
     except ValueError as e:
         msg = "Unable to parse date"
-        raise ValueError(msg) from e
+        raise exc.InvalidDateError(msg) from e
     if date is None:
         msg = "Date must not be empty"
-        raise ValueError(msg)
+        raise exc.InvalidDateError(msg)
     if max_future == 0:
         if date > today:
             msg = "Cannot be in advance"
-            raise ValueError(msg)
+            raise exc.InvalidDateError(msg)
     elif max_future is not None and date > (
         today + datetime.timedelta(days=max_future)
     ):
         msg = f"Only up to {utils.format_days(max_future)} in advance"
-        raise ValueError(msg)
+        raise exc.InvalidDateError(msg)
 
     return date

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import shutil
 from typing import TYPE_CHECKING
 
@@ -85,3 +86,11 @@ def test_migrate_postgres(
     captured = capsys.readouterr()
     assert "Database is unlocked" in captured.out
     assert not captured.err
+
+
+def test_setup_args() -> None:
+    parser = argparse.ArgumentParser()
+
+    Migrate.setup_args(parser)
+
+    assert vars(parser.parse_args([])) == {}

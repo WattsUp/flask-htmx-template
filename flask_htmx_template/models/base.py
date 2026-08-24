@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import enum
+from contextvars import ContextVar
 from decimal import Decimal
 from typing import ClassVar, NamedTuple, overload, override, Self, TYPE_CHECKING
 
@@ -45,7 +46,10 @@ class NamePair(NamedTuple):
 class SessionMixIn:
     """Mix-in that provides a session reference to the type."""
 
-    _sessions: ClassVar[list[orm.Session]] = []
+    _active_session: ClassVar[ContextVar[orm.Session | None]] = ContextVar(
+        "active_orm_session",
+        default=None,
+    )
 
     @classmethod
     @contextlib.contextmanager
@@ -56,11 +60,12 @@ class SessionMixIn:
             SQL session
 
         """
-        cls._sessions.append(s)
+        token = cls._active_session.set(s)
         try:
             yield
         finally:
-            cls._sessions.pop()
+            # NOTE: The token restores nested contexts without crossing task boundaries.
+            cls._active_session.reset(token)
 
     @classmethod
     def session(cls) -> orm.Session:
@@ -73,9 +78,10 @@ class SessionMixIn:
             UnboundExecutionError: set_session has not been called yet
 
         """
-        if not cls._sessions:
+        session = cls._active_session.get()
+        if session is None:
             raise exc.UnboundExecutionError
-        return cls._sessions[-1]
+        return session
 
 
 class QueryMixIn(SessionMixIn):

@@ -53,6 +53,59 @@ def test_page_all_before_rejects_invalid_date(web_client: WebClient) -> None:
     assert "before must be an ISO 8601 date string" in result
 
 
+def test_page_all_empty_before_keeps_filter_unset(web_client: WebClient) -> None:
+    result, _ = web_client.GET(
+        "items.page_all",
+        query_string={"before": ""},
+    )
+
+    assert "Items" in result
+
+
+def test_page_all_limit_and_offset_paginate_items(
+    web_client: WebClient,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    with session.begin_nested():
+        older = Item.create(name="Apples", date_ord=today_ord - 1)
+        newer = Item.create(name="Cherries", date_ord=today_ord + 1)
+
+    result, _ = web_client.GET(
+        "items.page_all",
+        query_string={"limit": 1, "offset": 1},
+    )
+
+    assert item.name in result
+    assert older.name not in result
+    assert newer.name not in result
+    assert "offset=2" in result
+
+
+@pytest.mark.parametrize(
+    ("query_string", "message"),
+    [
+        ({"limit": "invalid"}, "limit must be an integer"),
+        ({"limit": 0}, "limit must be between 1 and 100"),
+        ({"offset": "invalid"}, "offset must be an integer"),
+        ({"offset": -1}, "offset must be at least 0"),
+    ],
+)
+def test_page_all_rejects_invalid_pagination(
+    web_client: WebClient,
+    query_string: dict[str, object],
+    message: str,
+) -> None:
+    result, _ = web_client.GET(
+        "items.page_all",
+        query_string=query_string,
+        rc=base.HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert message in result
+
+
 def test_page(web_client: WebClient, item: Item) -> None:
     result, _ = web_client.GET(("items.page", {"uri": item.uri}))
     assert item.name in result

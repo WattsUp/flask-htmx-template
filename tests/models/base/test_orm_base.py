@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+from contextvars import Context
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import ForeignKey, orm
+from sqlalchemy.dialects.sqlite import dialect as sqlite_dialect
 
 import flask_htmx_template
 import tests
@@ -186,6 +188,20 @@ def test_set_decimal_value(session: orm.Session, child: Child) -> None:
     assert child.height == height
 
 
+def test_decimal6_process_bind_param() -> None:
+    value = Decimal("1.2345678")
+
+    result = Decimal6().process_bind_param(value, sqlite_dialect())
+
+    assert result == 1234567
+
+
+def test_decimal6_process_result_value() -> None:
+    result = Decimal6().process_result_value(1234567, sqlite_dialect())
+
+    assert result == Decimal("1.234567")
+
+
 def test_set_enum(session: orm.Session, child: Child) -> None:
     with session.begin_nested():
         child.color = Derived.RED
@@ -304,10 +320,8 @@ def test_query_kwargs() -> None:
 
 
 def test_unbound_error() -> None:
-    s = Base._sessions.pop()
     with pytest.raises(exc.UnboundExecutionError):
-        Base.session()
-    Base._sessions.append(s)
+        Context().run(Base.session)
 
 
 def noop[T](x: T) -> T:
