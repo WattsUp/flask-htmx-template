@@ -3,6 +3,9 @@
 .env*
 .nvim*
 prompt.md
+.vale/styles/Microsoft
+.vale/styles/proselint
+.vale/styles/write-good
 
 # Build artifacts
 __pycache__

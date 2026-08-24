@@ -404,7 +404,7 @@ def test_build_localns_resolves_type_checking_datetime() -> None:
 
 
 # ---------------------------------------------------------------------------
-# get_operations — error cases
+# get_operations -- error cases
 # ---------------------------------------------------------------------------
 
 
@@ -506,7 +506,7 @@ def test_operation_request_example_json_none() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _find_typed_dict — union arm
+# _find_typed_dict -- union arm
 # ---------------------------------------------------------------------------
 
 
@@ -614,7 +614,7 @@ def test_schema_type_unknown() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _response_arms — tuple with no TypedDict
+# _response_arms -- tuple with no TypedDict
 # ---------------------------------------------------------------------------
 
 
@@ -712,7 +712,7 @@ def test_json_api_enums_example_matches_actual(web_client: WebClient) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _find_typed_dict — non-object dict value branch
+# _find_typed_dict -- non-object dict value branch
 # ---------------------------------------------------------------------------
 
 

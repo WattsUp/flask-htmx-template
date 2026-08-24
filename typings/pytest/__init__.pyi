@@ -1,4 +1,4 @@
-# Partial stub — only symbols used in this project.
+# Partial stub -- only symbols used in this project.
 
 from _pytest.capture import CaptureFixture as CaptureFixture
 from _pytest.fixtures import fixture as fixture

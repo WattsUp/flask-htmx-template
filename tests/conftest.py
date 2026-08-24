@@ -356,7 +356,7 @@ def item(session: orm.Session, today_ord: int) -> Item:
 
 
 # ---------------------------------------------------------------------------
-# Postgres fixtures — spin up a fresh cluster; no system setup needed
+# Postgres fixtures -- spin up a fresh cluster; no system setup needed
 # ---------------------------------------------------------------------------
 
 _pg_proc = postgresql_proc(
