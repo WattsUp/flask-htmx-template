@@ -4,19 +4,61 @@ import io
 from pathlib import Path
 
 import flask
+import pytest
 import setuptools
 
 from flask_htmx_template import web_assets
 
 
-def test_tailwindcss_filter() -> None:
-    f = web_assets.TailwindCSSFilter()
+@pytest.mark.parametrize(
+    ("filter_class", "expected_flag"),
+    [
+        (web_assets.TailwindCSSFilter, "--minify"),
+        (web_assets.TailwindCSSFilterDebug, "--optimize"),
+    ],
+)
+def test_tailwindcss_filter_uses_pinned_version(
+    filter_class: type[web_assets.TailwindCSSFilter],
+    expected_flag: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def run(
+        args: list[str],
+        *,
+        auto_install: bool,
+        version: str,
+    ) -> str:
+        calls.append(
+            {
+                "args": args,
+                "auto_install": auto_install,
+                "version": version,
+            },
+        )
+        return "built css"
+
+    assert web_assets.pytailwindcss is not None
+    monkeypatch.setattr(web_assets.pytailwindcss, "run", run)
 
     out = io.StringIO()
-    f.output(io.StringIO(), out)
-    buf = out.getvalue()
-    assert "/*! tailwindcss" in buf
-    assert "*,:after,:before" in buf
+    filter_class().output(io.StringIO(), out)
+
+    assert out.getvalue() == "built css"
+    path_in = Path(web_assets.__file__).parent / "static" / "src" / "css" / "main.css"
+    assert calls == [
+        {
+            "args": [
+                "-i",
+                str(path_in),
+                expected_flag,
+            ],
+            "auto_install": True,
+            "version": web_assets.TAILWINDCSS_VERSION,
+        },
+    ]
+    assert web_assets.TAILWINDCSS_VERSION == "v4.3.3"
 
 
 def test_jsmin_filter() -> None:

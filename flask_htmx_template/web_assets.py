@@ -9,6 +9,9 @@ import flask
 import flask_assets
 import webassets.filter
 
+# NOTE: The CI image preinstalls this exact binary; bumping it invalidates that image.
+TAILWINDCSS_VERSION = "v4.3.3"
+
 try:
     from setuptools.command import build_py
 except ImportError:
@@ -44,7 +47,11 @@ class TailwindCSSFilter(webassets.filter.Filter):
             str(path_in),
             "--optimize" if self.DEBUG else "--minify",
         ]
-        built_css = pytailwindcss.run(args, auto_install=True, version="v4.1.11")
+        built_css = pytailwindcss.run(
+            args,
+            auto_install=True,
+            version=TAILWINDCSS_VERSION,
+        )
         out.write(built_css)
 
 
