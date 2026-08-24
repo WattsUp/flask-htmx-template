@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import contextlib
-from typing import cast, NamedTuple, NoReturn, TYPE_CHECKING
+import json
+from typing import cast, NamedTuple, NoReturn, TYPE_CHECKING, TypedDict
 
 import anyio
 import httpx2
@@ -10,6 +11,7 @@ import pytest
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
+from mcp_types import TextResourceContents
 from starlette.testclient import TestClient
 
 from flask_htmx_template import asgi
@@ -25,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     import flask
-    from mcp_types import CallToolResult, Tool
+    from mcp_types import CallToolResult, Resource, Tool
     from sqlalchemy import orm
     from starlette.applications import Starlette
     from starlette.routing import Mount, Route
@@ -80,6 +82,25 @@ class StreamableHTTPLifecycle(NamedTuple):
     protocol_version: str
     tool_names: list[str]
     tool_result: CallToolResult
+
+
+class ServerMetadata(TypedDict):
+    """Application identity and version resource document."""
+
+    schema_version: int
+    name: str
+    description: str
+    version: str
+
+
+class ServerCapabilities(TypedDict):
+    """MCP capability resource document."""
+
+    schema_version: int
+    transport: str
+    authentication: str
+    tools: list[str]
+    resources: list[str]
 
 
 @pytest.fixture
@@ -203,6 +224,39 @@ async def _list_tools(server: mcp.MCPServer) -> list[str]:
     async with Client(server) as client:
         result = await client.list_tools()
     return [tool.name for tool in result.tools]
+
+
+async def _list_resources(server: mcp.MCPServer) -> list[Resource]:
+    """List the available resources through an in-process MCP client.
+
+    Args:
+        server: MCP server to inspect
+
+    Returns:
+        Registered MCP resources
+
+    """
+    async with Client(server) as client:
+        result = await client.list_resources()
+    return result.resources
+
+
+async def _read_resource(server: mcp.MCPServer, uri: str) -> str:
+    """Read one text resource through an in-process MCP client.
+
+    Args:
+        server: MCP server hosting the resource
+        uri: Resource URI to read
+
+    Returns:
+        Resource text content
+
+    """
+    async with Client(server) as client:
+        result = await client.read_resource(uri)
+    content = result.contents[0]
+    assert isinstance(content, TextResourceContents)
+    return content.text
 
 
 async def _get_tool(server: mcp.MCPServer, name: str) -> Tool:
@@ -346,6 +400,66 @@ def test_create_server_registers_read_only_items_tool(
     tools = anyio.run(_list_tools, server)
 
     assert tools == ["get_items"]
+
+
+def test_create_server_registers_metadata_resources(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    resources = anyio.run(_list_resources, server)
+
+    assert [str(resource.uri) for resource in resources] == [
+        mcp.METADATA_RESOURCE_URI,
+        mcp.CAPABILITIES_RESOURCE_URI,
+    ]
+    assert [resource.name for resource in resources] == [
+        "server_metadata",
+        "server_capabilities",
+    ]
+    assert all(resource.mime_type == "application/json" for resource in resources)
+
+
+def test_server_metadata_resource_identifies_application_version(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    content = anyio.run(_read_resource, server, mcp.METADATA_RESOURCE_URI)
+
+    metadata = cast("ServerMetadata", json.loads(content))
+    assert metadata == {
+        "schema_version": 1,
+        "name": "Flask HTMX Template",
+        "description": "Read-only item information from Flask HTMX Template.",
+        "version": mcp.__version__,
+    }
+
+
+def test_server_capabilities_resource_describes_mcp_surface(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    content = anyio.run(_read_resource, server, mcp.CAPABILITIES_RESOURCE_URI)
+
+    capabilities = cast("ServerCapabilities", json.loads(content))
+    assert capabilities == {
+        "schema_version": 1,
+        "transport": "streamable-http",
+        "authentication": "bearer",
+        "tools": ["get_items"],
+        "resources": [
+            mcp.METADATA_RESOURCE_URI,
+            mcp.CAPABILITIES_RESOURCE_URI,
+        ],
+    }
 
 
 def test_items_tool_is_registered_in_central_registry() -> None:

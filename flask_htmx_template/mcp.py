@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import importlib
+import json
 import logging
 import pkgutil
 import time
@@ -11,9 +12,7 @@ from enum import IntEnum
 from typing import NamedTuple, TYPE_CHECKING
 
 import prometheus_client
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.context import Context
-from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server import MCPServer
 from mcp.shared.exceptions import MCPError
 from mcp_types import (
     CallToolResult,
@@ -31,9 +30,9 @@ from flask_htmx_template.version import __version__
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from typing import Any
 
-    from mcp.server.context import LifespanContextT, ServerRequestContext
-    from mcp_types import CallToolRequestParams, InputRequiredResult
+    from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 
     from flask_htmx_template.database import Database
 
@@ -53,6 +52,54 @@ _MCP_ERROR_MESSAGES: dict[MCPErrorCode, str] = {
 }
 
 _LOGGER = logging.getLogger(__name__)
+_CALL_TOOL_METHOD = "tools/call"
+
+_SERVER_NAME = "Flask HTMX Template"
+_SERVER_DESCRIPTION = "Read-only item information from Flask HTMX Template."
+_METADATA_SCHEMA_VERSION = 1
+METADATA_RESOURCE_URI = "flask-htmx-template://metadata/server"
+CAPABILITIES_RESOURCE_URI = "flask-htmx-template://metadata/capabilities"
+_RESOURCE_URIS = (
+    METADATA_RESOURCE_URI,
+    CAPABILITIES_RESOURCE_URI,
+)
+
+
+def _metadata_resource() -> str:
+    """Return stable application identity and version metadata.
+
+    Returns:
+        JSON-encoded application metadata
+
+    """
+    return json.dumps(
+        {
+            "schema_version": _METADATA_SCHEMA_VERSION,
+            "name": _SERVER_NAME,
+            "description": _SERVER_DESCRIPTION,
+            "version": __version__,
+        },
+        sort_keys=True,
+    )
+
+
+def _capabilities_resource() -> str:
+    """Return the stable MCP capability manifest.
+
+    Returns:
+        JSON-encoded capability metadata
+
+    """
+    return json.dumps(
+        {
+            "schema_version": _METADATA_SCHEMA_VERSION,
+            "transport": "streamable-http",
+            "authentication": "bearer",
+            "tools": sorted(tool.__name__ for tool in base.get_mcp_tools()),
+            "resources": list(_RESOURCE_URIS),
+        },
+        sort_keys=True,
+    )
 
 
 def _error_result(code: MCPErrorCode) -> CallToolResult:
@@ -72,42 +119,69 @@ def _error_result(code: MCPErrorCode) -> CallToolResult:
     )
 
 
-class _SafeMCPServer(MCPServer):
-    """MCP server that sanitizes errors returned by database-backed tools."""
+class _SafeToolErrors:
+    """Sanitize errors returned by database-backed MCP tools."""
 
-    async def _handle_call_tool(
-        self,
-        ctx: ServerRequestContext[LifespanContextT],
-        params: CallToolRequestParams,
-    ) -> CallToolResult | InputRequiredResult:
-        """Call a tool and return a safe, protocol-compatible error result.
+    def __init__(self, tool_names: frozenset[str]) -> None:
+        """Initialize the middleware.
 
-        Returns:
-            MCP tool result or input request
+        Args:
+            tool_names: Names of tools registered with the server
 
         """
-        context = Context(
-            request_context=ctx,
-            mcp_server=self,
-            input_params=params,
-            subscriptions=self._subscriptions,
-        )
-        if not any(tool.name == params.name for tool in await self.list_tools()):
+        self._tool_names = tool_names
+
+    async def __call__(
+        self,
+        ctx: ServerRequestContext[Any, Any],
+        call_next: CallNext,
+    ) -> HandlerResult:
+        """Call the next handler and sanitize MCP tool failures.
+
+        Args:
+            ctx: Current MCP request context
+            call_next: Remaining server middleware and request handler
+
+        Returns:
+            MCP handler result with safe tool errors
+
+        """
+        if ctx.method != _CALL_TOOL_METHOD:
+            return await call_next(ctx)
+
+        tool_name = ctx.params.get("name") if ctx.params is not None else None
+        if isinstance(tool_name, str) and tool_name not in self._tool_names:
             return _error_result(MCPErrorCode.METHOD_NOT_FOUND)
         try:
-            result = await self.call_tool(params.name, params.arguments or {}, context)
+            result = await call_next(ctx)
         except MCPError as error:
             try:
                 code = MCPErrorCode(error.code)
             except ValueError:
                 code = MCPErrorCode.INTERNAL_ERROR
             return _error_result(code)
-        except ToolError:
-            return _error_result(MCPErrorCode.INVALID_PARAMS)
         # NOTE: Unexpected handler failures must not expose server details.
         except Exception:
             _LOGGER.exception("Unexpected MCP tool handler failure")
             return _error_result(MCPErrorCode.INTERNAL_ERROR)
+
+        # NOTE: Registered tools translate argument validation failures into an
+        # error result, so sanitize that result after the public handler runs.
+        if isinstance(result, dict) and result.get("isError") is True:
+            safe_result = _error_result(MCPErrorCode.INVALID_PARAMS).model_dump(
+                by_alias=True,
+                mode="json",
+                exclude_none=True,
+            )
+            if "resultType" in result:
+                safe_result["resultType"] = result["resultType"]
+            result_meta = result.get("_meta")
+            if isinstance(result_meta, dict):
+                safe_result["_meta"] = {
+                    **result_meta,
+                    **safe_result["_meta"],
+                }
+            return safe_result
         return result
 
 
@@ -158,11 +232,30 @@ def create_server(
         MCP server with template tools
 
     """
-    server = _SafeMCPServer(
-        "Flask HTMX Template",
-        description="Read-only item information from Flask HTMX Template.",
+    tool_names = frozenset(tool.__name__ for tool in base.get_mcp_tools())
+    server = MCPServer(
+        _SERVER_NAME,
+        description=_SERVER_DESCRIPTION,
         version=__version__,
+        middleware=[_SafeToolErrors(tool_names)],
     )
+
+    server.resource(
+        METADATA_RESOURCE_URI,
+        name="server_metadata",
+        title="Server metadata",
+        description="Stable application identity and version metadata.",
+        mime_type="application/json",
+    )(_metadata_resource)
+    server.resource(
+        CAPABILITIES_RESOURCE_URI,
+        name="server_capabilities",
+        title="Server capabilities",
+        description=(
+            "Stable MCP transport, authentication, tool, and resource metadata."
+        ),
+        mime_type="application/json",
+    )(_capabilities_resource)
 
     for tool in base.get_mcp_tools():
         bound_tool = _bind_database(tool, database, _get_metrics(registry))

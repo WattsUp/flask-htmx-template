@@ -114,6 +114,13 @@ The combined ASGI service exposes a stateless Streamable HTTP MCP endpoint at
 records per-tool call count and duration metrics in the web application's Prometheus
 registry.
 
+Clients can discover stable JSON metadata with `resources/list` and
+`resources/read`:
+
+- `flask-htmx-template://metadata/server` identifies the application and version.
+- `flask-htmx-template://metadata/capabilities` lists the transport,
+  authentication method, tools, and resource URIs.
+
 MCP requests must send the same database-backed API token as the JSON API:
 
 ```text
@@ -128,8 +135,11 @@ Use the project-local client to inspect a running server without putting the bea
 token in shell history or the process list:
 
 ```bash
-export MCP_BEARER_TOKEN="<ConfigKey.API_BEARER_TOKEN>"
+export BEARER_TOKEN="<ConfigKey.API_BEARER_TOKEN>"
 python tools/mcp_connect.py list-tools
+python tools/mcp_connect.py list-resources
+python tools/mcp_connect.py read-resource flask-htmx-template://metadata/server
+python tools/mcp_connect.py read-resource flask-htmx-template://metadata/capabilities
 python tools/mcp_connect.py call get_items
 ```
 

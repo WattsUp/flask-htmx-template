@@ -208,6 +208,7 @@ class FlaskExtension:
         metrics = metrics_class(
             app,
             path="/metrics",
+            metrics_decorator=auth_ctx.login_exempt,
             excluded_paths=["/static", "/metrics", "/status"],
             group_by="endpoint",
             registry=(
