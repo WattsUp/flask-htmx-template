@@ -35,9 +35,6 @@ def test_json_api_documents_item_delete(web_client: WebClient) -> None:
         "value": "number or number string",
         "date": "ISO-8601 date string",
         "note": "string or null",
-        "category": "item category enum value",
-        "literal": "'a word'",
-        "many": "1 or 2 or 3",
     }
 
 

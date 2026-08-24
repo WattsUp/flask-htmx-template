@@ -25,6 +25,7 @@ from mcp_types import (
 )
 
 from flask_htmx_template import controllers
+from flask_htmx_template import exceptions as exc
 from flask_htmx_template.controllers import base
 from flask_htmx_template.version import __version__
 
@@ -40,12 +41,15 @@ if TYPE_CHECKING:
 class MCPErrorCode(IntEnum):
     """Safe JSON-RPC error codes returned for MCP tool failures."""
 
+    # NOTE: -32004 is in JSON-RPC's implementation-defined server-error range.
+    RESOURCE_NOT_FOUND = -32004
     INVALID_PARAMS = MCP_INVALID_PARAMS
     METHOD_NOT_FOUND = MCP_METHOD_NOT_FOUND
     INTERNAL_ERROR = MCP_INTERNAL_ERROR
 
 
 _MCP_ERROR_MESSAGES: dict[MCPErrorCode, str] = {
+    MCPErrorCode.RESOURCE_NOT_FOUND: "Requested resource was not found.",
     MCPErrorCode.INVALID_PARAMS: "MCP tool arguments are invalid.",
     MCPErrorCode.METHOD_NOT_FOUND: "MCP tool was not found.",
     MCPErrorCode.INTERNAL_ERROR: "MCP tool execution failed.",
@@ -196,6 +200,7 @@ _MCP_CALL_SUCCESS = "success"
 _MCP_CALL_ERROR = "error"
 _MCP_ERROR_NONE = "none"
 _MCP_ERROR_INTERNAL = "internal"
+_MCP_ERROR_NOT_FOUND = "not_found"
 
 
 _METRICS: dict[prometheus_client.CollectorRegistry, MCPMetrics] = {}
@@ -328,6 +333,18 @@ def _bind_database(
         started_at = time.perf_counter()
         try:
             result = tool(database, *args, **kwargs)
+        except exc.http.NotFound as error:
+            _record_metrics(
+                metrics,
+                tool.__name__,
+                _MCP_CALL_ERROR,
+                _MCP_ERROR_NOT_FOUND,
+                time.perf_counter() - started_at,
+            )
+            raise MCPError(
+                code=MCPErrorCode.RESOURCE_NOT_FOUND,
+                message=_MCP_ERROR_MESSAGES[MCPErrorCode.RESOURCE_NOT_FOUND],
+            ) from error
         except Exception as error:
             _LOGGER.exception("MCP tool %s failed", tool.__name__)
             _record_metrics(

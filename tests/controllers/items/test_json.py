@@ -18,9 +18,9 @@ if TYPE_CHECKING:
     from tests.controllers.conftest import WebClient
 
 
-def test_body_item_context_resolves_type_checking_datetime() -> None:
+def test_body_item_payload_resolves_type_checking_datetime() -> None:
     payload, errors = json_api.body(
-        ctx.ItemContext,
+        ctx.ItemPayload,
         {
             "name": "New name",
             "value": "1234",

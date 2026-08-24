@@ -78,7 +78,7 @@ def new() -> str | flask.Response:
     today = datetime.datetime.now(datetime.UTC).date()
     with web.db.begin_session() as session:
         if flask.request.method == "GET":
-            item: ctx.ItemContext = {
+            item: ctx.ItemPayload = {
                 "name": "",
                 "date": today,
                 "value": Decimal(),

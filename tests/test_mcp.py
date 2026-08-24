@@ -302,6 +302,24 @@ async def _call_tool(
         return await client.call_tool(name, arguments=arguments)
 
 
+async def _get_item_from_listing(server: mcp.MCPServer) -> CallToolResult:
+    """List items and fetch the first item using its published URI.
+
+    Args:
+        server: MCP server hosting the item tools
+
+    Returns:
+        Result of fetching the listed item
+
+    """
+    async with Client(server) as client:
+        listed = await client.call_tool("get_items")
+        assert listed.structured_content is not None
+        uri = listed.structured_content["items"][0]["uri"]
+        assert isinstance(uri, str)
+        return await client.call_tool("get_item", arguments={"uri": uri})
+
+
 def _duplicate_items_tool(database: Database) -> dict[str, object]:
     """Return a dummy result for duplicate-name registration tests.
 
@@ -571,6 +589,10 @@ def test_get_items_publishes_output_schema(
         "next_offset",
         "total",
     }
+    assert tool.description == items_mcp.get_items.mcp_description
+    assert tool.description is not None
+    assert "count is the number of matching items before pagination" in tool.description
+    assert "total is the sum of values in the returned page" in tool.description
 
 
 def test_get_items_publishes_typed_input_schema(
@@ -637,6 +659,21 @@ def test_get_items_accepts_typed_arguments_in_process(
     }
 
 
+def test_get_item_accepts_uri_from_get_items(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+    item: Item,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+
+    result = anyio.run(_get_item_from_listing, server)
+
+    assert not result.is_error
+    assert result.structured_content is not None
+    assert result.structured_content["uri"] == item.uri
+
+
 def test_get_items_rejects_invalid_pagination_in_process(
     current_session_database: Database,
     flask_app: flask.Flask,
@@ -684,6 +721,28 @@ def test_mcp_tool_hides_internal_error_details(
         "meta": None,
     }
     assert "database unavailable" not in str(result)
+
+
+def test_get_item_returns_structured_error_when_item_is_missing(
+    current_session_database: Database,
+    flask_app: flask.Flask,
+) -> None:
+    registry = flask_app.extensions["flask_htmx_template_metrics"].registry
+    server = mcp.create_server(registry, current_session_database)
+    arguments: dict[str, object] = {"uri": Item.id_to_uri(999)}
+
+    result = anyio.run(_call_tool, server, "get_item", arguments)
+
+    assert result.is_error
+    assert result.structured_content is None
+    assert result.meta is not None
+    assert result.meta["errorCode"] == int(mcp.MCPErrorCode.RESOURCE_NOT_FOUND)
+    assert result.content[0].model_dump() == {
+        "type": "text",
+        "text": "Requested resource was not found.",
+        "annotations": None,
+        "meta": None,
+    }
 
 
 def test_mcp_tool_returns_safe_code_when_tool_is_missing(
@@ -749,3 +808,27 @@ def test_mcp_tool_records_error_metrics() -> None:
         'flask_htmx_template_mcp_tool_duration_seconds_count{error_code="internal",'
         'status="error",tool="get_items"} 1.0'
     ) in metrics
+
+
+def test_mcp_tool_records_not_found_metrics(
+    current_session_database: Database,
+) -> None:
+    registry = prometheus_client.CollectorRegistry()
+    tool = mcp._bind_database(
+        items_mcp.get_item,
+        current_session_database,
+        mcp._get_metrics(registry),
+    )
+
+    with pytest.raises(MCPError, match="Requested resource was not found"):
+        tool(uri=Item.id_to_uri(999))
+
+    metrics = prometheus_client.generate_latest(registry).decode()
+    assert (
+        'flask_htmx_template_mcp_tool_calls_total{error_code="not_found",'
+        'status="error",tool="get_item"} 1.0'
+    ) in metrics
+    assert (
+        'flask_htmx_template_mcp_tool_duration_seconds_count{error_code="not_found",'
+        'status="error",tool="get_item"} 1.0' in metrics
+    )

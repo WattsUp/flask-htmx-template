@@ -114,6 +114,12 @@ The combined ASGI service exposes a stateless Streamable HTTP MCP endpoint at
 update, and delete operations as the HTML and JSON interfaces. The server records
 per-tool call count and duration metrics in the web application's Prometheus registry.
 
+The `get_items` response reports `count` as the number of items matching the
+`before` filter before `limit` and `offset` are applied. Its `total` is the sum of
+the `value` fields in the returned page, rather than the sum across all matches.
+Missing item URIs return an MCP tool error with `_meta.errorCode` set to `-32004`
+and the safe message `Requested resource was not found.`
+
 Clients can discover stable JSON metadata with `resources/list` and
 `resources/read`:
 

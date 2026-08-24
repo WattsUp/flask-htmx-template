@@ -27,22 +27,36 @@ class ItemCategory(BaseEnum):
     SPECIAL = 1
 
 
-class ItemContext(TypedDict):
-    """Type definition for Item context."""
+class ItemFields(TypedDict):
+    """Fields shared by serialized items and writable payloads."""
+
+    name: str
+    value: Decimal
+    note: str | None
+
+
+class ItemContext(ItemFields):
+    """Canonical serialized item context."""
+
+    uri: str
+    date: datetime.date
+
+
+# NOTE: Keep optional input and demonstration fields out of ItemContext so its
+# exact output contract remains valid for JSON responses and MCP tools.
+class ItemPayload(ItemFields):
+    """Writable item fields accepted by the JSON API."""
 
     # NOTE: ``json_api.body()`` resolves these annotations at runtime.
     uri: NotRequired[str]
-    name: str
-    value: Decimal
     date: NotRequired[datetime.date]
-    note: str | None
     category: NotRequired[ItemCategory]
     literal: NotRequired[Literal["a word"]]
     many: NotRequired[Literal[1, 2, 3]]
 
 
 class ItemsContext(TypedDict):
-    """Context for all items."""
+    """Context for an item page and its pagination metadata."""
 
     total: Decimal
     items: list[ItemContext]
@@ -90,7 +104,7 @@ def items(
         offset: Number of filtered items to skip
 
     Returns:
-        Context for all items and their total.
+        Context for an item page, its pre-pagination match count, and its page total.
 
     """
     query = Item.query().order_by(Item.date_ord, Item.id_)

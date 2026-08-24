@@ -17,7 +17,9 @@ if TYPE_CHECKING:
 
 
 @base.mcp_tool(
-    "List a filtered page of items with their names, dates, values, and notes.",
+    "List a filtered page of items with their names, dates, values, and notes. "
+    "The count is the number of matching items before pagination, and the total "
+    "is the sum of values in the returned page.",
     read_only_hint=True,
 )
 def get_items(
@@ -36,7 +38,8 @@ def get_items(
         offset: Number of filtered items to skip
 
     Returns:
-        Page of items, page value total, filtered count, and next offset
+        Page of items, pre-pagination filtered count, page value total, and next
+        offset
 
     """
     with database.begin_session():

@@ -38,7 +38,7 @@ def json_new() -> ctx.ItemContext | base.JSONResponse:
         Created item context or JSON validation error.
 
     """
-    payload, errors = json_api.body(ctx.ItemContext)
+    payload, errors = json_api.body(ctx.ItemPayload)
     if errors:
         return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
     with web.db.begin_session() as session:
@@ -87,7 +87,7 @@ def json_put(uri: str) -> ctx.ItemContext | base.JSONResponse:
             item = base.find(Item, uri)
         except exc.http.HTTPException as error:
             return {"errors": [str(error)]}, error.code or base.HTTP_CODE_INTERNAL_ERROR
-        payload, errors = json_api.body(ctx.ItemContext)
+        payload, errors = json_api.body(ctx.ItemPayload)
         if errors:
             return {"errors": errors}, base.HTTP_CODE_BAD_REQUEST
         try:
