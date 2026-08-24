@@ -76,6 +76,32 @@ def test_json_encoder_honors_indent_header(flask_app: flask.Flask) -> None:
     assert result == '{\n  "value": 1\n}'
 
 
+def test_json_encoder_caps_indent_header(flask_app: flask.Flask) -> None:
+    with flask_app.test_request_context(headers={"X-Indent": "9"}):
+        result = flask_app.json.dumps({"value": 1})
+
+    assert result == '{\n        "value": 1\n}'
+
+
+@pytest.mark.parametrize(
+    ("indent", "expected"),
+    [
+        ("invalid", '{"value": 1}'),
+        ("0", '{\n"value": 1\n}'),
+        ("-1", '{\n"value": 1\n}'),
+    ],
+)
+def test_json_encoder_preserves_non_positive_or_invalid_indent(
+    flask_app: flask.Flask,
+    indent: str,
+    expected: str,
+) -> None:
+    with flask_app.test_request_context(headers={"X-Indent": indent}):
+        result = flask_app.json.dumps({"value": 1})
+
+    assert result == expected
+
+
 @pytest.mark.parametrize(
     ("kwargs", "target"),
     [

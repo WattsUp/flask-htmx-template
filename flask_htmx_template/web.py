@@ -74,7 +74,7 @@ class JSONEncoder(flask.json.provider.JSONProvider):
         if flask.has_request_context():
             indent = flask.request.headers.get("X-Indent", type=int)
             if indent is not None:
-                kwargs["indent"] = indent
+                kwargs["indent"] = min(indent, 8)
         return json.dumps(utils.json_mutate(obj), **cast("Any", kwargs))
 
     @override
