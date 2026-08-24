@@ -103,10 +103,15 @@ def test_create_app_uses_default_flask_app_and_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     server = MagicMock()
+    lifecycle_events: list[str] = []
 
     @asynccontextmanager
     async def run_session_manager() -> AsyncGenerator[None]:
-        yield
+        lifecycle_events.append("started")
+        try:
+            yield
+        finally:
+            lifecycle_events.append("stopped")
 
     def create_server(*_args: object) -> MagicMock:
         return server
@@ -120,9 +125,17 @@ def test_create_app_uses_default_flask_app_and_database(
 
     async def run_lifespan() -> None:
         async with app.router.lifespan_context(app):
-            pass
+            lifecycle_events.append("running")
 
     anyio.run(run_lifespan)
+
+    assert lifecycle_events == ["started", "running", "stopped"]
+    server.streamable_http_app.assert_called_once_with(
+        streamable_http_path="/",
+        json_response=True,
+        stateless_http=True,
+    )
+    server.session_manager.run.assert_called_once_with()
 
 
 def test_create_app_uses_explicit_flask_app_and_database(

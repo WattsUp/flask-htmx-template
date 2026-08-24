@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import contextlib
-from typing import cast, NoReturn, TYPE_CHECKING
+from typing import cast, NamedTuple, NoReturn, TYPE_CHECKING
 
 import anyio
+import httpx2
 import prometheus_client
 import pytest
 from mcp import Client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from starlette.testclient import TestClient
 
@@ -20,12 +22,19 @@ from flask_htmx_template.models.config import Config, ConfigKey
 from flask_htmx_template.models.item import Item
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
     import flask
     from mcp_types import CallToolResult, Tool
     from sqlalchemy import orm
+    from starlette.applications import Starlette
     from starlette.routing import Mount, Route
 
     from flask_htmx_template.database import Database
+
+
+# NOTE: localhost satisfies the SDK's DNS-rebinding validation for ASGI requests.
+_TEST_SERVER_ORIGIN = "http://localhost:8000"  # flask-htmx-template: ignore[url]
 
 
 class CurrentSessionDatabase:
@@ -65,6 +74,14 @@ class ErrorDatabase:
         raise RuntimeError(message)
 
 
+class StreamableHTTPLifecycle(NamedTuple):
+    """Results captured across one Streamable HTTP client lifecycle."""
+
+    protocol_version: str
+    tool_names: list[str]
+    tool_result: CallToolResult
+
+
 @pytest.fixture
 def current_session_database(session: orm.Session) -> Database:
     """Return a Database adapter backed by the current test session.
@@ -74,6 +91,103 @@ def current_session_database(session: orm.Session) -> Database:
 
     """
     return cast("Database", CurrentSessionDatabase(session))
+
+
+@contextlib.asynccontextmanager
+async def _streamable_http_connection(
+    app: Starlette,
+    token: str,
+) -> AsyncGenerator[Client]:
+    """Connect an authenticated MCP client through the ASGI HTTP transport.
+
+    Args:
+        app: Combined Flask and MCP ASGI application
+        token: MCP bearer token
+
+    Yields:
+        Connected Streamable HTTP MCP client
+
+    """
+    transport = httpx2.ASGITransport(app=app)
+    headers = {"Authorization": f"Bearer {token}"}
+    async with httpx2.AsyncClient(
+        transport=transport,
+        base_url=_TEST_SERVER_ORIGIN,
+        headers=headers,
+    ) as http_client:
+        client_transport = streamable_http_client(
+            f"{_TEST_SERVER_ORIGIN}{asgi.MCP_PATH}",
+            http_client=http_client,
+        )
+        async with Client(client_transport) as client:
+            yield client
+
+
+async def _run_streamable_http_lifecycle(
+    app: Starlette,
+    token: str,
+) -> StreamableHTTPLifecycle:
+    """Run one Streamable HTTP client from negotiation through tool call.
+
+    Args:
+        app: Combined Flask and MCP ASGI application
+        token: MCP bearer token
+
+    Returns:
+        Protocol, tool listing, and tool call results
+
+    """
+    async with (
+        app.router.lifespan_context(app),
+        _streamable_http_connection(app, token) as client,
+    ):
+        protocol_version = client.protocol_version
+        tools = await client.list_tools()
+        tool_result = await client.call_tool("get_items")
+    return StreamableHTTPLifecycle(
+        protocol_version,
+        [tool.name for tool in tools.tools],
+        tool_result,
+    )
+
+
+async def _run_concurrent_streamable_http_clients(
+    app: Starlette,
+    token: str,
+) -> list[CallToolResult]:
+    """Call one MCP tool from two clients whose lifecycles overlap.
+
+    Args:
+        app: Combined Flask and MCP ASGI application
+        token: MCP bearer token
+
+    Returns:
+        Tool results in client index order
+
+    """
+    client_count = 2
+    connected = [anyio.Event() for _ in range(client_count)]
+    release_clients = anyio.Event()
+    results: dict[int, CallToolResult] = {}
+
+    async def connect_and_call(index: int) -> None:
+        """Wait until both clients connect, then call the item tool."""
+        async with _streamable_http_connection(app, token) as client:
+            connected[index].set()
+            await release_clients.wait()
+            results[index] = await client.call_tool("get_items")
+
+    async with (
+        app.router.lifespan_context(app),
+        anyio.create_task_group() as task_group,
+    ):
+        for index in range(client_count):
+            task_group.start_soon(connect_and_call, index)
+        for event in connected:
+            await event.wait()
+        release_clients.set()
+
+    return [results[index] for index in range(client_count)]
 
 
 async def _list_tools(server: mcp.MCPServer) -> list[str]:
@@ -186,6 +300,40 @@ def test_mcp_endpoint_accepts_api_bearer_token(
         )
 
     assert response.status_code != 401
+
+
+def test_streamable_http_client_completes_full_lifecycle(
+    empty_database: Database,
+    flask_app: flask.Flask,
+    item: Item,
+) -> None:
+    app = asgi.create_app(flask_app, empty_database)
+    token = Config.fetch(ConfigKey.API_BEARER_TOKEN)
+
+    lifecycle = anyio.run(_run_streamable_http_lifecycle, app, token)
+
+    assert lifecycle.protocol_version
+    assert lifecycle.tool_names == ["get_items"]
+    assert not lifecycle.tool_result.is_error
+    assert lifecycle.tool_result.structured_content is not None
+    assert lifecycle.tool_result.structured_content["items"][0]["name"] == item.name
+
+
+def test_streamable_http_clients_call_tool_concurrently(
+    empty_database: Database,
+    flask_app: flask.Flask,
+    item: Item,
+) -> None:
+    app = asgi.create_app(flask_app, empty_database)
+    token = Config.fetch(ConfigKey.API_BEARER_TOKEN)
+
+    results = anyio.run(_run_concurrent_streamable_http_clients, app, token)
+
+    assert len(results) == 2
+    for result in results:
+        assert not result.is_error
+        assert result.structured_content is not None
+        assert result.structured_content["items"][0]["name"] == item.name
 
 
 def test_create_server_registers_read_only_items_tool(
