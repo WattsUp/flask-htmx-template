@@ -325,3 +325,29 @@ def test_put_not_found(web_client: WebClient) -> None:
         json={"name": "x", "value": "1", "note": ""},
     )
     assert "errors" in result
+
+
+def test_delete(web_client: WebClient, item: Item, session: orm.Session) -> None:
+    item_id = item.id_
+    target = {
+        "uri": item.uri,
+        "name": item.name,
+        "date": item.date.isoformat(),
+        "value": 0,
+        "note": item.note,
+    }
+
+    result, _ = web_client.DELETE_J(("items.json", {"uri": item.uri}))
+
+    assert result == target
+    session.expire_all()
+    assert session.get(Item, item_id) is None
+
+
+def test_delete_not_found(web_client: WebClient) -> None:
+    result, _ = web_client.DELETE_J(
+        ("items.json", {"uri": "bad-uri"}),
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert "errors" in result

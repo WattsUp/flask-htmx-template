@@ -2,9 +2,11 @@
   hx-get="{{ url_for('items.page_all') }}"
   hx-trigger="item from:body"
   hx-target="#main"
-  hx-include="[name='before']"
+  hx-include="[name='before'], [name='limit'], [name='offset']"
 >
   <h1>Items</h1>
+  <input name="limit" type="hidden" value="{{ limit }}" />
+  <input name="offset" type="hidden" value="{{ offset }}" />
   <div class="flex flex-wrap items-end gap-2">
     <form
       class="flex items-end gap-2"
@@ -13,6 +15,7 @@
       hx-target="#main"
       hx-swap="innerHTML show:window:top"
       hx-push-url="true"
+      hx-include="[name='before']"
     >
       <label class="input-outlined input-bg-surface-container-high">
         <input name="before" type="date" value="{{ before }}" placeholder="" />
@@ -54,3 +57,33 @@
   {% include "items/item-row.jinja" %}
   {% if not loop.last %}<hr class="mx-4 my-1" />{% endif %}
 {% endfor %}
+{% if offset > 0 or ctx.next_offset is not none %}
+  <nav class="flex gap-2 py-2">
+    {% if offset > 0 %}
+      <a
+        class="mr-auto btn-outlined"
+        href="{{ url_for('items.page_all', before=before, limit=limit, offset=offset - limit if offset >= limit else 0) }}"
+        hx-get="{{ url_for('items.page_all', before=before, limit=limit, offset=offset - limit if offset >= limit else 0) }}"
+        hx-disabled-elt="this"
+        hx-target="#main"
+        hx-swap="innerHTML show:window:top"
+        hx-push-url="true"
+      >
+        <icon>chevron_backward</icon>Previous
+      </a>
+    {% endif %}
+    {% if ctx.next_offset is not none %}
+      <a
+        class="btn-outlined"
+        href="{{ url_for('items.page_all', before=before, limit=limit, offset=ctx.next_offset) }}"
+        hx-get="{{ url_for('items.page_all', before=before, limit=limit, offset=ctx.next_offset) }}"
+        hx-disabled-elt="this"
+        hx-target="#main"
+        hx-swap="innerHTML show:window:top"
+        hx-push-url="true"
+      >
+        Next<icon>chevron_forward</icon>
+      </a>
+    {% endif %}
+  </nav>
+{% endif %}

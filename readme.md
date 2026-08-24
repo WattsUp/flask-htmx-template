@@ -110,9 +110,9 @@ only in the database and is not issued or validated by an external identity prov
 ### Model Context Protocol
 
 The combined ASGI service exposes a stateless Streamable HTTP MCP endpoint at
-`http://127.0.0.1:5000/mcp`. It includes a read-only `get_items` example tool and
-records per-tool call count and duration metrics in the web application's Prometheus
-registry.
+`http://127.0.0.1:5000/mcp`. Its item tools support the same list, get, create,
+update, and delete operations as the HTML and JSON interfaces. The server records
+per-tool call count and duration metrics in the web application's Prometheus registry.
 
 Clients can discover stable JSON metadata with `resources/list` and
 `resources/read`:
@@ -127,9 +127,8 @@ MCP requests must send the same database-backed API token as the JSON API:
 Authorization: Bearer <ConfigKey.API_BEARER_TOKEN>
 ```
 
-Add tools in a controller's `mcp.py`, decorate each one with `base.mcp_tool`, and
-register the module's `TOOLS` collection in `flask_htmx_template/mcp.py`. The plain
-Flask development command does not expose MCP; use the ASGI command above.
+Add tools in a controller's `mcp.py` and decorate each one with `base.mcp_tool`. The
+plain Flask development command does not expose MCP; use the ASGI command above.
 
 Use the project-local client to inspect a running server without putting the bearer
 token in shell history or the process list:

@@ -367,7 +367,13 @@ def test_streamable_http_client_completes_full_lifecycle(
     lifecycle = anyio.run(_run_streamable_http_lifecycle, app, token)
 
     assert lifecycle.protocol_version
-    assert lifecycle.tool_names == ["get_items"]
+    assert lifecycle.tool_names == [
+        "get_items",
+        "get_item",
+        "create_item",
+        "update_item",
+        "delete_item",
+    ]
     assert not lifecycle.tool_result.is_error
     assert lifecycle.tool_result.structured_content is not None
     assert lifecycle.tool_result.structured_content["items"][0]["name"] == item.name
@@ -390,7 +396,7 @@ def test_streamable_http_clients_call_tool_concurrently(
         assert result.structured_content["items"][0]["name"] == item.name
 
 
-def test_create_server_registers_read_only_items_tool(
+def test_create_server_registers_item_tools(
     current_session_database: Database,
     flask_app: flask.Flask,
 ) -> None:
@@ -399,7 +405,13 @@ def test_create_server_registers_read_only_items_tool(
 
     tools = anyio.run(_list_tools, server)
 
-    assert tools == ["get_items"]
+    assert tools == [
+        "get_items",
+        "get_item",
+        "create_item",
+        "update_item",
+        "delete_item",
+    ]
 
 
 def test_create_server_registers_metadata_resources(
@@ -435,7 +447,7 @@ def test_server_metadata_resource_identifies_application_version(
     assert metadata == {
         "schema_version": 1,
         "name": "Flask HTMX Template",
-        "description": "Read-only item information from Flask HTMX Template.",
+        "description": "Read and write item information from Flask HTMX Template.",
         "version": mcp.__version__,
     }
 
@@ -454,7 +466,13 @@ def test_server_capabilities_resource_describes_mcp_surface(
         "schema_version": 1,
         "transport": "streamable-http",
         "authentication": "bearer",
-        "tools": ["get_items"],
+        "tools": [
+            "create_item",
+            "delete_item",
+            "get_item",
+            "get_items",
+            "update_item",
+        ],
         "resources": [
             mcp.METADATA_RESOURCE_URI,
             mcp.CAPABILITIES_RESOURCE_URI,

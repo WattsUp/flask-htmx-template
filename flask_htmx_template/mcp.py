@@ -55,7 +55,7 @@ _LOGGER = logging.getLogger(__name__)
 _CALL_TOOL_METHOD = "tools/call"
 
 _SERVER_NAME = "Flask HTMX Template"
-_SERVER_DESCRIPTION = "Read-only item information from Flask HTMX Template."
+_SERVER_DESCRIPTION = "Read and write item information from Flask HTMX Template."
 _METADATA_SCHEMA_VERSION = 1
 METADATA_RESOURCE_URI = "flask-htmx-template://metadata/server"
 CAPABILITIES_RESOURCE_URI = "flask-htmx-template://metadata/capabilities"
