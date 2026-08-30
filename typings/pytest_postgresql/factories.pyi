@@ -3,7 +3,7 @@ from pathlib import Path
 
 from _pytest.fixtures import FixtureRequest
 from _pytest.tmpdir import TempPathFactory
-from pytest_postgresql.executor import PostgreSQLExecutor
+from pytest_postgresql.executors import PostgreSQLExecutor
 
 def postgresql_proc(
     executable: str | None = ...,

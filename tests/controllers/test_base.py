@@ -20,6 +20,8 @@ from tests import conftest
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from sqlalchemy import orm
+
     from tests.conftest import RandomStringGenerator
     from tests.controllers.conftest import HTMLValidator, WebClient
 
@@ -100,7 +102,7 @@ def test_find(item: Item) -> None:
     assert base.find(Item, item.uri) == item
 
 
-def test_find_404() -> None:
+def test_find_404(session: orm.Session) -> None:
     with pytest.raises(exc.http.NotFound):
         base.find(Item, Item.id_to_uri(0))
 
@@ -411,6 +413,7 @@ def test_error_str(
 
 
 def test_error_empty_field(
+    session: orm.Session,
     valid_html: HTMLValidator,
 ) -> None:
     try:

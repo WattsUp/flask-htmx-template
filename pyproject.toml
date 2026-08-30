@@ -54,15 +54,15 @@ build = ["build"]
 build-docker = ["flask-htmx-template[build]", "setuptools-scm>=8"]
 deploy = ["gunicorn"]
 dev = [
-  "basedpyright>=1.38.0",
-  "black>=26.5",
-  "codespell>=2.4.1",
-  "djlint>=1.36.4",
+  "basedpyright>=1.39.10",
+  "black>=26.5.1",
+  "codespell>=2.4.3",
+  "djlint>=1.44.2",
   "flask-htmx-template[deploy,test,postgres]",
-  "isort",
-  "prek",
-  "ruff>=0.15.20",
-  "taplo",
+  "isort>=9.0.1",
+  "prek>=0.5.0",
+  "ruff>=0.16.5",
+  "taplo>=0.9.3",
 ]
 postgres = ["psycopg[binary]"]
 test = [
@@ -82,7 +82,6 @@ preview = true
 target-version = ["py312", "py313"]
 
 [tool.codespell]
-ignore-words-list = ["initialY"]
 skip = "3rd-party,dist,*.pem,*.json"
 
 [tool.coverage.run]
@@ -215,6 +214,7 @@ ignore = [
 ]
 "tests/controllers/*.py" = ["invalid-function-name"]
 "tests/mock*.py" = ["raise-vanilla-class"]
+"tests/**/test*.py" = ["pytest-fixture-autouse"]
 "tools/**/*.py" = ["print"]
 "tools/run_coverage.py" = [
   "subprocess-without-shell-equals-true",

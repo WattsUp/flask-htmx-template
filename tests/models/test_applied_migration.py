@@ -7,11 +7,14 @@ from flask_htmx_template.models.applied_migration import AppliedMigration
 if TYPE_CHECKING:
     import datetime
 
+    from sqlalchemy import orm
+
     from tests.conftest import RandomStringGenerator
 
 
 def test_init_properties(
     rand_str_generator: RandomStringGenerator,
+    session: orm.Session,
     utc: datetime.datetime,
 ) -> None:
     d = {

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     import time_machine
-    from pytest_postgresql.executor import PostgreSQLExecutor
+    from pytest_postgresql.executors import PostgreSQLExecutor
 
     from flask_htmx_template.database import Database
 
@@ -106,7 +106,7 @@ def rand_real(rand_real_generator: RandomRealGenerator) -> Decimal:
     return rand_real_generator()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(scope="session")
 def sql_engine_args() -> None:
     """Change all engines to NullPool so timing isn't an issue."""
     # Needed specifically for DatabaseIntegrity test
@@ -134,6 +134,7 @@ class EmptyDatabaseGenerator:
 def empty_database_generator(
     tmp_path_factory: pytest.TempPathFactory,
     rand_str_generator: RandomStringGenerator,
+    sql_engine_args: None,
 ) -> EmptyDatabaseGenerator:
     """Return an empty database generator.
 
@@ -157,8 +158,11 @@ def empty_database(
     return empty_database_generator()
 
 
-@pytest.fixture(autouse=True)
-def session(empty_database: SQLiteDatabase) -> Generator[orm.Session]:
+@pytest.fixture
+def session(
+    empty_database: SQLiteDatabase,
+    uri_cipher: None,
+) -> Generator[orm.Session]:
     """Create SQL session.
 
     Yields:
@@ -170,7 +174,7 @@ def session(empty_database: SQLiteDatabase) -> Generator[orm.Session]:
         yield s
 
 
-@pytest.fixture(autouse=True, scope="session")
+@pytest.fixture(scope="session")
 def uri_cipher() -> None:
     """Generate a URI cipher."""
     base_uri._cipher = base_uri.Cipher.generate()
@@ -330,6 +334,7 @@ def flask_app_generator(
 def flask_app(
     flask_app_generator: FlaskAppGenerator,
     empty_database: Database,
+    session: orm.Session,
 ) -> flask.Flask:
     """Create flask app for EmptyDatabase.
 
@@ -406,7 +411,7 @@ class PostgresDatabaseGenerator:
         return PostgresDatabase.create(self._pg_url)
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def disable_ssl() -> Generator[None]:
     """Disable SSL for local test postgres (no TLS cert configured)."""
     original = sql._POSTGRES_SSL_MODE
@@ -416,7 +421,10 @@ def disable_ssl() -> Generator[None]:
 
 
 @pytest.fixture(scope="session")
-def pg_proc(_pg_proc: PostgreSQLExecutor) -> PostgreSQLExecutor:
+def pg_proc(
+    _pg_proc: PostgreSQLExecutor,
+    disable_ssl: None,
+) -> PostgreSQLExecutor:
     """Expose the postgres process under a stable name.
 
     Returns:

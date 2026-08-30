@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import cast, TYPE_CHECKING
 
+import pytest
 from sqlalchemy import orm
 
 from flask_htmx_template import sql
@@ -24,6 +25,17 @@ class ORMBase(orm.DeclarativeBase):
 
 class Child(ORMBase):
     __tablename__ = "child"
+
+
+@pytest.fixture(autouse=True)
+def session(session: orm.Session) -> orm.Session:
+    """Activate the shared database session for this module.
+
+    Returns:
+        Active database session
+
+    """
+    return session
 
 
 def test_get_engine(tmp_path: Path) -> None:

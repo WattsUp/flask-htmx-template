@@ -152,9 +152,9 @@ def _is_named_tuple(t: object) -> bool:
     """
     return (
         isinstance(t, type)
-        and issubclass(t, tuple)
         and isinstance(getattr(t, "_fields", None), tuple)
         and hasattr(t, "__annotations__")
+        and issubclass(t, tuple)
     )
 
 
