@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import contextlib
 import json
+from types import SimpleNamespace
 from typing import cast, NamedTuple, NoReturn, TYPE_CHECKING, TypedDict
 
 import anyio
+import anyio.lowlevel
 import httpx2
 import prometheus_client
 import pytest
@@ -25,8 +27,10 @@ from flask_htmx_template.models.item import Item
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+    from typing import Any
 
     import flask
+    from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
     from mcp_types import CallToolResult, Resource, Tool
     from sqlalchemy import orm
     from starlette.applications import Starlette
@@ -37,6 +41,7 @@ if TYPE_CHECKING:
 
 # NOTE: localhost satisfies the SDK's DNS-rebinding validation for ASGI requests.
 _TEST_SERVER_ORIGIN = "http://localhost:8000"  # flask-htmx-template: ignore[url]
+_KNOWN_TOOL_PARAMS: dict[str, object] = {"name": "known_tool"}
 
 
 class CurrentSessionDatabase:
@@ -318,6 +323,28 @@ async def _get_item_from_listing(server: mcp.MCPServer) -> CallToolResult:
         uri = listed.structured_content["items"][0]["uri"]
         assert isinstance(uri, str)
         return await client.call_tool("get_item", arguments={"uri": uri})
+
+
+async def _run_safe_tool_errors(
+    call_next: CallNext,
+    params: dict[str, object] | None = None,
+) -> HandlerResult:
+    """Invoke the MCP error middleware with a minimal request context.
+
+    Args:
+        call_next: Handler behavior to exercise
+        params: MCP request parameters
+
+    Returns:
+        Middleware result
+
+    """
+    context = cast(
+        "ServerRequestContext[Any, Any]",
+        SimpleNamespace(method="tools/call", params=params),
+    )
+    middleware = mcp._SafeToolErrors(frozenset({"known_tool"}))
+    return await middleware(context, call_next)
 
 
 def _duplicate_items_tool(database: Database) -> dict[str, object]:
@@ -762,6 +789,118 @@ def test_mcp_tool_returns_safe_code_when_tool_is_missing(
         "text": "MCP tool was not found.",
         "annotations": None,
         "meta": None,
+    }
+
+
+def test_safe_tool_errors_sanitizes_unknown_mcp_error_code() -> None:
+    async def call_next(
+        _context: ServerRequestContext[Any, Any],
+    ) -> HandlerResult:
+        """Raise an MCP error with an unrecognized code.
+
+        Raises:
+            MCPError: Always, with an unknown error code
+
+        """
+        await anyio.lowlevel.checkpoint()
+        raise MCPError(code=-32099, message="sensitive error")
+
+    result = anyio.run(
+        _run_safe_tool_errors,
+        call_next,
+        _KNOWN_TOOL_PARAMS,
+    )
+
+    safe_result = cast("CallToolResult", result)
+    assert safe_result.is_error
+    assert safe_result.meta == {
+        "errorCode": int(mcp.MCPErrorCode.INTERNAL_ERROR),
+    }
+    assert "sensitive error" not in str(safe_result)
+
+
+def test_safe_tool_errors_sanitizes_unexpected_exception() -> None:
+    async def call_next(
+        _context: ServerRequestContext[Any, Any],
+    ) -> HandlerResult:
+        """Raise an unexpected handler failure.
+
+        Raises:
+            RuntimeError: Always, to exercise unexpected failures
+
+        """
+        await anyio.lowlevel.checkpoint()
+        message = "sensitive failure"
+        raise RuntimeError(message)
+
+    result = anyio.run(
+        _run_safe_tool_errors,
+        call_next,
+        _KNOWN_TOOL_PARAMS,
+    )
+
+    safe_result = cast("CallToolResult", result)
+    assert safe_result.is_error
+    assert safe_result.meta == {
+        "errorCode": int(mcp.MCPErrorCode.INTERNAL_ERROR),
+    }
+    assert "sensitive failure" not in str(safe_result)
+
+
+def test_safe_tool_errors_preserves_result_type_and_sanitizes_metadata() -> None:
+    async def call_next(
+        _context: ServerRequestContext[Any, Any],
+    ) -> HandlerResult:
+        """Return an invalid result with metadata to sanitize.
+
+        Returns:
+            Invalid result with metadata
+
+        """
+        await anyio.lowlevel.checkpoint()
+        return {
+            "resultType": "partial",
+            "isError": True,
+            "_meta": {"requestId": "request-1", "errorCode": 1234},
+        }
+
+    result = anyio.run(
+        _run_safe_tool_errors,
+        call_next,
+        _KNOWN_TOOL_PARAMS,
+    )
+
+    safe_result = cast("dict[str, object]", result)
+    assert safe_result["resultType"] == "partial"
+    assert safe_result["_meta"] == {
+        "requestId": "request-1",
+        "errorCode": int(mcp.MCPErrorCode.INVALID_PARAMS),
+    }
+
+
+def test_safe_tool_errors_sanitizes_result_without_optional_fields() -> None:
+    async def call_next(
+        _context: ServerRequestContext[Any, Any],
+    ) -> HandlerResult:
+        """Return an invalid result without optional fields.
+
+        Returns:
+            Invalid result without optional fields
+
+        """
+        await anyio.lowlevel.checkpoint()
+        return {"isError": True}
+
+    result = anyio.run(
+        _run_safe_tool_errors,
+        call_next,
+        _KNOWN_TOOL_PARAMS,
+    )
+
+    safe_result = cast("dict[str, object]", result)
+    assert safe_result["resultType"] == "complete"
+    assert safe_result["_meta"] == {
+        "errorCode": int(mcp.MCPErrorCode.INVALID_PARAMS),
     }
 
 

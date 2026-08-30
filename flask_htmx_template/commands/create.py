@@ -13,6 +13,8 @@ from flask_htmx_template.commands.base import Command
 if TYPE_CHECKING:
     import argparse
 
+DATABASE_ALREADY_INITIALIZED_EXIT_CODE = 2
+
 
 class Create(Command):
     """Create database."""
@@ -63,7 +65,9 @@ class Create(Command):
                     )
                     return -1
                 print(f"{Fore.RED}{e}", file=sys.stderr)
-                return -1
+                # NOTE: The container entrypoint relies on this distinct status to
+                # distinguish an existing database from connection failures.
+                return DATABASE_ALREADY_INITIALIZED_EXIT_CODE
             print(f"{Fore.GREEN}Postgres database initialized at {self._path_db}")
             return 0
 

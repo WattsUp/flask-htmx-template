@@ -192,6 +192,10 @@ ignore = [
 "flask_htmx_template/mcp.py" = ["blind-except"]
 "flask_htmx_template/models/base_uri.py" = ["global-statement"]
 "flask_htmx_template/migrations/v*.py" = ["invalid-class-name"]
+"tools/run_coverage.py" = [
+  "subprocess-without-shell-equals-true",
+  "suspicious-subprocess-import",
+]
 "tools/**/*.py" = ["print"]
 "tests/**/*.py" = [
   "undocumented-public-module",

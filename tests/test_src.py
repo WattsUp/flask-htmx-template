@@ -9,6 +9,7 @@ import pytest
 
 import flask_htmx_template
 import tests
+import tools
 from flask_htmx_template import commands, main
 from tests.conftest import id_func
 
@@ -203,6 +204,7 @@ _SOURCE_PATHS = sorted(
     [
         *Path(flask_htmx_template.__file__).parent.glob("**/*.py"),
         *Path(tests.__file__).parent.glob("**/*.py"),
+        *Path(tools.__file__).parent.glob("**/*.py"),
     ],
 )
 
@@ -211,8 +213,8 @@ _SOURCE_PATHS = sorted(
 def test_ruff_ignore(path: Path) -> None:
     lines = path.read_text("utf-8").splitlines()
 
-    allowed_noqa = (
-        {
+    if "tests" in path.parts:
+        allowed_noqa = {
             "call-datetime-without-tzinfo",
             "comparison-with-itself",
             "hardcoded-password-func-arg",
@@ -221,12 +223,13 @@ def test_ruff_ignore(path: Path) -> None:
             "private-member-access",
             "subprocess-without-shell-equals-true",
         }
-        if "tests" in path.parts
-        else {
+    elif "tools" in path.parts:
+        allowed_noqa = {"subprocess-without-shell-equals-true"}
+    else:
+        allowed_noqa = {
             "hardcoded-sql-expression",
             "typing-only-standard-library-import",
         }
-    )
 
     re_noqa = re.compile(r"ruff: ignore\[([\w, -]+)\]")
     errors: list[str] = []

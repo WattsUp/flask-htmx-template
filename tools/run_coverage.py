@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess  # ruff: ignore[suspicious-subprocess-import]
+import subprocess
 import sys
 import tempfile
 from collections import defaultdict
@@ -354,11 +354,12 @@ def run_command(
         The completed subprocess result.
 
     """
-    return subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+    return subprocess.run(
         command,
         check=False,
         cwd=REPOSITORY_ROOT,
         env=environment,
+        shell=False,
         stderr=subprocess.STDOUT,
         stdout=subprocess.PIPE,
         text=True,
@@ -375,10 +376,11 @@ def run_live_command(command: Sequence[str]) -> int:
         The subprocess exit status.
 
     """
-    result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+    result = subprocess.run(
         command,
         check=False,
         cwd=REPOSITORY_ROOT,
+        shell=False,
     )
     return result.returncode
 

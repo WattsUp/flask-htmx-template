@@ -170,7 +170,7 @@ docker run \
 
 | Env                | Default             | Description                                   |
 | ------------------ | ------------------- | --------------------------------------------- |
-| `DB_PATH`          | `/data/database.db` | SQLite path **or** a `postgresql://` URL      |
+| `DB_PATH`          | `/data/database.db` | SQLite path or PostgreSQL URL                 |
 | `DB_WEB_KEY`       | `web-admin`         | Web password set when creating a new database |
 | `WEB_PORT`         | `8000`              | Port to bind server to                        |
 | `WEB_PORT_METRICS` | `8001`              | Port to bind metrics server to                |
@@ -183,6 +183,8 @@ docker run \
 ## PostgreSQL Deployment
 
 PostgreSQL is supported as an alternative to SQLite. Connections always use TLS (`sslmode=require`).
+`DB_PATH` accepts `postgres://` and `postgresql://` URLs, including optional
+SQLAlchemy driver suffixes such as `postgresql+psycopg://`.
 
 ### 1. Generate a Self-Signed Certificate
 
