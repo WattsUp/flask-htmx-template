@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import ast
 import datetime
+import inspect
 import logging
+import pathlib
 import textwrap
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -16,6 +18,17 @@ from tests import conftest
 
 if TYPE_CHECKING:
     from tests.conftest import RandomStringGenerator
+
+
+def test_first_party_caller_selects_package_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(utils, "_PACKAGE_DIR", pathlib.Path(__file__).parent)
+    stack = inspect.stack()
+
+    result = utils.first_party_caller(stack)
+
+    assert result.filename == __file__
 
 
 @pytest.mark.parametrize(

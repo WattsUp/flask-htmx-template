@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
+import inspect
+import logging
+import sqlite3
 import sys
+import time
 from collections.abc import Sequence
+from contextlib import contextmanager, suppress
 from typing import cast, overload, TYPE_CHECKING
 
 import sqlalchemy
 import sqlalchemy.event
 from sqlalchemy import func, orm
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.sql import case
 
+from flask_htmx_template import exceptions as exc
+from flask_htmx_template import utils
+
 if TYPE_CHECKING:
-    import sqlite3
     from collections.abc import Generator, Iterable
     from pathlib import Path
 
@@ -33,7 +41,206 @@ ColumnClause = sqlalchemy.ColumnElement[bool]
 
 __all__ = ["case"]
 
+logger = logging.getLogger(__name__)
+
+_SQLITE_PROGRESS_INSTRUCTIONS = 2000
+
 _POSTGRES_PREFIXES = ("postgres://", "postgres+", "postgresql://", "postgresql+")
+
+
+@contextmanager
+def _sqlite_time_limit(
+    conn: sqlite3.Connection,
+    timeout_ms: int,
+    caller: inspect.FrameInfo,
+    threshold_warning_ms: float,
+) -> Generator[None, None, None]:
+    """Limit work performed by a SQLite connection.
+
+    Args:
+        conn: Raw SQLite connection to limit
+        timeout_ms: Time limit in milliseconds
+        caller: First-party caller frame for diagnostics
+        threshold_warning_ms: Minimum duration that should be logged
+
+    Yields:
+        Control to the operation being limited
+
+    Raises:
+        TimeoutError: If SQLite interrupts the operation after the deadline
+
+    """
+    deadline = time.perf_counter() + (timeout_ms / 1000)
+
+    def handler() -> int:
+        """Interrupt SQLite when the operation's deadline has passed.
+
+        Returns:
+            One when the deadline has passed, otherwise zero
+
+        """
+        return int(time.perf_counter() >= deadline)
+
+    start = time.perf_counter()
+    try:
+        conn.set_progress_handler(handler, _SQLITE_PROGRESS_INSTRUCTIONS)
+        yield
+    except OperationalError as error:
+        message = (
+            "Session operation exceeded time limit - called from "
+            f"{caller.filename}:{caller.lineno}"
+        )
+        raise TimeoutError(message) from error
+    finally:
+        conn.set_progress_handler(None, _SQLITE_PROGRESS_INSTRUCTIONS)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        if elapsed_ms >= threshold_warning_ms:
+            logger.warning(
+                "Query used %.0f ms of %d ms timeout (%.0f%%) - called from %s:%d",
+                elapsed_ms,
+                timeout_ms,
+                elapsed_ms / timeout_ms * 100,
+                caller.filename,
+                caller.lineno,
+            )
+
+
+@contextmanager
+def _psycopg_time_limit(
+    session: orm.Session,
+    timeout_ms: int,
+    caller: inspect.FrameInfo,
+    threshold_warning_ms: float,
+) -> Generator[None, None, None]:
+    """Limit statements executed by a PostgreSQL session.
+
+    Args:
+        session: SQLAlchemy session to limit
+        timeout_ms: Time limit in milliseconds
+        caller: First-party caller frame for diagnostics
+        threshold_warning_ms: Minimum duration that should be logged
+
+    Yields:
+        Control to the operation being limited
+
+    Raises:
+        TimeoutError: If PostgreSQL cancels a statement after the deadline
+
+    """
+    sa_connection = session.connection()
+    timing: dict[str, float] = {"start": 0.0, "max_ms": 0.0}
+
+    def before_cursor_execute(*_args: object, **_kwargs: object) -> None:
+        """Record the start of a statement."""
+        timing["start"] = time.perf_counter()
+
+    def after_cursor_execute(*_args: object, **_kwargs: object) -> None:
+        """Record the longest statement duration."""
+        elapsed_ms = (time.perf_counter() - timing["start"]) * 1000
+        timing["max_ms"] = max(timing["max_ms"], elapsed_ms)
+
+    sqlalchemy.event.listen(
+        sa_connection,
+        "before_cursor_execute",
+        before_cursor_execute,
+    )
+    sqlalchemy.event.listen(
+        sa_connection,
+        "after_cursor_execute",
+        after_cursor_execute,
+    )
+    try:
+        session.execute(
+            sqlalchemy.text(f"SET LOCAL statement_timeout = {timeout_ms}"),
+        )
+        yield
+    except OperationalError as error:
+        message = (
+            "Session operation exceeded time limit - called from "
+            f"{caller.filename}:{caller.lineno}"
+        )
+        raise TimeoutError(message) from error
+    finally:
+        sqlalchemy.event.remove(
+            sa_connection,
+            "before_cursor_execute",
+            before_cursor_execute,
+        )
+        sqlalchemy.event.remove(
+            sa_connection,
+            "after_cursor_execute",
+            after_cursor_execute,
+        )
+        # NOTE: A timed-out PostgreSQL transaction may already be aborted. In
+        # that case rollback will restore the previous transaction-local setting.
+        with suppress(Exception):
+            session.execute(
+                sqlalchemy.text("SET LOCAL statement_timeout = DEFAULT"),
+            )
+        max_statement_ms = timing["max_ms"]
+        if max_statement_ms >= threshold_warning_ms:
+            logger.warning(
+                "Query used %.0f ms of %d ms timeout (%.0f%%) - called from %s:%d",
+                max_statement_ms,
+                timeout_ms,
+                max_statement_ms / timeout_ms * 100,
+                caller.filename,
+                caller.lineno,
+            )
+
+
+@contextmanager
+def time_limit(session: orm.Session, timeout_ms: int) -> Generator[None, None, None]:
+    """Limit SQL work performed by an active session.
+
+    The limit applies only while this context is active. SQLite uses a
+    progress handler, while PostgreSQL uses its transaction-local
+    ``statement_timeout`` setting. The timeout is approximate for SQLite and
+    is measured per statement for PostgreSQL.
+
+    Args:
+        session: Active SQLAlchemy session to limit
+        timeout_ms: Positive time limit in milliseconds
+
+    Yields:
+        Control to the operation being limited
+
+    Raises:
+        TypeError: If ``timeout_ms`` is not an integer or the session uses an
+            unsupported database driver
+        InvalidTimeoutError: If ``timeout_ms`` is not positive
+
+    """
+    if timeout_ms <= 0:
+        msg = "timeout_ms must be positive"
+        raise exc.InvalidTimeoutError(msg)
+
+    # TimeoutError is explicitly raised by the dialect-specific implementations.
+    raw_connection = session.connection().connection.driver_connection
+    # NOTE: Skip both this generator and contextlib's __enter__ frame so the
+    # fallback is the actual caller when it lives outside the package.
+    caller = utils.first_party_caller(inspect.stack()[2:])
+    threshold_warning_ms = 0.5 * timeout_ms
+
+    if isinstance(raw_connection, sqlite3.Connection):
+        with _sqlite_time_limit(
+            raw_connection,
+            timeout_ms,
+            caller,
+            threshold_warning_ms,
+        ):
+            yield
+    elif "psycopg" in type(raw_connection).__module__:
+        with _psycopg_time_limit(
+            session,
+            timeout_ms,
+            caller,
+            threshold_warning_ms,
+        ):
+            yield
+    else:
+        msg = "unsupported database driver for time_limit"
+        raise TypeError(msg)
 
 
 def is_postgres_url(s: str) -> bool:

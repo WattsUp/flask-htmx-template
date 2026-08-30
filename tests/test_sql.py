@@ -1,16 +1,25 @@
 from __future__ import annotations
 
+import inspect
+import logging
+import sqlite3
 from typing import cast, TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import orm
+import sqlalchemy.event
+from sqlalchemy import orm, text
+from sqlalchemy.exc import OperationalError
 
+from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql
 from flask_htmx_template.models.config import Config, ConfigKey
 
 if TYPE_CHECKING:
-    import sqlite3
+    from collections.abc import Callable
     from pathlib import Path
+
+    from _pytest.logging import LogCaptureFixture
 
 
 class ORMBase(orm.DeclarativeBase):
@@ -25,6 +34,14 @@ class ORMBase(orm.DeclarativeBase):
 
 class Child(ORMBase):
     __tablename__ = "child"
+
+
+class UnsupportedConnection:
+    __module__ = "unsupported_driver"
+
+
+class PsycopgConnection:
+    __module__ = "psycopg.testing"
 
 
 @pytest.fixture(autouse=True)
@@ -197,3 +214,210 @@ def test_get_engine_postgres_ssl_mode() -> None:
         assert engine is not None
     finally:
         sql._POSTGRES_SSL_MODE = original
+
+
+def test_time_limit_sqlite_completion(session: orm.Session) -> None:
+    with sql.time_limit(session, 1_000):
+        result = session.execute(text("SELECT 1")).scalar_one()
+
+    assert result == 1
+
+
+def test_time_limit_sqlite_timeout(session: orm.Session) -> None:
+    query = text(
+        "WITH RECURSIVE counter(value) AS ("
+        "SELECT 1 UNION ALL SELECT value + 1 FROM counter) "
+        "SELECT value FROM counter",
+    )
+
+    with (
+        pytest.raises(TimeoutError, match="exceeded time limit"),
+        sql.time_limit(
+            session,
+            1,
+        ),
+    ):
+        list(session.execute(query))
+
+
+def test_time_limit_sqlite_cleanup() -> None:
+    connection = MagicMock(spec=sqlite3.Connection)
+    caller = inspect.stack()[0]
+    error = OperationalError(None, {}, RuntimeError("interrupted"))
+
+    with (
+        pytest.raises(TimeoutError),
+        sql._sqlite_time_limit(
+            connection,
+            1_000,
+            caller,
+            500,
+        ),
+    ):
+        raise error
+
+    assert connection.set_progress_handler.call_count == 2
+    connection.set_progress_handler.assert_any_call(None, 2_000)
+
+
+def test_time_limit_sqlite_warning(
+    session: orm.Session,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: LogCaptureFixture,
+) -> None:
+    timestamps = iter((0.0, 0.0, 0.6))
+    monkeypatch.setattr(sql.time, "perf_counter", lambda: next(timestamps))
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger=sql.__name__,
+        ),
+        sql.time_limit(session, 1_000),
+    ):
+        session.execute(text("SELECT 1")).scalar_one()
+
+    assert any(
+        "Query used 600 ms of 1000 ms timeout" in record.message
+        for record in caplog.records
+    )
+
+
+@pytest.fixture
+def postgres_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[MagicMock, dict[str, list[tuple[str, object]]]]:
+    raw_connection = PsycopgConnection()
+    sa_connection = MagicMock()
+    sa_connection.connection.driver_connection = raw_connection
+    session = MagicMock()
+    session.connection.return_value = sa_connection
+    events: dict[str, list[tuple[str, object]]] = {"listen": [], "remove": []}
+
+    def listen(
+        _target: object,
+        identifier: str,
+        callback: object,
+    ) -> None:
+        events["listen"].append((identifier, callback))
+
+    def remove(
+        _target: object,
+        identifier: str,
+        callback: object,
+    ) -> None:
+        events["remove"].append((identifier, callback))
+
+    monkeypatch.setattr(sqlalchemy.event, "listen", listen)
+    monkeypatch.setattr(sqlalchemy.event, "remove", remove)
+    return session, events
+
+
+def test_time_limit_postgres_completion(
+    postgres_session: tuple[MagicMock, dict[str, list[tuple[str, object]]]],
+) -> None:
+    session, events = postgres_session
+
+    with sql.time_limit(session, 1_000):
+        session.execute(text("SELECT 1"))
+
+    statements = [str(call.args[0]) for call in session.execute.call_args_list]
+    assert statements == [
+        "SET LOCAL statement_timeout = 1000",
+        "SELECT 1",
+        "SET LOCAL statement_timeout = DEFAULT",
+    ]
+    assert events["remove"] == events["listen"]
+
+
+def test_time_limit_postgres_timeout(
+    postgres_session: tuple[MagicMock, dict[str, list[tuple[str, object]]]],
+) -> None:
+    session, events = postgres_session
+    session.execute.side_effect = [
+        None,
+        OperationalError("SELECT 1", {}, RuntimeError("cancelled")),
+        None,
+    ]
+
+    with (
+        pytest.raises(TimeoutError, match="exceeded time limit"),
+        sql.time_limit(
+            session,
+            1_000,
+        ),
+    ):
+        session.execute(text("SELECT 1"))
+
+    assert len(events["remove"]) == 2
+    assert events["remove"] == events["listen"]
+    assert str(session.execute.call_args_list[-1].args[0]) == (
+        "SET LOCAL statement_timeout = DEFAULT"
+    )
+
+
+def test_time_limit_postgres_warning(
+    postgres_session: tuple[MagicMock, dict[str, list[tuple[str, object]]]],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: LogCaptureFixture,
+) -> None:
+    session, events = postgres_session
+    timestamps = iter((0.0, 0.6))
+    monkeypatch.setattr(sql.time, "perf_counter", lambda: next(timestamps))
+
+    def execute(statement: object) -> None:
+        if str(statement) == "SELECT 1":
+            callback = cast("Callable[..., object]", events["listen"][0][1])
+            callback()
+
+    session.execute.side_effect = execute
+
+    with (
+        caplog.at_level(
+            logging.WARNING,
+            logger=sql.__name__,
+        ),
+        sql.time_limit(session, 1_000),
+    ):
+        session.execute(text("SELECT 1"))
+        callback = cast("Callable[..., object]", events["listen"][1][1])
+        callback()
+
+    assert any(
+        "Query used 600 ms of 1000 ms timeout" in record.message
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize("timeout_ms", [0, -1])
+def test_time_limit_rejects_nonpositive_timeout(
+    session: orm.Session,
+    timeout_ms: int,
+) -> None:
+    with (
+        pytest.raises(exc.InvalidTimeoutError, match="timeout_ms must be positive"),
+        sql.time_limit(
+            session,
+            timeout_ms,
+        ),
+    ):
+        pass
+
+
+def test_time_limit_rejects_unsupported_driver() -> None:
+    raw_connection = UnsupportedConnection()
+    sa_connection = MagicMock()
+    sa_connection.connection.driver_connection = raw_connection
+    session = MagicMock()
+    session.connection.return_value = sa_connection
+
+    with (
+        pytest.raises(TypeError, match="unsupported database driver"),
+        sql.time_limit(
+            session,
+            1_000,
+        ),
+    ):
+        pass
+
+    session.execute.assert_not_called()
