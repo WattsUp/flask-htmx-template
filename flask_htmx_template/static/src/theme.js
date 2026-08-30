@@ -1,5 +1,6 @@
 "use strict";
 const themeEdit = {
+  _hasEdits: false,
   _timer: null,
 
   /**
@@ -36,6 +37,7 @@ const themeEdit = {
   },
 
   _schedulePreview() {
+    this._hasEdits = true;
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this._preview(), 400);
   },
@@ -48,6 +50,29 @@ const themeEdit = {
     const mood = htmx.find("#theme-mood-select").value;
     htmx.find("#theme-mood-hidden").value = mood;
     const link = htmx.find("#theme-live");
+    link.onload = () => {
+      // NOTE: Theme-dependent UI must update after the browser applies CSS.
+      if (typeof pluginColor !== "undefined") pluginColor.update();
+      if (typeof pluginTreeColor !== "undefined") pluginTreeColor.update();
+      if (typeof updateColorSwatches !== "undefined") updateColorSwatches();
+    };
     link.href = `/theme.css?swatch=${encodeURIComponent(swatch)}&mood=${encodeURIComponent(mood)}`;
+  },
+
+  /** Restore the configured default theme after discarding a preview. */
+  reset() {
+    clearTimeout(this._timer);
+    this._timer = null;
+    if (this._hasEdits) {
+      const link = htmx.find("#theme-live");
+      link.onload = () => {
+        // NOTE: Theme-dependent UI must update after the browser applies CSS.
+        if (typeof pluginColor !== "undefined") pluginColor.update();
+        if (typeof pluginTreeColor !== "undefined") pluginTreeColor.update();
+        if (typeof updateColorSwatches !== "undefined") updateColorSwatches();
+      };
+      link.href = "/theme.css";
+    }
+    this._hasEdits = false;
   },
 };
