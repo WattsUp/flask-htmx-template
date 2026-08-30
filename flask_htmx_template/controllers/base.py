@@ -28,7 +28,7 @@ from flask.typing import RouteCallable
 from mcp_types import ToolAnnotations
 
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql, utils
+from flask_htmx_template import parsing, sql, utils
 from flask_htmx_template.models.base import BaseEnum
 from flask_htmx_template.version import __version__
 
@@ -699,7 +699,7 @@ def validate_date(
     """
     value = value.strip()
     try:
-        date = utils.parse_date(value)
+        date = parsing.date(value)
     except ValueError:
         return "Unable to parse"
     if date is None:
@@ -856,7 +856,7 @@ def parse_date(
 
     """
     try:
-        date = utils.parse_date(value)
+        date = parsing.date(value)
     except ValueError as e:
         msg = "Unable to parse date"
         raise exc.InvalidDateError(msg) from e

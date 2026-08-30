@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import ast
 import calendar
+import contextlib
 import datetime
 import logging
 import operator as op
 import re
 import shutil
 import sys
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import (
     cast,
@@ -20,6 +21,7 @@ from typing import (
 )
 
 from flask_htmx_template import exceptions as exc
+from flask_htmx_template import parsing
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -27,8 +29,7 @@ if TYPE_CHECKING:
 
 _REGEX_CC_SC_0 = re.compile(r"(.)([A-Z][a-z]+)")
 _REGEX_CC_SC_1 = re.compile(r"([a-z0-9])([A-Z])")
-
-_REGEX_REAL_CLEAN = re.compile(r"[^0-9\.]")
+_REGEX_REAL_STATEMENT_LITERAL = re.compile(r"(?:(?:[eE][+-])|[^()+\-*/])+")
 
 REAL_OPERATORS: dict[type[ast.operator], Callable[[Decimal, Decimal], Decimal]] = {
     ast.Add: op.add,
@@ -127,7 +128,19 @@ def camel_to_snake(s: str) -> str:
 
 def _eval_node(node: ast.expr) -> Decimal:
     if isinstance(node, ast.Constant):
-        if isinstance(node.value, int | float | str):
+        if isinstance(node.value, str):
+            literal = node.value.strip()
+            with contextlib.suppress(InvalidOperation):
+                literal = format(Decimal(literal), "f")
+            try:
+                value = parsing.real(literal, precision=None)
+            except InvalidOperation:
+                value = None
+            if value is None:
+                msg = f"Unable to parse numeric literal: {literal!r}"
+                raise exc.EvaluationError(msg) from None
+            return value
+        if isinstance(node.value, int | float):
             return Decimal(node.value)
         msg = f"Unknown constant type: {node.value}({type(node.value)})"
         raise TypeError(msg)
@@ -146,7 +159,7 @@ def evaluate_real_statement(s: str | None, precision: int = 2) -> Decimal | None
     """Evaluate statement, using Decimal for numbers.
 
     Args:
-        s: String statement
+        s: Arithmetic statement whose literals may include currency formatting
         precision: Number of digits to round number to
 
     Returns:
@@ -155,61 +168,14 @@ def evaluate_real_statement(s: str | None, precision: int = 2) -> Decimal | None
     """
     if s is None:
         return None
+    # NOTE: Keep exponent signs inside numeric literals while leaving arithmetic
+    # operators unquoted for the AST to interpret.
+    s = _REGEX_REAL_STATEMENT_LITERAL.sub(lambda match: repr(match.group()), s)
     try:
         value = _eval_node(ast.parse(s, mode="eval").body)
     except (exc.EvaluationError, SyntaxError, TypeError):
         return None
     return round(value, precision)
-
-
-def parse_real(s: str | None, precision: int = 2) -> Decimal | None:
-    """Parse a string into a real number.
-
-    Args:
-        s: String to parse
-        precision: Number of digits to round number to
-
-    Returns:
-        String as number
-
-    """
-    if s is None:
-        return None
-    clean = _REGEX_REAL_CLEAN.sub("", s)
-    if not clean:
-        return None
-    value = -Decimal(clean) if "-" in s or "(" in s else Decimal(clean)
-    return round(value, precision)
-
-
-def parse_bool(s: str | None) -> bool | None:
-    """Parse a string into a bool.
-
-    Args:
-        s: String to parse
-
-    Returns:
-        Parsed bool
-
-    """
-    if s is None or not s:
-        return None
-    return s.lower() in {"true", "t", "1"}
-
-
-def parse_date(s: str | None) -> datetime.date | None:
-    """Parse isoformat date.
-
-    Args:
-        s: String to parse
-
-    Returns:
-        Date or None
-
-    """
-    if s is None or not s:
-        return None
-    return datetime.date.fromisoformat(s)
 
 
 def format_days(days: int, labels: list[str] | None = None) -> str:

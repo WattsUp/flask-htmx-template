@@ -39,6 +39,8 @@ def test_camel_to_snake(s: str, c: str) -> None:
         ("(+21.3e-5*-.1234e5/81.7)*100", Decimal("-3.22")),
         ("-1*2", Decimal(-2)),
         ("1*2", Decimal(2)),
+        ("$1,000.00", Decimal("1000.00")),
+        ("$1,000.00 + $2,000.00", Decimal("3000.00")),
         ("-1*-2", Decimal(2)),
         ("-1*(-2)", Decimal(2)),
         ("2>3", None),
@@ -54,51 +56,6 @@ def test_evaluate_real_statement(s: str | None, target: Decimal | None) -> None:
 def test_eval_node_unknown() -> None:
     with pytest.raises(exc.EvaluationError):
         utils._eval_node(ast.expr())
-
-
-@pytest.mark.parametrize(
-    ("s", "precision", "target"),
-    [
-        (None, 2, None),
-        ("", 2, None),
-        ("Not a number", 2, None),
-        ("1000.1", 2, Decimal("1000.1")),
-        ("1000", 2, Decimal(1000)),
-        ("$1,000.101", 2, Decimal("1000.1")),
-        ("$1,000.101", 3, Decimal("1000.101")),
-        ("-$1,000.101", 2, Decimal("-1000.1")),
-        ("-$1,000.101", 3, Decimal("-1000.101")),
-    ],
-)
-def test_parse_real(s: str | None, precision: int, target: Decimal | None) -> None:
-    assert utils.parse_real(s, precision=precision) == target
-
-
-@pytest.mark.parametrize(
-    ("s", "target"),
-    [
-        ("", None),
-        ("TRUE", True),
-        ("FALSE", False),
-        ("t", True),
-        ("f", False),
-        ("1", True),
-        ("0", False),
-    ],
-)
-def test_parse_bool(s: str, target: bool | None) -> None:
-    assert utils.parse_bool(s) == target
-
-
-@pytest.mark.parametrize(
-    ("s", "target"),
-    [
-        ("", None),
-        ("2024-01-01", datetime.date(2024, 1, 1)),
-    ],
-)
-def test_parse_date(s: str, target: datetime.date | None) -> None:
-    assert utils.parse_date(s) == target
 
 
 @pytest.mark.parametrize(
