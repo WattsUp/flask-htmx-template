@@ -25,6 +25,7 @@ __all__ = [
     "InvalidKeyError",
     "InvalidORMValueError",
     "InvalidTableError",
+    "InvalidTimeoutError",
     "InvalidURIError",
     "MigrationRequiredError",
     "MultipleResultsFound",
@@ -104,6 +105,10 @@ class InvalidORMValueError(Exception):
 
 class InvalidTableError(Exception):
     """Error when tabular data cannot be formatted."""
+
+
+class InvalidTimeoutError(Exception):
+    """Error when a timeout value is invalid."""
 
 
 class EvaluationError(Exception):

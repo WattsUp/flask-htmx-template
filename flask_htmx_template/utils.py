@@ -8,6 +8,7 @@ import contextlib
 import datetime
 import logging
 import operator as op
+import pathlib
 import re
 import shutil
 import sys
@@ -25,7 +26,12 @@ from flask_htmx_template import exceptions as exc
 from flask_htmx_template import parsing
 
 if TYPE_CHECKING:
+    import inspect
     from collections.abc import Callable
+
+
+_PACKAGE_DIR = pathlib.Path(__file__).parent
+_UTILS_PATH = pathlib.Path(__file__)
 
 
 _REGEX_CC_SC_0 = re.compile(r"(.)([A-Z][a-z]+)")
@@ -94,6 +100,30 @@ MONTHS = [
     "November",
     "December",
 ]
+
+
+def first_party_caller(stack: list[inspect.FrameInfo]) -> inspect.FrameInfo:
+    """Return the first frame belonging to this package.
+
+    Frames from the standard library and third-party libraries are skipped so
+    diagnostics identify the application query that initiated an operation.
+
+    Args:
+        stack: Stack frames from ``inspect.stack()``
+
+    Returns:
+        First frame inside the package, or the first entry when none match
+
+    """
+    for frame in stack:
+        try:
+            frame_path = pathlib.Path(frame.filename)
+            if frame_path != _UTILS_PATH and frame_path.is_relative_to(_PACKAGE_DIR):
+                return frame
+        except ValueError:  # pragma: no cover
+            # Paths on different drives cannot be compared on Windows.
+            continue
+    return stack[0]
 
 
 class Downsampled(NamedTuple):

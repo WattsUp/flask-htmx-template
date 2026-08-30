@@ -178,6 +178,28 @@ docker run \
 | `WEB_N_THREADS`    | `1`                 | Threads per worker                            |
 | `WEB_TIMEOUT`      | `30`                | Worker silent timeout (seconds)               |
 
+### Database Query Time Limits
+
+Use `sql.time_limit()` inside an active SQLAlchemy session to bound a specific
+query or group of queries:
+
+```python
+from sqlalchemy import text
+
+from flask_htmx_template import sql
+
+with database.begin_session() as session:
+    with sql.time_limit(session, timeout_ms=2_000):
+        result = session.execute(text("SELECT 1")).scalar_one()
+```
+
+Timeouts must be positive integers in milliseconds. SQLite limits are
+approximate because they're checked between virtual-machine instruction
+batches. PostgreSQL applies the limit to each statement in the context. A
+PostgreSQL cancellation can leave the transaction aborted, so callers that
+catch `TimeoutError` may need to roll it back. Unsupported database drivers
+raise `TypeError`.
+
 ---
 
 ## PostgreSQL Deployment
