@@ -10,7 +10,20 @@ from flask_htmx_template.models.item import Item
 from flask_htmx_template.utils import MIN_STR_LEN
 
 if TYPE_CHECKING:
+    from sqlalchemy import orm
+
     from tests.conftest import RandomStringGenerator
+
+
+@pytest.fixture(autouse=True)
+def session(session: orm.Session) -> orm.Session:
+    """Activate the shared database session for this module.
+
+    Returns:
+        Active database session
+
+    """
+    return session
 
 
 @pytest.fixture

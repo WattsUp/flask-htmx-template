@@ -20,9 +20,7 @@ from mcp_types import (
 from mcp_types import INTERNAL_ERROR as MCP_INTERNAL_ERROR
 from mcp_types import INVALID_PARAMS as MCP_INVALID_PARAMS
 from mcp_types import METHOD_NOT_FOUND as MCP_METHOD_NOT_FOUND
-from mcp_types import (
-    TextContent,
-)
+from mcp_types import TextContent
 
 from flask_htmx_template import controllers
 from flask_htmx_template import exceptions as exc

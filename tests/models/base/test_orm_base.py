@@ -216,7 +216,7 @@ def test_no_uri() -> None:
         _ = no_uri.uri
 
 
-def test_comparators_same_session() -> None:
+def test_comparators_same_session(session: orm.Session) -> None:
     parent_a = Parent.create()
     parent_b = Parent.create()
 
@@ -240,7 +240,10 @@ def test_map_name_none() -> None:
         Base.map_name()
 
 
-def test_map_name_parent(rand_str_generator: RandomStringGenerator) -> None:
+def test_map_name_parent(
+    session: orm.Session,
+    rand_str_generator: RandomStringGenerator,
+) -> None:
     parent_a = Parent.create(name=rand_str_generator())
     parent_b = Parent.create(name=rand_str_generator())
 

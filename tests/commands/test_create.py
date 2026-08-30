@@ -4,7 +4,10 @@ import argparse
 import sys
 from typing import override, TYPE_CHECKING
 
-from flask_htmx_template.commands.create import Create
+from flask_htmx_template.commands.create import (
+    Create,
+    DATABASE_ALREADY_INITIALIZED_EXIT_CODE,
+)
 from flask_htmx_template.database import SQLiteDatabase
 
 if TYPE_CHECKING:
@@ -95,7 +98,7 @@ def test_create_postgres_already_exists(
 ) -> None:
     postgres_database_generator()
     c = Create(postgres_database_generator.url, force=False)
-    assert c.run() == -1
+    assert c.run() == DATABASE_ALREADY_INITIALIZED_EXIT_CODE
 
     captured = capsys.readouterr()
     assert not captured.out

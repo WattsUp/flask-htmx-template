@@ -249,21 +249,15 @@ def args[T: tuple[object, ...]](
         TypeError: If ``type_`` is not a ``NamedTuple`` subclass.
 
     """
-    candidate = cast("object", type_)
-    if (
-        not isinstance(candidate, type)
-        or not issubclass(candidate, tuple)
-        or not hasattr(candidate, "_fields")
-        or not hasattr(candidate, "_field_defaults")
-    ):
+    if not hasattr(type_, "_fields") or not hasattr(type_, "_field_defaults"):
         msg = "type_ must be a NamedTuple subclass"
         raise TypeError(msg)
 
-    namespace = vars(candidate)
+    namespace = vars(type_)
     fields = cast("tuple[str, ...]", namespace["_fields"])
     defaults = cast("dict[str, object]", namespace["_field_defaults"])
     hints = get_type_hints(
-        candidate,
+        type_,
         localns={"datetime": datetime},
         include_extras=True,
     )
@@ -295,7 +289,7 @@ def args[T: tuple[object, ...]](
     errors.extend(
         f"{name} is not recognized" for name in sorted(query_args) if name not in fields
     )
-    constructor = cast("Callable[..., T]", candidate)
+    constructor = cast("Callable[..., T]", type_)
     return constructor(**values), errors
 
 

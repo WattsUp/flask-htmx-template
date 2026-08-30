@@ -20,7 +20,11 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
-DEFAULT_URL = "http://127.0.0.1:5000/mcp"
+_DEFAULT_SCHEME = "http"
+_DEFAULT_HOST = "127.0.0.1"
+_DEFAULT_PORT = 5000
+_DEFAULT_PATH = "/mcp"
+DEFAULT_URL = f"{_DEFAULT_SCHEME}://{_DEFAULT_HOST}:{_DEFAULT_PORT}{_DEFAULT_PATH}"
 DEFAULT_ENV = "BEARER_TOKEN"
 
 type JSONValue = str | int | float | bool | list[JSONValue] | JSONObject | None

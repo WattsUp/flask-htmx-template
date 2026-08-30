@@ -11,11 +11,14 @@ from flask_htmx_template.models.item import Item
 if TYPE_CHECKING:
     import datetime
 
+    from sqlalchemy import orm
+
     from tests.conftest import RandomStringGenerator
 
 
 def test_init_properties(
     rand_str_generator: RandomStringGenerator,
+    session: orm.Session,
     today: datetime.date,
     today_ord: int,
 ) -> None:

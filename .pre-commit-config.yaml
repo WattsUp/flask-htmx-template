@@ -1,17 +1,17 @@
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.15.20
+    rev: v0.16.5
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
   - repo: https://github.com/DetachHead/basedpyright-prek-mirror
-    rev: 1.38.0
+    rev: 1.39.10
     hooks:
       - id: basedpyright
         language: system
   - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+    rev: 9.0.1
     hooks:
       - id: isort
   - repo: https://github.com/psf/black
@@ -20,47 +20,47 @@ repos:
       - id: black
         types: [python]
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-ast
-      - id: check-byte-order-marker
-        exclude: ^tests/data
       - id: check-builtin-literals
       - id: check-case-conflict
       - id: check-docstring-first
       - id: check-executables-have-shebangs
-      - id: check-shebang-scripts-are-executable
-      - id: check-merge-conflict
       - id: check-json
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
       - id: check-toml
+      - id: check-vcs-permalinks
       - id: check-xml
       - id: check-yaml
-      - id: check-vcs-permalinks
       - id: debug-statements
-      - id: check-symlinks
       - id: destroyed-symlinks
       - id: detect-private-key
       - id: end-of-file-fixer
         exclude: ^LICENSE|\.(html|csv|txt|svg|py)$
+      - id: fix-byte-order-marker
+        exclude: ^tests/data
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
       - id: pretty-format-json
         args: ["--autofix", "--no-ensure-ascii", "--no-sort-keys"]
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
         exclude: \.(html|svg)$
-      - id: mixed-line-ending
-        args: [--fix=lf]
-      - id: no-commit-to-branch
-        args: ["--branch", "main"]
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
+    rev: v2.4.3
     hooks:
       - id: codespell
         exclude: ^tests/data
         additional_dependencies:
           - tomli
   - repo: https://github.com/Riverside-Healthcare/djLint
-    rev: v1.36.4
+    rev: v1.44.2
     hooks:
       - id: djlint-jinja
   - repo: https://github.com/ComPWA/taplo-pre-commit
@@ -68,16 +68,11 @@ repos:
     hooks:
       - id: taplo-format
   - repo: https://github.com/google/yamlfmt
-    rev: v0.13.0
+    rev: v0.21.0
     hooks:
       - id: yamlfmt
   - repo: local
     hooks:
-      - id: prettier
-        name: prettier
-        entry: npx prettier --write
-        language: node
-        files: \.(md|jinja|css|js)$
       - id: grep-console
         name: grep-console
         entry: console.log
@@ -95,6 +90,17 @@ repos:
         language: pygrep
         files: \.(py|jinja|js|css|sh|toml|yaml|yml|md|adoc|rst|txt)$
         exclude: ^\.pre-commit-config\.yaml$
+      - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: node
+        files: \.(md|jinja|css|js)$
+      - id: remove-test-phase-comments
+        name: remove test phase comments
+        entry: >-
+          sed -i -E '/^[[:space:]]*#[[:space:]]*(Arrange|Act|Assert)[[:space:]]*$/Id'
+        language: system
+        files: ^tests/.*\.py$
       - id: vale
         name: vale
         entry: vale

@@ -351,3 +351,24 @@ def test_delete_not_found(web_client: WebClient) -> None:
     )
 
     assert "errors" in result
+
+
+def test_delete_referenced_item_returns_error(
+    web_client: WebClient,
+    item: Item,
+    session: orm.Session,
+    today_ord: int,
+) -> None:
+    with session.begin_nested():
+        Item.create(
+            name="Apples",
+            date_ord=today_ord,
+            other_id=item.id_,
+        )
+
+    result, _ = web_client.DELETE_J(
+        ("items.json", {"uri": item.uri}),
+        rc=HTTP_CODE_BAD_REQUEST,
+    )
+
+    assert "errors" in result
