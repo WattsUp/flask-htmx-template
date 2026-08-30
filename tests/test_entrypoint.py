@@ -145,7 +145,6 @@ def test_entrypoint_initializes_database(
     create_result: str,
     expected_actions: Sequence[str],
 ) -> None:
-    # Arrange
     database: Path | str = (
         entrypoint_runner.sqlite_path
         if database_kind == "sqlite"
@@ -155,10 +154,8 @@ def test_entrypoint_initializes_database(
         assert isinstance(database, Path)
         database.touch()
 
-    # Act
     result = entrypoint_runner.run(database, create_result=create_result)
 
-    # Assert
     assert result.returncode == 0
     cli_calls = [
         call for call in entrypoint_runner.commands if call[0] == "flask_htmx_template"
@@ -185,13 +182,10 @@ def test_entrypoint_initializes_database(
 def test_entrypoint_stops_on_postgres_creation_failure(
     entrypoint_runner: EntrypointRunner,
 ) -> None:
-    # Arrange
     database = "postgres://test:test@localhost/test"
 
-    # Act
     result = entrypoint_runner.run(database, create_result="failure")
 
-    # Assert
     assert result.returncode == 1
     assert entrypoint_runner.commands == [
         ["flask_htmx_template", "--database", database, "create"],

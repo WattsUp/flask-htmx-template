@@ -73,6 +73,12 @@ repos:
       - id: yamlfmt
   - repo: local
     hooks:
+      - id: remove-test-phase-comments
+        name: remove test phase comments
+        entry: >-
+          sed -i -E '/^[[:space:]]*#[[:space:]]*(Arrange|Act|Assert)[[:space:]]*$/Id'
+        language: system
+        files: ^tests/.*\.py$
       - id: prettier
         name: prettier
         entry: npx prettier --write

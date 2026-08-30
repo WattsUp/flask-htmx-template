@@ -189,3 +189,67 @@ def test_run_standard_maps_targeted_files_and_directories(
         "flask_htmx_template/controllers/api_docs/json.py",
     )
     assert result == 0
+
+
+def test_run_standard_targets_tools_with_source_override(
+    live_commands: list[tuple[str, ...]],
+) -> None:
+    source_arguments = [Path("tools")]
+
+    result = run_coverage.run_standard(source_arguments)
+
+    assert live_commands == [
+        ("coverage", "erase"),
+        (
+            "coverage",
+            "run",
+            "--source=tools",
+            "-m",
+            "pytest",
+            "tests/tools",
+        ),
+        ("coverage", "report", "tools/mcp_connect.py", "tools/run_coverage.py"),
+    ]
+    assert result == 0
+
+
+def test_run_cases_targets_tools_with_source_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_path = Path("tools/run_coverage.py")
+    commands: list[tuple[str, ...]] = []
+
+    def run_command(
+        command: Sequence[str],
+        environment: Mapping[str, str],
+    ) -> subprocess.CompletedProcess[str]:
+        """Return successful synthetic coverage subprocess results.
+
+        Returns:
+            A successful completed subprocess result.
+
+        """
+        commands.append(tuple(command))
+        assert "COVERAGE_FILE" in environment
+        if command[1] == "json":
+            output_path = Path(command[command.index("-o") + 1])
+            _write_coverage_json(output_path, source_path)
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    monkeypatch.setattr(run_coverage, "run_command", run_command)
+    coverage_case = run_coverage.CoverageCase(
+        source_path,
+        Path("tests/tools/test_run_coverage.py"),
+    )
+
+    result = run_coverage.run_cases([coverage_case])
+
+    assert commands[0] == (
+        "coverage",
+        "run",
+        "--source=tools",
+        "-m",
+        "pytest",
+        "tests/tools/test_run_coverage.py",
+    )
+    assert result == 0

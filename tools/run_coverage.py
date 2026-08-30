@@ -21,7 +21,13 @@ if TYPE_CHECKING:
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = Path("flask_htmx_template")
+TOOLS_ROOT = Path("tools")
+SOURCE_ROOTS = (SOURCE_ROOT, TOOLS_ROOT)
 TEST_ROOT = Path("tests")
+TEST_ROOTS = {
+    SOURCE_ROOT: TEST_ROOT,
+    TOOLS_ROOT: TEST_ROOT / TOOLS_ROOT,
+}
 REQUIRED_COVERAGE_PERCENT = 100.0
 BRANCH_ARC_LENGTH = 2
 
@@ -79,21 +85,37 @@ def normalize_source_path(raw_path: Path) -> Path:
         raw_path: User-provided source file or directory.
 
     Returns:
-        A normalized path rooted under the source package.
+        A normalized path rooted under a configured source root.
 
     Raises:
-        ValueError: If the path is outside the source package or does not exist.
+        ValueError: If the path is outside configured roots or does not exist.
 
     """
     source_path = Path(os.path.normpath(raw_path))
-    source_parents = {source_path, *source_path.parents}
-    if source_path.is_absolute() or SOURCE_ROOT not in source_parents:
-        message = f"Source path must begin with {SOURCE_ROOT}/: {raw_path}"
+    if find_source_root(source_path) is None:
+        roots = " or ".join(f"{root}/" for root in SOURCE_ROOTS)
+        message = f"Source path must begin with {roots}: {raw_path}"
         raise ValueError(message)
     if not (REPOSITORY_ROOT / source_path).exists():
         message = f"Source path does not exist: {source_path}"
         raise ValueError(message)
     return source_path
+
+
+def find_source_root(source_path: Path) -> Path | None:
+    """Find the configured source root containing a path.
+
+    Args:
+        source_path: Relative source path to inspect.
+
+    Returns:
+        The matching source root, or None when the path is outside all roots.
+
+    """
+    if source_path.is_absolute():
+        return None
+    source_parents = {source_path, *source_path.parents}
+    return next((root for root in SOURCE_ROOTS if root in source_parents), None)
 
 
 def expand_source_paths(raw_paths: Sequence[Path]) -> list[Path]:
@@ -148,11 +170,16 @@ def find_test_path(source_path: Path) -> Path:
         ValueError: If no corresponding test target exists.
 
     """
-    source_relative = source_path.relative_to(SOURCE_ROOT)
-    test_parent = TEST_ROOT / source_relative.parent
+    source_root = find_source_root(source_path)
+    if source_root is None:
+        message = f"Source path is outside configured roots: {source_path}"
+        raise ValueError(message)
+    source_relative = source_path.relative_to(source_root)
+    test_root = TEST_ROOTS[source_root]
+    test_parent = test_root / source_relative.parent
     candidates = (
         test_parent / f"test_{source_path.name}",
-        TEST_ROOT / source_relative.with_suffix(""),
+        test_root / source_relative.with_suffix(""),
         test_parent,
     )
     for candidate in candidates:
@@ -178,12 +205,44 @@ def find_target_test_path(source_path: Path) -> Path:
     absolute_source_path = REPOSITORY_ROOT / source_path
     if absolute_source_path.is_file():
         return find_test_path(source_path)
-    source_relative = source_path.relative_to(SOURCE_ROOT)
-    test_path = TEST_ROOT / source_relative
+    source_root = find_source_root(source_path)
+    if source_root is None:
+        message = f"Source path is outside configured roots: {source_path}"
+        raise ValueError(message)
+    source_relative = source_path.relative_to(source_root)
+    test_path = TEST_ROOTS[source_root] / source_relative
     if (REPOSITORY_ROOT / test_path).is_dir():
         return test_path
     message = f"Could not find a targeted test for source path: {source_path}"
     raise ValueError(message)
+
+
+def coverage_source_option(source_paths: Sequence[Path]) -> tuple[str, ...]:
+    """Build a Coverage source override for non-default source roots.
+
+    Args:
+        source_paths: Normalized source paths included in a coverage run.
+
+    Returns:
+        A command-line source option, or an empty tuple for the default root.
+
+    Raises:
+        ValueError: If a path is outside the configured source roots.
+
+    """
+    # NOTE: pyproject.toml measures only the application package by default, so
+    # non-default roots need an explicit Coverage source override.
+    source_roots: set[Path] = set()
+    for source_path in source_paths:
+        source_root = find_source_root(source_path)
+        if source_root is None:
+            message = f"Source path is outside configured roots: {source_path}"
+            raise ValueError(message)
+        source_roots.add(source_root)
+    if not source_roots or source_roots == {SOURCE_ROOT}:
+        return ()
+    roots = sorted(source_roots, key=Path.as_posix)
+    return (f"--source={','.join(root.as_posix() for root in roots)}",)
 
 
 def make_cases(source_paths: Sequence[Path]) -> list[CoverageCase]:
@@ -407,9 +466,17 @@ def run_standard(source_arguments: Sequence[Path]) -> int:
             {find_target_test_path(path) for path in source_paths},
         )
         report_paths = sorted(set(expand_source_paths(source_paths)))
+        source_option = coverage_source_option(source_paths)
         commands = (
             ("coverage", "erase"),
-            ("coverage", "run", "-m", "pytest", *(str(path) for path in test_paths)),
+            (
+                "coverage",
+                "run",
+                *source_option,
+                "-m",
+                "pytest",
+                *(str(path) for path in test_paths),
+            ),
             ("coverage", "report", *(str(path) for path in report_paths)),
         )
     for command in commands:
@@ -438,7 +505,14 @@ def run_cases(cases: Sequence[CoverageCase]) -> int:
             environment = os.environ.copy()
             environment["COVERAGE_FILE"] = str(temp_dir / f"coverage-{index}")
             test_result = run_command(
-                ("coverage", "run", "-m", "pytest", str(case.test_path)),
+                (
+                    "coverage",
+                    "run",
+                    *coverage_source_option([case.source_path]),
+                    "-m",
+                    "pytest",
+                    str(case.test_path),
+                ),
                 environment,
             )
             if test_result.returncode != 0:
@@ -507,7 +581,11 @@ def main(command_line: list[str] | None = None) -> int:
         nargs="*",
         type=Path,
         metavar="SOURCE_PATH",
-        help=f"source file or directory under {SOURCE_ROOT} (default: all)",
+        help=(
+            "source file or directory under "
+            f"{', '.join(root.as_posix() for root in SOURCE_ROOTS)} "
+            f"(default: {SOURCE_ROOT})"
+        ),
     )
     argcomplete.autocomplete(parser)
     arguments = parser.parse_args(command_line)
