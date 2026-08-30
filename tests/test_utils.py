@@ -40,7 +40,7 @@ def test_camel_to_snake(s: str, c: str) -> None:
         ("-1*2", Decimal(-2)),
         ("1*2", Decimal(2)),
         ("$1,000.00", Decimal("1000.00")),
-        ("$1,000.00 + $2,000.00", Decimal("3000.00")),
+        ("£1,000.00 + ¥2,000.00", Decimal("3000.00")),
         ("-1*-2", Decimal(2)),
         ("-1*(-2)", Decimal(2)),
         ("2>3", None),

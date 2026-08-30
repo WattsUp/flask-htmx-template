@@ -11,6 +11,7 @@ import operator as op
 import re
 import shutil
 import sys
+import unicodedata
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import (
@@ -126,12 +127,35 @@ def camel_to_snake(s: str) -> str:
     return _REGEX_CC_SC_1.sub(r"\1_\2", s).lower()  # _ at then end of Words
 
 
+def _is_real_literal_character(char: str) -> bool:
+    """Check whether a character is valid numeric display formatting.
+
+    Args:
+        char: Character to check
+
+    Returns:
+        Whether the character may appear in a numeric literal
+
+    """
+    # NOTE: Unicode category Sc covers currency symbols without maintaining a
+    # hard-coded list of dollars, euros, pounds, yen, and other currencies.
+    return (
+        (char.isascii() and char.isdecimal())
+        or char in ".,"
+        or char.isspace()
+        or unicodedata.category(char) == "Sc"
+    )
+
+
 def _eval_node(node: ast.expr) -> Decimal:
     if isinstance(node, ast.Constant):
         if isinstance(node.value, str):
             literal = node.value.strip()
             with contextlib.suppress(InvalidOperation):
                 literal = format(Decimal(literal), "f")
+            if not all(_is_real_literal_character(char) for char in literal):
+                msg = f"Unsupported numeric literal: {literal!r}"
+                raise exc.EvaluationError(msg)
             try:
                 value = parsing.real(literal, precision=None)
             except InvalidOperation:
