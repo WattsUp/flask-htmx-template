@@ -39,7 +39,7 @@ Column = (
 )
 ColumnClause = sqlalchemy.ColumnElement[bool]
 
-__all__ = ["case", "time_limit"]
+__all__ = ["case"]
 
 logger = logging.getLogger(__name__)
 
