@@ -231,7 +231,7 @@ def test_ruff_ignore(path: Path) -> None:
             "typing-only-standard-library-import",
         }
 
-    re_noqa = re.compile(r"ruff: ignore\[([\w, -]+)\]")
+    re_noqa = re.compile(r"ruff: (?:file-)?ignore\[([\w, -]+)\]")
     errors: list[str] = []
 
     for i, line in enumerate(lines):

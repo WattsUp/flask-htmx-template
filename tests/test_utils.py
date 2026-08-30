@@ -58,6 +58,26 @@ def test_eval_node_unknown() -> None:
         utils._eval_node(ast.expr())
 
 
+def test_eval_node_rejects_malformed_numeric_literal() -> None:
+    node = ast.Constant(value="..")
+
+    with pytest.raises(exc.EvaluationError, match="Unable to parse numeric literal"):
+        utils._eval_node(node)
+
+
+def test_eval_node_accepts_numeric_constant() -> None:
+    result = utils._eval_node(ast.Constant(value=3))
+
+    assert result == Decimal(3)
+
+
+def test_eval_node_rejects_unknown_constant_type() -> None:
+    node = ast.Constant(value=None)
+
+    with pytest.raises(TypeError, match="Unknown constant type"):
+        utils._eval_node(node)
+
+
 @pytest.mark.parametrize(
     ("d", "target"),
     [
