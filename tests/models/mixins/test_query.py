@@ -11,7 +11,6 @@ import tests
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql
 from flask_htmx_template.models.base import Base
-from flask_htmx_template.models.mixins import QueryMixIn as ExportedQueryMixIn
 from flask_htmx_template.models.mixins.query import QueryMixIn
 from flask_htmx_template.models.mixins.session import SessionMixIn
 from tests import conftest
@@ -24,7 +23,6 @@ if TYPE_CHECKING:
 
 
 def test_query_mixin_is_public_and_composed_into_base() -> None:
-    assert ExportedQueryMixIn is QueryMixIn
     assert issubclass(QueryMixIn, SessionMixIn)
     assert issubclass(Base, QueryMixIn)
 

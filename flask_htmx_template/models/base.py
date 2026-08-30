@@ -12,7 +12,8 @@ from sqlalchemy import CheckConstraint, orm, types
 
 from flask_htmx_template import exceptions as exc
 from flask_htmx_template import sql, utils
-from flask_htmx_template.models import base_uri, mixins
+from flask_htmx_template.models import base_uri
+from flask_htmx_template.models.mixins.query import QueryMixIn
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
@@ -30,9 +31,6 @@ ORMStr = orm.Mapped[str]
 ORMStrOpt = orm.Mapped[str | None]
 ORMReal = orm.Mapped[Decimal]
 ORMRealOpt = orm.Mapped[Decimal | None]
-
-QueryMixIn = mixins.QueryMixIn
-SessionMixIn = mixins.SessionMixIn
 
 
 class NamePair(NamedTuple):
