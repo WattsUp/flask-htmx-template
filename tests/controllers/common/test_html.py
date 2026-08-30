@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from flask_htmx_template import web_theme
+from flask_htmx_template.controllers.common import ctx
 
 if TYPE_CHECKING:
     from tests.controllers.conftest import WebClient
@@ -155,3 +156,25 @@ def test_theme_save_invalid_mood(web_client: WebClient) -> None:
         "common.theme",
         data={"swatch": "#3f6837", "mood": "INVALID"},
     )
+
+
+def test_theme_delete_refreshes_page(web_client: WebClient) -> None:
+    result, headers = web_client.DELETE("common.theme")
+
+    assert not result
+    assert headers["HX-Refresh"] == "true"
+
+
+def test_theme_delete_expires_theme_cookies(web_client: WebClient) -> None:
+    _set_cookies(web_client, "#ff5500", web_theme.Mood.EXPRESSIVE.name)
+
+    _, headers = web_client.DELETE("common.theme")
+
+    all_cookies = headers.get_all("Set-Cookie")
+    assert len(all_cookies) == 2
+    for name in (ctx.COOKIE_SWATCH, ctx.COOKIE_MOOD):
+        cookie = next(cookie for cookie in all_cookies if cookie.startswith(f"{name}="))
+        assert f"{name}=;" in cookie
+        assert "Max-Age=0" in cookie
+        assert "Path=/" in cookie
+        assert "SameSite=Lax" in cookie

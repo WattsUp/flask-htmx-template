@@ -17,7 +17,7 @@
     max="359"
     autocomplete="off"
   />
-  <label class="input-outlined col-span-full input-bg-surface-container-high">
+  <label class="input-outlined col-span-2 input-bg-surface-container-high">
     <select id="theme-mood-select" autocomplete="off">
       {% for m in moods %}
         <option value="{{ m.name }}">{{ m.pretty }}</option>
@@ -27,6 +27,16 @@
       <div>Mood</div>
     </div>
   </label>
+  <button
+    class="col-span-2 btn-outlined"
+    title="Reset to site default"
+    hx-delete="{{ url_for('common.theme') }}"
+    hx-disabled-elt="this"
+    hx-target="body"
+  >
+    <icon>undo</icon>
+    Default
+  </button>
 
   {# Live palette preview -- updates automatically as CSS variables change #}
   <div class="rounded bg-primary p-1 text-on-primary">Text</div>

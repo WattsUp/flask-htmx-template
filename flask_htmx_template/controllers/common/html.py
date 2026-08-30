@@ -53,9 +53,23 @@ def theme_css() -> flask.Response:
     )
 
 
+def _theme_delete() -> flask.Response:
+    """Clear the saved theme and request a page refresh.
+
+    Returns:
+        Response that expires the theme cookies and refreshes the page.
+
+    """
+    response = flask.make_response("")
+    response.headers["HX-Refresh"] = "true"
+    for name in (ctx.COOKIE_SWATCH, ctx.COOKIE_MOOD):
+        response.delete_cookie(name, path="/", samesite="Lax")
+    return response
+
+
 @auth_ctx.login_exempt
 def theme() -> str | flask.Response:
-    """GET and PUT the theme editor dialog.
+    """GET, PUT, and DELETE the theme editor dialog.
 
     Returns:
         Theme editor, validation error, or update response.
@@ -71,6 +85,9 @@ def theme() -> str | flask.Response:
             mood=selection.mood.name,
             moods=list(web_theme.Mood),
         )
+
+    if flask.request.method == "DELETE":
+        return _theme_delete()
 
     swatch = flask.request.form.get("swatch", "").strip()
     mood_name = flask.request.form.get("mood", "").strip()
@@ -145,6 +162,6 @@ ROUTES: base.Routes = {
     "/favicon.ico": (favicon, ["GET"]),
     "/status": (page_status, ["GET"]),
     "/theme.css": (theme_css, ["GET"]),
-    "/h/theme": (theme, ["GET", "PUT"]),
+    "/h/theme": (theme, ["GET", "PUT", "DELETE"]),
     "/d/style-test": (page_style_test, ["GET"]),
 }

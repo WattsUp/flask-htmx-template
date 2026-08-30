@@ -11,6 +11,7 @@ const dialog = {
       this.confirm("Discard draft?", "Discard", () => {
         this.pending = false;
         htmx.find("#dialog").innerHTML = "";
+        themeEdit.reset();
       });
       return;
     }
@@ -29,6 +30,7 @@ const dialog = {
   reset() {
     this.pending = false;
     if (location.hash == "#dialog") history.back();
+    themeEdit.reset();
   },
   /**
    * Check if all required element are populated
