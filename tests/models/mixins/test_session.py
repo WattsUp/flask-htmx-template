@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+from contextvars import Context
+
 import anyio
+import pytest
 from sqlalchemy import orm
 
+from flask_htmx_template import exceptions as exc
 from flask_htmx_template.models.base import Base
+from flask_htmx_template.models.mixins import SessionMixIn as ExportedSessionMixIn
+from flask_htmx_template.models.mixins.session import SessionMixIn
 
 
 async def _capture_task_local_sessions(
@@ -56,6 +62,16 @@ async def _capture_task_local_sessions(
     assert observed_first is not None
     assert observed_second is not None
     return observed_first, observed_second
+
+
+def test_session_mixin_is_public_and_composed_into_base() -> None:
+    assert ExportedSessionMixIn is SessionMixIn
+    assert Base.session.__func__ is SessionMixIn.session.__func__
+
+
+def test_unbound_error() -> None:
+    with pytest.raises(exc.UnboundExecutionError):
+        Context().run(Base.session)
 
 
 def test_active_session_is_task_local_under_concurrency(

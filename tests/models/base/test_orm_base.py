@@ -1,157 +1,23 @@
 from __future__ import annotations
 
-import re
-from contextvars import Context
 from decimal import Decimal
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from sqlalchemy import ForeignKey, orm
+from sqlalchemy import orm
 from sqlalchemy.dialects.sqlite import dialect as sqlite_dialect
 
-import flask_htmx_template
-import tests
 from flask_htmx_template import exceptions as exc
-from flask_htmx_template import sql
-from flask_htmx_template.models.base import (
-    Base,
-    BaseEnum,
-    Decimal6,
-    ORMInt,
-    ORMIntOpt,
-    ORMRealOpt,
-    ORMStrOpt,
-    SQLEnum,
-    string_column_args,
-)
-from tests import conftest
+from flask_htmx_template.models.base import Base, Decimal6
+from tests.models.base.conftest import Child, Derived, NoURI, Parent
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Mapping
+    from collections.abc import Callable
 
     from flask_htmx_template.models.base import (
         NamePair,
     )
     from tests.conftest import RandomStringGenerator
-
-
-class Bytes:
-    def __init__(self, s: str) -> None:
-        self._data = s.encode(encoding="utf-8")
-
-    def __eq__(self, other: Bytes | object) -> bool:
-        return isinstance(other, Bytes) and self._data == other._data
-
-    def __hash__(self) -> int:
-        return hash(self._data)
-
-
-class Derived(BaseEnum):
-    RED = 1
-    BLUE = 2
-    SEAFOAM_GREEN = 3
-
-    @classmethod
-    def lut(cls) -> Mapping[str, Derived]:
-        return {"r": cls.RED, "b": cls.BLUE}
-
-
-class Parent(Base, skip_register=True):
-    __tablename__ = "parent"
-    __table_id__ = 0xF0000000
-
-    generic_column: ORMIntOpt
-    name: ORMStrOpt
-    children: orm.Mapped[list[Child]] = orm.relationship(back_populates="parent")
-
-    __table_args__ = (*string_column_args("name"),)
-
-    _SEARCH_PROPERTIES = ("name",)
-
-    @orm.validates("name")
-    def validate_strings(self, key: str, field: str | None) -> str | None:
-        return self.clean_strings(key, field)
-
-    @property
-    def favorite_child(self) -> Child | None:
-        if len(self.children) < 1:
-            return None
-        return self.children[0]
-
-    @property
-    def uri_bytes(self) -> Bytes:
-        return Bytes(self.uri)
-
-
-class Child(Base, skip_register=True):
-    __tablename__ = "child"
-    __table_id__ = 0xE0000000
-
-    parent_id: ORMInt = orm.mapped_column(ForeignKey("parent.id_"))
-    parent: orm.Mapped[Parent] = orm.relationship(back_populates="children")
-    name: ORMStrOpt
-
-    height: ORMRealOpt = orm.mapped_column(Decimal6)
-
-    color: orm.Mapped[Derived | None] = orm.mapped_column(SQLEnum(Derived))
-
-    __table_args__ = (*string_column_args("name", lower_check=True),)
-
-    @orm.validates("height")
-    def validate_decimals(self, key: str, field: Decimal | None) -> Decimal | None:
-        return self.clean_decimals(key, field)
-
-
-class NoURI(Base, skip_register=True):
-    __tablename__ = "no_uri"
-    __table_id__ = None
-
-
-@pytest.fixture
-def session(tmp_path: Path) -> Generator[orm.Session]:
-    """Create SQL session.
-
-    Args:
-        tmp_path: Temp path to create DB in
-
-    Yields:
-        Session generator
-
-    """
-    path = tmp_path / "sql.db"
-    s = orm.Session(sql.get_engine(path))
-    with s.begin_nested():
-        Base.metadata.create_all(
-            s.get_bind(),
-            tables=[Parent.sql_table(), Child.sql_table()],
-        )
-    with Base.set_session(s):
-        yield s
-
-
-@pytest.fixture
-def parent(session: orm.Session) -> Parent:
-    """Create a Parent.
-
-    Returns:
-        Parent
-
-    """
-    with session.begin_nested():
-        return Parent.create()
-
-
-@pytest.fixture
-def child(session: orm.Session, parent: Parent) -> Child:
-    """Create a Child.
-
-    Returns:
-        Child
-
-    """
-    with session.begin_nested():
-        return Child.create(parent=parent)
 
 
 def test_init_properties(parent: Parent) -> None:
@@ -316,17 +182,6 @@ def test_clean_decimals() -> None:
     assert child.height == Decimal("1.234567")
 
 
-def test_query_kwargs() -> None:
-    with pytest.raises(exc.NoKeywordArgumentsError):
-        # Intentional bad argument
-        Parent.query(kw=None)  # type: ignore[attr-defined]
-
-
-def test_unbound_error() -> None:
-    with pytest.raises(exc.UnboundExecutionError):
-        Context().run(Base.session)
-
-
 def noop[T](x: T) -> T:
     return x
 
@@ -377,138 +232,3 @@ def test_find_missing(parent: Parent) -> None:
         Parent.find(query, cache)
 
     assert not cache
-
-
-def test_delete(session: orm.Session, parent: Parent) -> None:
-    with session.begin_nested():
-        parent.delete()
-    assert not sql.any_(Parent.query())
-
-
-def test_all(parent: Parent) -> None:
-    assert Parent.all() == [parent]
-
-
-def test_one(parent: Parent) -> None:
-    assert Parent.one() == parent
-
-
-def test_first(parent: Parent) -> None:
-    assert Parent.first() == parent
-
-
-def test_count(parent: Parent) -> None:
-    assert Parent.count() == 1
-
-
-re_check_no_session_add = re.compile(r"^ *(s|session)\.add\(\w+\)")
-re_check_no_model_new = re.compile(
-    "|".join(rf"\b{m.__name__}\(" for m in Base._MODELS),
-)
-re_check_no_session_query = re.compile(r"[( ](s|session)\.query\(")
-re_check_no_scalar_query = re.compile(r"(\w*)\.scalar\(")
-re_check_no_query_one = re.compile(r"(\w*)\.one\(")
-re_check_no_query_all = re.compile(r"(\w*)\.all\(")
-re_check_no_query_col0 = re.compile(r"for \w+,? in query")
-
-
-def check_no_session_add(line: str) -> str:
-    if re_check_no_session_add.match(line):
-        return "Use of session.add found, use Model.create()"
-    return ""
-
-
-def check_no_model_new(line: str) -> str:
-    if not line.startswith("class") and re_check_no_model_new.search(line):
-        return "Use of Model(...) found, use Model.create()"
-    return ""
-
-
-def check_no_session_query(line: str) -> str:
-    if re_check_no_session_query.search(line):
-        return "Use of session.query found, use Model.query()"
-    return ""
-
-
-def check_no_query_with_entities(line: str) -> str:
-    if ".with_entities" in line:
-        return "Use of with_entities found, use Model.query(col, ...)"
-    return ""
-
-
-def check_no_query_scalar(line: str) -> str:
-    if (m := re_check_no_scalar_query.search(line)) and m.group(1) != "sql":
-        return "Use of query.scalar found, use sql.scalar()"
-    return ""
-
-
-def check_no_query_one(line: str) -> str:
-    if not (m := re_check_no_query_one.search(line)):
-        return ""
-    g = m.group(1)
-    if (g and g[0] == g[0].upper()) or g == "sql":
-        # use of Model.one()
-        return ""
-    return "Use of query.one found, use sql.one()"
-
-
-def check_no_query_all(line: str) -> str:
-    if not (m := re_check_no_query_all.search(line)):
-        return ""
-    g = m.group(1)
-    if (g and g[0] == g[0].upper()) or g == "sql":
-        # use of Model.all()
-        return ""
-    return "Use of query.all found, use sql.yield_()"
-
-
-def check_no_query_col0(line: str) -> str:
-    if re_check_no_query_col0.search(line):
-        return "Use of first column iterator found, use sql.col0()"
-    return ""
-
-
-@pytest.mark.parametrize(
-    "path",
-    sorted(
-        [
-            *Path(flask_htmx_template.__file__).parent.glob("**/*.py"),
-            *Path(tests.__file__).parent.glob("**/*.py"),
-        ],
-    ),
-    ids=conftest.id_func,
-)
-def test_use_of_mixins(path: Path) -> None:
-    lines = path.read_text("utf-8").splitlines()
-
-    ignore = "# flask_htmx_template: ignore[mixins]"
-
-    errors: list[str] = []
-
-    for i, line in enumerate(lines):
-        checks = [
-            check_no_query_col0(line),
-        ]
-        if "(" in line:
-            checks.extend(
-                [
-                    check_no_session_add(line),
-                    check_no_model_new(line),
-                    check_no_session_query(line),
-                    check_no_query_with_entities(line),
-                    check_no_query_scalar(line),
-                    check_no_query_one(line),
-                    check_no_query_all(line),
-                ],
-            )
-        checks = [f"{path:}:{i + 1}: {c}" for c in checks if c]
-        if checks:
-            if not line.endswith(ignore):
-                errors.extend(checks)
-        elif line.endswith(ignore):
-            errors.append(
-                f"{path}:{i + 1}: Use of unnecessary '{ignore}'",
-            )
-
-    print("\n".join(errors))
-    assert not errors
